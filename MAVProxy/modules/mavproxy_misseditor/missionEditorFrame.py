@@ -21,7 +21,7 @@ from MAVProxy.modules.mavproxy_misseditor import me_defines
 from MAVProxy.modules.lib import mp_elevation
 
 from MAVProxy.modules.mavproxy_misseditor import button_renderer
-from pymavlink import mavutil
+from pymavlink import mavutil, mavwp
 
 #define column names via "enums":
 ME_COMMAND_COL = 0
@@ -208,6 +208,8 @@ class MissionEditorFrame(wx.Frame):
         wx.Frame.__init__(self, *args, **kwds)
         self.CreateStatusBar()
         self.mission_revision = 0
+        self.mission_modified = False
+        self.home_received = False
         self.ftp_revision = None
         self.label_sync_state = wx.StaticText(self, wx.ID_ANY, "UNSYNCED   \n", style=wx.ALIGN_CENTRE)
         self.label_wp_radius = wx.StaticText(self, wx.ID_ANY, "WP Radius")
@@ -236,6 +238,8 @@ class MissionEditorFrame(wx.Frame):
         self.button_add_wp = wx.Button(self, wx.ID_ANY, "Add Below")
         self.button_split = wx.Button(self, wx.ID_ANY, "Split")
         self.button_height_profile = wx.Button(self, wx.ID_ANY, "Height Profile")
+        self.button_survey = wx.Button(self, wx.ID_ANY, "Survey")
+        self.button_survey.Disable()
 
         self.__set_properties()
         self.__do_layout()
@@ -271,6 +275,8 @@ class MissionEditorFrame(wx.Frame):
         self.Bind(wx.EVT_BUTTON, self.add_wp_below_pushed, self.button_add_wp)
         self.Bind(wx.EVT_BUTTON, self.split_pushed, self.button_split)
         self.Bind(wx.EVT_BUTTON, self.height_profile_pushed, self.button_height_profile)
+        self.Bind(wx.EVT_BUTTON, self.survey_pushed, self.button_survey)
+        self.Bind(wx.EVT_UPDATE_UI, self.update_survey_button, self.button_survey)
         # end wxGlade
 
         #use a timer to facilitate event an event handlers for events
@@ -306,7 +312,10 @@ class MissionEditorFrame(wx.Frame):
             self.read_only_attr = wx.grid.GridCellAttr()
             self.read_only_attr.SetReadOnly(True)
             self.grid_mission.SetColAttr(ME_DIST_COL, self.read_only_attr)
+            # SetColAttr takes ownership of one reference per column.
+            self.read_only_attr.IncRef()
             self.grid_mission.SetColAttr(ME_ANGLE_COL, self.read_only_attr)
+            self.read_only_attr.IncRef()
             self.grid_mission.SetColAttr(ME_AGL_COL, self.read_only_attr)
         self.grid_mission.SetRowLabelSize(50)
 
@@ -332,7 +341,7 @@ class MissionEditorFrame(wx.Frame):
                         self.button_read_wps, self.button_write_wps,
                         self.checkbox_mavftp,
                         self.button_load_wp_file,
-                        self.button_add_wp, self.button_split):
+                        self.button_add_wp, self.button_split, self.button_survey):
             control.Hide()
         for column in (ME_DELETE_COL, ME_UP_COL, ME_DOWN_COL):
             self.grid_mission.SetColSize(column, 0)
@@ -455,6 +464,7 @@ class MissionEditorFrame(wx.Frame):
         sizer_16.Add(self.button_split, 0, 0, 0)
         sizer_16.Add((20, 20), 0, 0, 0)
         sizer_16.Add(self.button_height_profile, 0, 0, 0)
+        sizer_16.Add(self.button_survey, 0, 0, 0)
         sizer_3.Add(sizer_16, 0, wx.EXPAND, 0)
         self.SetSizer(sizer_3)
         self.Layout()
@@ -480,20 +490,20 @@ class MissionEditorFrame(wx.Frame):
             self.check_terrain_pending()
             self.check_height_profile()
             return
-        event_processed = False
         queue_access_start_time = time.time()
-        self.gui_event_queue_lock.acquire()
-        while (not self.gui_event_queue.empty()) and (time.time() < queue_access_start_time) < 0.6:
-            event_processed = True
-            event = self.gui_event_queue.get()
+        events = []
+        with self.gui_event_queue_lock:
+            while not self.gui_event_queue.empty() and time.time() - queue_access_start_time < 0.6:
+                events.append(self.gui_event_queue.get())
+        # Handlers can publish a map snapshot on the outgoing queue. Release
+        # the incoming lock first: the event thread takes these in reverse order.
+        for event in events:
             try:
                 self.process_gui_event(event)
             except Exception as e:
                 print("Caught exception (%s)" % str(e))
 
-        self.gui_event_queue_lock.release()
-
-        if (event_processed == True):
+        if events:
             #redraw window to apply changes
             self.Refresh()
             self.Update()
@@ -502,15 +512,21 @@ class MissionEditorFrame(wx.Frame):
         self.check_height_profile()
 
     def process_gui_event(self, event):
-        if event.get_type() == me_event.MEGE_FTP_MISSION:
+        if event.get_type() == me_event.MEGE_LOAD_MISSION:
+            if self.mission_modified:
+                self.SetStatusText('Controller mission changed; local edits kept. Read WPs to replace them.')
+                return
+            self.load_wploader(event.get_arg('wploader'))
+        elif event.get_type() in (me_event.MEGE_FTP_MISSION, me_event.MEGE_READ_MISSION):
+            protocol = 'MAVFTP' if event.get_type() == me_event.MEGE_FTP_MISSION else 'MAVLink'
             self.button_read_wps.Enable()
             self.button_write_wps.Enable()
             if self.mission_revision != self.ftp_revision:
-                self.SetStatusText('MAVFTP: Read completed; local edits kept. Read again to replace them.')
+                self.SetStatusText('%s: Read completed; local edits kept. Read again to replace them.' % protocol)
                 return
             loader = event.get_arg('wploader')
             self.load_wploader(loader)
-            self.SetStatusText('MAVFTP: Read succeeded (%u waypoints)' % loader.count())
+            self.SetStatusText('%s: Read succeeded (%u waypoints)' % (protocol, loader.count()))
         elif event.get_type() == me_event.MEGE_FTP_TRANSFER:
             self.SetStatusText(event.get_arg("message"))
             self.button_read_wps.Enable()
@@ -518,6 +534,7 @@ class MissionEditorFrame(wx.Frame):
             if event.get_arg("success") and self.mission_revision == self.ftp_revision:
                 self.set_modified_state(False)
         elif event.get_type() == me_event.MEGE_CLEAR_MISS_TABLE:
+            self.home_received = False
             self.grid_mission.ClearGrid()
             if (self.grid_mission.GetNumberRows() > 0):
                 self.grid_mission.DeleteRows(0,
@@ -546,6 +563,7 @@ class MissionEditorFrame(wx.Frame):
             command = event.get_arg("command")
 
             if row == -1:
+                self.home_received = True
                 #1st mission item is special: it's the immutable home position
                 self.label_home_lat_value.SetLabel(
                         str(event.get_arg("lat")))
@@ -655,17 +673,56 @@ class MissionEditorFrame(wx.Frame):
             num_remaining = num_remaining - 1
 
     def set_modified_state(self, modified):
+        self.mission_modified = modified
         if (modified):
             self.mission_revision += 1
-            self.set_grad_dist()
-            self.set_agl()
             self.label_sync_state.SetLabel("MODIFIED")
             self.label_sync_state.SetForegroundColour(wx.Colour(255, 0, 0))
+            self.update_map_mission(True)
+            try:
+                self.set_grad_dist()
+                self.set_agl()
+            except (ValueError, OverflowError):
+                # Keep incomplete numeric edits dirty until the user fixes them.
+                pass
         else:
             self.label_sync_state.SetLabel("SYNCED")
             self.label_sync_state.SetForegroundColour(wx.Colour(12, 152, 26))
+            self.update_map_mission(False)
+
+    def update_map_mission(self, modified):
+        '''Publish a display-only draft; never change the vehicle transfer loader.'''
+        if self.read_only:
+            return
+        if modified and not self.home_received:
+            return
+        loader = None
+        if modified:
+            loader = mavwp.MAVWPLoader()
+            try:
+                loader.add(mavutil.mavlink.MAVLink_mission_item_message(
+                    0, 0, 0, 0, mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 0, 1,
+                    0, 0, 0, 0, float(self.label_home_lat_value.GetLabel()),
+                    float(self.label_home_lon_value.GetLabel()), float(self.label_home_alt_value.GetLabel())))
+                for row in range(self.grid_mission.GetNumberRows()):
+                    command = self.grid_mission.GetCellValue(row, ME_COMMAND_COL)
+                    command_id = me_defines.cmd_reverse_lookup(command) or int(command)
+                    params = [float(self.grid_mission.GetCellValue(row, col)) for col in range(1, 8)]
+                    if not all(math.isfinite(value) for value in params[4:]):
+                        return
+                    frame = me_defines.frame_enum_rev[self.grid_mission.GetCellValue(row, ME_FRAME_COL)]
+                    loader.add(mavutil.mavlink.MAVLink_mission_item_message(
+                        0, 0, row + 1, frame, command_id, 0, 1, *params))
+            except (ValueError, KeyError):
+                # A cell is incomplete: keep the last valid map until corrected.
+                return
+        with self.event_queue_lock:
+            self.event_queue.put(MissionEditorEvent(me_event.MEE_MAP_MISSION, wploader=loader))
 
     def read_wp_pushed(self, event):  # wxGlade: MissionEditorFrame.<event_handler>
+        self.grid_mission.SaveEditControlValue()
+        self.grid_mission.DisableCellEditControl()
+        self.ftp_revision = self.mission_revision
         if self.checkbox_mavftp.GetValue():
             self.ftp_transfer_started("Reading waypoints")
         self.event_queue_lock.acquire()
@@ -679,9 +736,6 @@ class MissionEditorFrame(wx.Frame):
 
         self.event_queue_lock.release()
         event.Skip()
-
-        if not self.checkbox_mavftp.GetValue():
-            self.set_modified_state(False)
 
     def ftp_transfer_started(self, message):
         self.ftp_revision = self.mission_revision
@@ -784,11 +838,98 @@ class MissionEditorFrame(wx.Frame):
                     str(self.last_map_click_pos[1]))
         #highlight new row
         self.grid_mission.SelectRow(row_selected+1)
+        self.fix_jumps(row_selected+1, 1)
         self.set_modified_state(True)
 
-        self.fix_jumps(row_selected+1, 1)
-
         event.Skip()
+
+    def survey_origin(self):
+        '''Return a selected location, rejecting empty and non-location items.'''
+        row = self.grid_mission.GetGridCursorRow()
+        if self.read_only or not 0 <= row < self.grid_mission.GetNumberRows():
+            return None
+        command = self.grid_mission.GetCellValue(row, ME_COMMAND_COL)
+        command_id = me_defines.cmd_reverse_lookup(command)
+        if not command_id:
+            try:
+                command_id = int(command)
+            except ValueError:
+                return None
+        if not self.has_location_cmd(command_id):
+            return None
+        try:
+            lat = float(self.grid_mission.GetCellValue(row, ME_LAT_COL))
+            lon = float(self.grid_mission.GetCellValue(row, ME_LON_COL))
+        except ValueError:
+            return None
+        if not (math.isfinite(lat) and math.isfinite(lon)
+                and -90 < lat < 90 and -180 <= lon <= 180):
+            return None
+        return (lat, lon) if (lat, lon) != (0, 0) else None
+
+    def update_survey_button(self, event):
+        event.Enable(self.survey_origin() is not None)
+
+    def survey_snapshot(self):
+        '''Ignore derived display columns, which may change as terrain arrives.'''
+        return (tuple(tuple(self.grid_mission.GetCellValue(row, col) for col in range(9))
+                      for row in range(self.grid_mission.GetNumberRows())),
+                self.label_home_lat_value.GetLabel(), self.label_home_lon_value.GetLabel(),
+                self.label_home_alt_value.GetLabel(), self.home_received)
+
+    def send_survey_preview(self, points):
+        with self.event_queue_lock:
+            self.event_queue.put(MissionEditorEvent(me_event.MEE_SURVEY_PREVIEW, points=points))
+
+    def survey_pushed(self, event):
+        self.grid_mission.SaveEditControlValue()
+        self.grid_mission.DisableCellEditControl()
+        origin = self.survey_origin()
+        if origin is None:
+            return
+        from MAVProxy.modules.mavproxy_misseditor.survey_dialog import SurveyDialog
+        row = self.grid_mission.GetGridCursorRow()
+        try:
+            dialog = SurveyDialog(self, row, origin,
+                                  self.grid_mission.GetCellValue(row, ME_FRAME_COL),
+                                  self.grid_mission.GetCellValue(row, ME_ALT_COL))
+        except ValueError as ex:
+            self.SetStatusText(str(ex))
+            return
+        try:
+            dialog.ShowModal()
+        finally:
+            dialog.Destroy()
+            self.send_survey_preview([])
+
+    def insert_survey(self, row, points, height, frame):
+        '''Insert after the anchor; sequence zero (home) is outside the grid.'''
+        # Validate jump fields before mutating the grid, so fix_jumps is atomic.
+        for i in range(self.grid_mission.GetNumberRows()):
+            if self.grid_mission.GetCellValue(i, ME_COMMAND_COL) in ('DO_JUMP', 'DO_CONDITION_JUMP'):
+                try:
+                    int(float(self.grid_mission.GetCellValue(i, ME_P1_COL)))
+                except (ValueError, OverflowError):
+                    raise ValueError('Fix the invalid jump target at waypoint %u first' % (i + 1))
+        insertion = row + 1
+        self.grid_mission.BeginBatch()
+        try:
+            self.grid_mission.InsertRows(insertion, len(points))
+            for offset, (lat, lon) in enumerate(points):
+                target = insertion + offset
+                self.prep_new_row(target)
+                self.grid_mission.SetCellValue(target, ME_LAT_COL, '%.8f' % lat)
+                self.grid_mission.SetCellValue(target, ME_LON_COL, '%.8f' % lon)
+                self.grid_mission.SetCellValue(target, ME_ALT_COL, str(height))
+                self.grid_mission.SetCellValue(target, ME_FRAME_COL, frame)
+            # Targets are mission sequences (grid row + 1). Shift every
+            # displaced original item, retaining jumps to the anchor/home.
+            self.fix_jumps(insertion, len(points))
+            self.grid_mission.SetGridCursor(insertion, ME_COMMAND_COL)
+            self.grid_mission.SelectRow(insertion)
+            self.set_modified_state(True)
+        finally:
+            self.grid_mission.EndBatch()
 
     def split_pushed(self, event):  # wxGlade: MissionEditorFrame.<event_handler>
         row_selected = self.grid_mission.GetGridCursorRow()
@@ -827,9 +968,8 @@ class MissionEditorFrame(wx.Frame):
         self.grid_mission.SetCellValue(row_selected, ME_ALT_COL, str(alt))
         #highlight new row
         self.grid_mission.SelectRow(row_selected)
-        self.set_modified_state(True)
-
         self.fix_jumps(row_selected, 1)
+        self.set_modified_state(True)
 
         event.Skip()
 
@@ -892,8 +1032,8 @@ class MissionEditorFrame(wx.Frame):
             if (result == wx.ID_YES):
                 #delete this row
                 self.grid_mission.DeleteRows(row)
-                self.set_modified_state(True)
                 self.fix_jumps(row, -1)
+                self.set_modified_state(True)
         #up column?
         elif (event.GetCol() == ME_UP_COL):
             row = event.GetRow()
