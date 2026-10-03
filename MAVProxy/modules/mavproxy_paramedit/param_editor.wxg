@@ -93,6 +93,7 @@
                                         <option>0</option>
                                         <object class="wxCheckBox" name="checkbox_mavftp" base="EditCheckBox">
                                             <label>MAVFTP</label>
+                                            <tooltip>Use MAVFTP for Fetch all</tooltip>
                                             <checked>1</checked>
                                         </object>
                                     </object>

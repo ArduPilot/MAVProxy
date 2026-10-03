@@ -41,6 +41,7 @@ class ParamEditorFrame(wx.Frame):
         self.write_params = wx.Button(self, wx.ID_ANY, ("Write"))
         self.checkbox_mavftp = wx.CheckBox(self, wx.ID_ANY, "MAVFTP")
         self.checkbox_mavftp.SetValue(True)
+        self.checkbox_mavftp.SetToolTip("Use MAVFTP for Fetch all")
         self.search_key = wx.TextCtrl(self, wx.ID_ANY, "")
         self.param_status = (0,0)
         self.param_label = wx.StaticText(self, wx.ID_ANY, "Status: " + str(self.param_status[0]) + "/ " + str(self.param_status[1]), style=wx.ALIGN_CENTRE)
@@ -299,10 +300,6 @@ class ParamEditorFrame(wx.Frame):
             self.param_status = event.get_arg("pstatus")
             self.param_label.SetLabel("Status: " + str(self.param_status[0]) + "/ " + str(self.param_status[1]))
             name = event.get_arg("paramid")
-            if ('submitted' in event.arg_dict and name in self.modified_param and
-                    self.modified_param[name] != event.get_arg("submitted")):
-                # Preserve edits made while the FTP upload was in flight.
-                return
             if event.get_arg("paramid") in self.param_received.keys():
                 self.param_received[name] = event.get_arg("paramvalue")
                 if event.get_arg("paramid") in self.modified_param.keys():
@@ -504,12 +501,9 @@ class ParamEditorFrame(wx.Frame):
         event.Skip()
 
     def write_param(self, event):  # wxGlade: ParamEditor.<event_handler>
-        if self.checkbox_mavftp.GetValue():
-            self.ftp_transfer_started("Writing changed parameters")
         param = [param for param, value in self.modified_param.items()]
         self.event_queue.put(ParamEditorEvent(ph_event.PEE_WRITE_PARAM,
-                                              modparam=dict(self.modified_param),
-                                              use_ftp=self.checkbox_mavftp.GetValue()))
+                                              modparam=dict(self.modified_param)))
         for row in range(self.display_list.GetNumberRows()):
             if self.display_list.GetCellValue(row, PE_PARAM) in param:
                 self.display_list.SetCellBackgroundColour(row, PE_VALUE,
