@@ -11,6 +11,7 @@ import math
 import os
 import queue
 import threading
+import time
 import urllib.request
 import warnings
 
@@ -43,8 +44,15 @@ warnings.filterwarnings(
     module=r"quantized_mesh_tile\.terrain")
 
 
+def wrap_longitude(lon):
+    '''a longitude, or a difference of two, as the one from -180 up to 180
+    it is.  Differences wrapped take the short way round, so that either side
+    of the antimeridian is next to the other rather than the world apart'''
+    return (lon + 180.0) % 360.0 - 180.0
+
+
 def enu(lat, lon, h, lat0, lon0):
-    e = math.radians(lon - lon0) * R * math.cos(math.radians(lat0))
+    e = math.radians(wrap_longitude(lon - lon0)) * R * math.cos(math.radians(lat0))
     n = math.radians(lat - lat0) * R
     return e, n, h
 
@@ -65,13 +73,30 @@ def np_rgb_to_texture(img):
     return tex
 
 
-def fetch_terrain_tile(z, x, y):
+def fetch_terrain_tile(z, x, y, timeout=30):
     path = os.path.join(CACHE_DIR, str(z), str(x), "%d.terrain" % y)
     if not os.path.exists(path):
         os.makedirs(os.path.dirname(path), exist_ok=True)
         url = "%s/%d/%d/%d.terrain" % (QUANTIZED_BASE, z, x, y)
         req = urllib.request.Request(url, headers={"Accept": "application/octet-stream"})
-        data = urllib.request.urlopen(req, timeout=30).read()
+        # a socket timeout is per read, so a tile dripping in a few bytes at
+        # a time would hold the caller for as long as it liked: give the
+        # whole fetch the deadline the caller asked for
+        deadline = time.time() + timeout
+        response = urllib.request.urlopen(req, timeout=timeout)
+        # read() waits to fill its buffer, however long the bytes take to
+        # come; read1() hands back what has arrived
+        read = getattr(response, 'read1', response.read)
+        chunks = []
+        while True:
+            chunk = read(64 * 1024)
+            if not chunk:
+                break
+            chunks.append(chunk)
+            if time.time() > deadline:
+                raise TimeoutError("terrain tile took longer than %gs"
+                                   % timeout)
+        data = b"".join(chunks)
         # publish atomically under a unique name: the viewer child process and
         # the module share this cache, so a reader must never see a partial tile
         tmppath = "%s.tmp.%u.%u" % (path, os.getpid(), threading.get_ident())
@@ -83,11 +108,11 @@ def fetch_terrain_tile(z, x, y):
     return path, gz
 
 
-def decode_terrain(z, x, y):
+def decode_terrain(z, x, y, timeout=30):
     '''worker-safe: return dict(bbox, verts, idx) using numpy only'''
     g = GlobalGeodetic(True)
     bbox = g.TileBounds(x, y, z)
-    path, gz = fetch_terrain_tile(z, x, y)
+    path, gz = fetch_terrain_tile(z, x, y, timeout)
     tile = qmt_decode(path, bbox, gzipped=gz)
     verts = np.array(tile.getVerticesCoordinates())
     nv = len(verts)
@@ -99,15 +124,17 @@ def decode_terrain(z, x, y):
 _sample_cache = {}
 
 
-def sample_terrain(lat, lon, zoom=12, cache_only=False):
+def sample_terrain(lat, lon, zoom=12, cache_only=False, timeout=30):
     '''return terrain elevation (m AMSL) at lat/lon from the quantized mesh
     (same source we render), or None. Decoded tiles are cached. Assumes the
     regular grid mesh ArduPilot publishes; falls back to the tile mean for a
     non-grid tile.
 
     cache_only returns None rather than fetching/decoding a missing tile, so
-    callers on a latency-sensitive thread can defer the work.'''
+    callers on a latency-sensitive thread can defer the work; timeout is how
+    long a caller which does fetch waits for the whole tile.'''
     g = GlobalGeodetic(True)
+    lon = wrap_longitude(lon)
     x, y = g.LonLatToTile(lon, lat, zoom)
     key = (zoom, x, y)
     dec = _sample_cache.get(key)
@@ -115,7 +142,7 @@ def sample_terrain(lat, lon, zoom=12, cache_only=False):
         if cache_only:
             return None
         try:
-            dec = decode_terrain(zoom, x, y)
+            dec = decode_terrain(zoom, x, y, timeout)
         except Exception:
             return None
         _sample_cache[key] = dec
@@ -358,7 +385,8 @@ class TerrainManager:
 
     def focal_latlon(self, tc):
         foclat = self.lat0 + math.degrees(tc.focal[1] / R)
-        foclon = self.lon0 + math.degrees(tc.focal[0] / (R * math.cos(math.radians(self.lat0))))
+        foclon = wrap_longitude(self.lon0 + math.degrees(
+            tc.focal[0] / (R * math.cos(math.radians(self.lat0)))))
         return foclat, foclon
 
     def desired_set(self, foclat, foclon):
@@ -380,6 +408,10 @@ class TerrainManager:
     def height_at(self, lat, lon):
         '''Return rendered terrain world Z at lat/lon, preferring fine tiles.'''
         e, n, _ = enu(lat, lon, 0.0, self.lat0, self.lon0)
+        lon = wrap_longitude(lon)
+        if lon == -180.0:
+            # the antimeridian is either tile's edge; 180 is the one tiles have
+            lon = 180.0
         for key, tile in sorted(self.tiles.items(), reverse=True):
             west, south, east, north = tile.bbox
             if not (west <= lon <= east and south <= lat <= north):
@@ -401,7 +433,7 @@ class TerrainManager:
             clat = 0.5 * (south + north)
             clon = 0.5 * (west + east)
             dlat = clat - foclat
-            dlon = (clon - foclon) * math.cos(math.radians(foclat))
+            dlon = wrap_longitude(clon - foclon) * math.cos(math.radians(foclat))
             return (-z, dlat * dlat + dlon * dlon)
 
         for (z, x, y) in sorted(want, key=tile_priority):

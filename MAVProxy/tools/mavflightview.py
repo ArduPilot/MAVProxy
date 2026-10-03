@@ -24,6 +24,7 @@ from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import multiproc
 from MAVProxy.modules.lib import grapher
 from MAVProxy.modules.lib import kmlread
+from MAVProxy.modules.lib.log_mission import LogMission, MISSION_TYPES
 
 
 def create_map(title):
@@ -202,8 +203,30 @@ def colourmap_for_mav_type(mav_type):
     return map
 
 
+def drawable_mission(wploader):
+    '''wploader, or a copy of it pymavlink can draw.  A DO_JUMP to an item
+    which is not there -- or to home -- ends the mission in ArduPilot, but
+    MAVWPLoader follows it and fails on the missing item.  In the copy such
+    a jump points at itself, which ends the line drawn there instead'''
+    import copy
+    count = wploader.count()
+    bad = [i for i in range(count)
+           if wploader.wp(i).command == mavutil.mavlink.MAV_CMD_DO_JUMP and
+           not 0 < int(wploader.wp(i).param1) < count]
+    if not bad:
+        return wploader
+    ret = mavwp.MAVWPLoader()
+    for i in range(count):
+        w = copy.copy(wploader.wp(i))
+        if i in bad:
+            w.param1 = i
+        ret.add(w)
+    return ret
+
+
 def display_waypoints(wploader, map, default_radius=None, mav_type=None):
     '''display the waypoints'''
+    wploader = drawable_mission(wploader)
     mission_list = wploader.view_list()
     polygons = wploader.polygon_list()
     map.add_object(mp_slipmap.SlipClearLayer('Mission'))
@@ -389,10 +412,6 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
     wp = mavwp.MAVWPLoader()
     if options.mission is not None:
         wp.load(options.mission)
-    # the radius a loiter item without one of its own will be flown at, from
-    # the parameters the log carries
-    options.default_circle_radius = mp_util.param_value(
-        getattr(mlog, 'params', None), 'WP_LOITER_RAD')
     fen = mavwp.MAVFenceLoader()
     if options.fence is not None:
         fen.load(options.fence)
@@ -423,8 +442,9 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
         if options.ahr2:
             expressions.extend(pos_expressions(['AHR2', 'AHRS2', 'GPS']))
 
-    # find the union of message types we need from the log for all expressions
-    recv_match_types = set()
+    # find the union of message types we need from the log for all
+    # expressions, and the ones the mission is read from
+    recv_match_types = set(MISSION_TYPES)
     for e in expressions:
         recv_match_types.update(set(e.recv_match_types))
 
@@ -443,6 +463,7 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
 
     mlog.rewind()
 
+    mission = LogMission()
     while True:
         try:
             m = mlog.recv_match(type=recv_match_types)
@@ -453,60 +474,10 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
 
         type = m.get_type()
 
-        if type in ['MISSION_ITEM', 'MISSION_ITEM_INT']:
-            try:
-                new_m = m
-                if type == 'MISSION_ITEM_INT':
-                    # create a MISSION_ITEM from MISSION_ITEM_INT
-                    new_m = mavutil.mavlink.MAVLink_mission_item_message(
-                        0,
-                        0,
-                        m.seq,
-                        m.frame,
-                        m.command,
-                        m.current,
-                        m.autocontinue,
-                        m.param1,
-                        m.param2,
-                        m.param3,
-                        m.param4,
-                        m.x / 1.0e7,
-                        m.y / 1.0e7,
-                        m.z
-                    )
-                while new_m.seq > wp.count():
-                    print("Adding dummy WP %u" % wp.count())
-                    wp.set(new_m, wp.count())
-                wp.set(new_m, m.seq)
-            except Exception as e:
-                print("Exception: %s" % str(e))
-                pass
-            continue
-        elif type == 'CMD':
+        if type in MISSION_TYPES:
+            # a mission given on the command line is drawn instead
             if options.mission is None:
-                m = mavutil.mavlink.MAVLink_mission_item_message(
-                    0,
-                    0,
-                    m.CNum,
-                    mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
-                    m.CId,
-                    0,       # current
-                    1,       # autocontinue
-                    m.Prm1,
-                    m.Prm2,
-                    m.Prm3,
-                    m.Prm4,
-                    m.Lat,
-                    m.Lng,
-                    m.Alt
-                )
-                try:
-                    while m.seq > wp.count():
-                        print("Adding dummy WP %u" % wp.count())
-                        wp.set(m, wp.count())
-                    wp.set(m, m.seq)
-                except Exception:
-                    pass
+                mission.read(m)
             continue
 
         if not mlog.check_condition(options.condition):
@@ -573,11 +544,46 @@ def mavflightview_mav(mlog, options=None, flightmode_selections=[]):
 
     path = paths2
 
+    mission.fill(wp)
+
+    # the radius a loiter item without one of its own will be flown at, from
+    # the parameters the log carries.  A telemetry log only has those once it
+    # has been read through
+    options.default_circle_radius = mp_util.param_value(
+        mp_util.log_params(mlog), 'WP_LOITER_RAD')
+
     if len(path) == 0:
         print("No points to plot")
         return None
 
     return [path, wp, fen, used_flightmodes, getattr(mlog, 'mav_type', None), instances]
+
+
+def mission_objects(wp, options, mav_type, title):
+    '''the map objects the mission in wp is drawn with: its legs and arcs,
+    and the circles of its loiters.  None if there is nothing to draw'''
+    if not options.show_waypoints:
+        return None
+    wp = drawable_mission(wp)
+    plist = wp.polygon_list()
+    vlist = wp.view_list()
+    if len(plist) == 0:
+        return None
+    mission_obj = []
+    for i in range(len(plist)):
+        mission_obj.append(mp_slipmap.SlipPolygon(
+            'Mission-%s-%u' % (title, i),
+            plist[i],
+            layer='Mission',
+            linewidth=2,
+            colour=(255, 255, 255),
+            arcs=mp_slipmap.mission_arcs(wp, vlist[i]),
+        ))
+        mission_obj.extend(mp_slipmap.mission_circles(
+            'Loiter-%s' % title, 'Mission', wp, vlist[i], plist[i],
+            default_radius=getattr(options, 'default_circle_radius', None),
+            vehicle=mav_type))
+    return mission_obj
 
 
 def mavflightview_show(path,
@@ -634,29 +640,7 @@ def mavflightview_show(path,
                 linewidth=2,
                 showlines=(not getattr(options, "no_show_lines", False)),
                 colour=(255, 0, 180)))
-    plist = []
-    vlist = []
-    if options.show_waypoints:
-        plist = wp.polygon_list()
-        vlist = wp.view_list()
-    mission_obj = None
-    if len(plist) > 0:
-        mission_obj = []
-        for i in range(len(plist)):
-            mission_obj.append(mp_slipmap.SlipPolygon(
-                'Mission-%s-%u' % (title, i),
-                plist[i],
-                layer='Mission',
-                linewidth=2,
-                colour=(255, 255, 255),
-                arcs=mp_slipmap.mission_arcs(wp, vlist[i]),
-            ))
-            mission_obj.extend(mp_slipmap.mission_circles(
-                'Loiter-%s' % title, 'Mission', wp, vlist[i], plist[i],
-                default_radius=getattr(options, 'default_circle_radius', None),
-                vehicle=mav_type))
-    else:
-        mission_obj = None
+    mission_obj = mission_objects(wp, options, mav_type, title)
 
     if len(fence) > 1:
         fence_obj = mp_slipmap.SlipPolygon('Fence-%s' % title, fen.polygon(), layer='Fence',
