@@ -10,6 +10,7 @@ from MAVProxy.modules.lib import multiproc
 from MAVProxy.modules.lib import win_layout
 
 from MAVProxy.modules.mavproxy_misseditor import me_event
+from MAVProxy.modules.mavproxy_misseditor.survey_preview import SurveyPreview
 import queue
 import copy
 from types import SimpleNamespace
@@ -86,18 +87,26 @@ class MissionEditorEventThread(threading.Thread):
                     event_type = event.get_type()
 
                     if event_type == me_event.MEE_READ_WPS:
+                        self.mp_misseditor.reading_mission = False
                         if event.get_arg("use_ftp"):
                             self.mp_misseditor.num_wps_expected = 0
                             self.start_ftp('Read', self.module('wp').wp_ftp_download,
                                            self.ftp_read_done, [])
                         else:
                             # A MAVLink read has an initially unknown count.
+                            self.mp_misseditor.reading_mission = True
                             self.mp_misseditor.num_wps_expected = -1
                             self.mp_misseditor.wps_received = {}
                             self.module('wp').cmd_wp(['list'])
 
                     elif event_type == me_event.MEE_TIME_TO_QUIT:
                         self.time_to_quit = True
+
+                    elif event_type == me_event.MEE_SURVEY_PREVIEW:
+                        self.mp_misseditor.survey_preview.set_points(event.get_arg('points'))
+
+                    elif event_type == me_event.MEE_MAP_MISSION:
+                        self.mp_misseditor.map_mission = (self.ftp_target(), event.get_arg('wploader'))
 
                     elif event_type == me_event.MEE_GET_WP_RAD:
                         wp_radius = self.module('param').mav_param.get('WP_RADIUS')
@@ -143,6 +152,7 @@ class MissionEditorEventThread(threading.Thread):
                         self.mp_misseditor.mpstate.settings.command(["wpalt",event.get_arg("alt")])
 
                     elif event_type == me_event.MEE_WRITE_WPS:
+                        self.mp_misseditor.reading_mission = False
                         self.write_use_ftp = event.get_arg("use_ftp")
                         self.module('wp').wploader.clear()
                         self.module('wp').wploader.expected_count = event.get_arg("count")
@@ -216,16 +226,7 @@ class MissionEditorEventThread(threading.Thread):
     def send_wploader(self, wploader):
         with self.mp_misseditor.gui_event_queue_lock:
             self.mp_misseditor.gui_event_queue.put(MissionEditorEvent(
-                me_event.MEGE_CLEAR_MISS_TABLE))
-            if wploader.count() > 1:
-                self.mp_misseditor.gui_event_queue.put(MissionEditorEvent(
-                    me_event.MEGE_ADD_MISS_TABLE_ROWS, num_rows=wploader.count()-1))
-            for m in wploader.wpoints:
-                self.mp_misseditor.gui_event_queue.put(MissionEditorEvent(
-                    me_event.MEGE_SET_MISS_ITEM,
-                    num=m.seq, command=m.command, param1=m.param1,
-                    param2=m.param2, param3=m.param3, param4=m.param4,
-                    lat=m.x, lon=m.y, alt=m.z, frame=m.frame))
+                me_event.MEGE_LOAD_MISSION, wploader=copy.deepcopy(wploader)))
 
     def ftp_target(self):
         settings = self.mp_misseditor.mpstate.settings
@@ -272,7 +273,10 @@ class MissionEditorMain(object):
         self.time_to_quit = False
         self.num_wps_expected = 0 #helps me to know if all my waypoints I'm expecting have arrived
         self.wps_received = {}
+        self.reading_mission = False
+        self.map_mission = None
 
+        self.survey_preview = SurveyPreview()
         self.event_queue = multiproc.Queue()
         self.event_queue_lock = multiproc.Lock()
         self.gui_event_queue = multiproc.Queue()
@@ -347,11 +351,25 @@ class MissionEditorMain(object):
             if not self.child.is_alive():
                 self.close()
                 return
+        maps = [module.map for name, module in self.mpstate.public_modules.items()
+                if name.startswith('map') and hasattr(getattr(module, 'map', None), 'add_object')]
+        self.survey_preview.draw(maps)
         last_wp_change = self.mpstate.module('wp').loading_waypoint_lasttime
         if last_wp_change > self.last_wp_change:
             self.last_wp_change = last_wp_change
-            self.get_wps_from_module()
+            if self.get_map_mission() is None:
+                self.get_wps_from_module()
 
+    def get_map_mission(self):
+        '''Return an immutable draft snapshot for this vehicle, if editing.'''
+        draft = self.map_mission
+        if self.time_to_quit or draft is None:
+            return None
+        target, loader = draft
+        settings = self.mpstate.settings
+        if target != (settings.target_system, settings.target_component):
+            return None
+        return loader
 
 
 
@@ -373,6 +391,24 @@ class MissionEditorMain(object):
         # to mavlink_packet, above
         if (getattr(m, 'mission_type', None) is not None and
             m.mission_type != mavutil.mavlink.MAV_MISSION_TYPE_MISSION):
+            return
+        if self.reading_mission:
+            # Deliver a complete read atomically, preserving newer local edits
+            # just as the MAVFTP path does. Do not show partial mission tables.
+            if mtype == 'MISSION_COUNT':
+                self.num_wps_expected = m.count
+                self.wps_received = {}
+            elif mtype == 'MISSION_ITEM' and 0 <= m.seq < self.num_wps_expected:
+                self.wps_received[m.seq] = m
+            else:
+                return
+            if len(self.wps_received) == self.num_wps_expected:
+                loader = mavwp.MAVWPLoader()
+                for seq in range(self.num_wps_expected):
+                    loader.add(self.wps_received[seq])
+                self.gui_event_queue.put(MissionEditorEvent(me_event.MEGE_READ_MISSION, wploader=loader))
+                self.reading_mission = False
+                self.num_wps_expected = 0
             return
         if mtype in ['MISSION_COUNT']:
             if (self.num_wps_expected == 0):
@@ -457,6 +493,7 @@ class MissionEditorMain(object):
     def close(self):
         '''close the Mission Editor window'''
         self.time_to_quit = True
+        self.survey_preview.close()
         self.close_window.release()
         if self.child.is_alive():
             self.child.join(1)
