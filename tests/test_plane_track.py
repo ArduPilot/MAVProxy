@@ -1,9 +1,11 @@
 '''the path plane_track flies a mission along, against ArduPlane's own
 navigation and a flight flown through it'''
 
+import json
 import math
 import os
 import struct
+import types
 
 import pytest
 
@@ -1204,6 +1206,338 @@ class TestMissionFlight(object):
 # the first 30s, which takes in a QuadPlane's transition and a plane's
 # takeoff; and the 90th percentile and worst of the height of each point
 # flown above or below the nearest point of the path drawn
+FLIGHTS = {
+    # QuadPlane.KalaupapaCanyonRun: loiters up and down over the sea, a
+    # winding gorge inland, a spiral up out of the head of the canyon, and
+    # down with the ground over a ridge and along the valley beyond
+    'kalaupapa-canyon-run.json': (2.0, 8.0, 80.0, 30.0, 25.0, 45.0),
+    # Plane.MissionItemTypes: every kind of item a plane flies on the way,
+    # and a landing
+    'sitl-plane-mission-items.json': (3.0, 16.0, 35.0, 35.0, 7.0, 22.0),
+    # a return to launch, which a rally point is nearer than home for
+    'sitl-plane-rtl-rally.json': (10.0, 40.0, 55.0, 55.0, 11.0, 18.0),
+    # a loiter for ever
+    'sitl-plane-loiter-unlimited.json': (2.0, 16.0, 30.0, 30.0, 12.0, 18.0),
+    # QuadPlane.VTOLMissionItemTypes: a VTOL landing on a fixed-wing
+    # approach, asked for by param1
+    'sitl-quadplane-vtol-land-approach.json': (7.0, 28.0, 45.0, 45.0, 7.0, 25.0),
+    # a VTOL landing straight in
+    'sitl-quadplane-vtol-land.json': (2.0, 20.0, 40.0, 40.0, 6.0, 11.0),
+    # a VTOL landing on an approach, asked for by Q_OPTIONS.  The flight
+    # met its circle already within the 5 degrees of the course it breaks
+    # out on, and broke out at once, where the path drawn went round once
+    # more: the approach is not modelled that finely
+    'sitl-quadplane-vtol-land-q-options.json': (15.0, 42.0, 90.0, 90.0, 13.0, 16.0),
+    # a return to launch with each Q_RTL_MODE: switching to QRTL near home,
+    # landing on an approach, whose circle is flown a little wider than
+    # drawn, and as QRTL
+    'sitl-quadplane-rtl-q-rtl-mode-1.json': (2.0, 15.0, 40.0, 40.0, 7.0, 12.0),
+    'sitl-quadplane-rtl-q-rtl-mode-2.json': (13.0, 35.0, 70.0, 70.0, 7.0, 22.0),
+    'sitl-quadplane-rtl-q-rtl-mode-3.json': (4.0, 30.0, 45.0, 45.0, 6.0, 11.0),
+}
+
+
+class TestFlownMission(object):
+    """the path worked out for a mission against a flight of it"""
+
+    @pytest.fixture(params=sorted(FLIGHTS))
+    def flight(self, request):
+        path = os.path.join(os.path.dirname(__file__), 'missions',
+                            request.param)
+        with open(path) as f:
+            return (json.load(f), FLIGHTS[request.param])
+
+    @staticmethod
+    def recorder():
+        import importlib.util
+        path = os.path.join(os.path.dirname(__file__), 'missions',
+                            'record_flight.py')
+        spec = importlib.util.spec_from_file_location('record_flight', path)
+        recorder = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(recorder)
+        return recorder
+
+    def test_the_firmware_which_flew_a_recording_is_kept(self):
+        '''the drawing follows what a version of ArduPlane does, so a
+        recording of a flight says which flew it'''
+        recorder = self.recorder()
+
+        class Log(object):
+            def __init__(self, *messages):
+                self.messages = list(messages)
+
+            def rewind(self):
+                self.left = list(self.messages)
+
+            def recv_match(self, type=None):
+                while self.left:
+                    m = self.left.pop(0)
+                    if type is None or m.get_type() in type:
+                        return m
+                return None
+
+        def message(kind, **fields):
+            m = types.SimpleNamespace(**fields)
+            m.get_type = lambda: kind
+            return m
+        started = message('MSG', Message='ArduPlane V4.8.0-dev (48c91a4c9e)')
+        other = message('MSG', Message='Frame: QUADPLANE')
+        version = message('VER', FWS='ArduPlane V4.8.0-dev', GH=0x48c91a4c)
+        # VER says which commit it was built from, wherever it comes: after
+        # the message the firmware starts with, as well as before it
+        for log in (Log(other, version, started),
+                    Log(other, started, version)):
+            assert recorder.firmware(log) == 'ArduPlane V4.8.0-dev (48c91a4c)'
+        # an older log has only what the firmware said as it started
+        assert recorder.firmware(Log(other, started)) == \
+            'ArduPlane V4.8.0-dev (48c91a4c9e)'
+        # and a VER which does not name a commit is still the version
+        assert recorder.firmware(Log(message('VER', FWS='ArduPlane V4.8.0'))) \
+            == 'ArduPlane V4.8.0'
+        # and one which says neither says nothing
+        assert recorder.firmware(Log(other)) is None
+
+    def test_a_course_of_north_is_recorded(self):
+        recorder = self.recorder()
+        assert recorder.extras(0.0, None, [], 0.0) == {
+            'heading': 0.0, 'approach': 0.0}
+        assert recorder.extras(None, (1, 2, 3), [(4, 5, 6)], None) == {
+            'start': (1, 2, 3), 'rally': [(4, 5, 6)]}
+
+    def test_a_loiter_to_altitude_with_no_radius_is_reached_at_the_default(
+            self):
+        # WP_LOITER_RAD 80: a point 100m from the centre is on its circle,
+        # which with 50 it is not, and one 60m off is
+        (lat, lon, amsl) = offset(1000, 0, 100)
+        items = [(mavlink.MAV_CMD_NAV_LOITER_TO_ALT, lat, lon, amsl,
+                  (0, 0, 0, 0))]
+        path = [offset(0, 0, 100), offset(500, 0, 100),
+                offset(900, 0, 100), offset(1000, 60, 100)]
+        assert self.arrivals(path, items, dict(PARAMS, WP_LOITER_RAD=80)) == \
+            [(1, 2)]
+        assert self.arrivals(path, items, dict(PARAMS, WP_LOITER_RAD=-50)) == \
+            [(1, 3)]
+        # and one of no radius at all is ArduPlane's 60m
+        for none in (0, 1, -1):
+            assert self.arrivals(path, items,
+                                 dict(PARAMS, WP_LOITER_RAD=none)) == [(1, 3)]
+
+    @staticmethod
+    def drawn(data):
+        '''the path drawn for a recorded flight's mission, given what
+        MAVExplorer gave it'''
+        items = [(c, la, lo, a, tuple(p)) for (c, la, lo, a, p) in data['items']]
+        rally = [tuple(point) for point in data.get('rally', [])]
+        start = data.get('start')
+        return (items, plane_track.mission_track(
+            tuple(data['home']), items, data['params'],
+            heading=data.get('heading'),
+            start=None if start is None else tuple(start),
+            rally=rally or None, approach=data.get('approach'),
+            takeoff_course=data.get('takeoff_course')))
+
+    def distances(self, track, flown):
+        '''metres from each flown point to the nearest leg of track, in
+        order of distance'''
+        return sorted(self.unsorted_distances(track, flown))
+
+    def unsorted_distances(self, track, flown):
+        '''metres from each flown point to the nearest leg of track'''
+        (lat0, lon0) = (track[0][0], track[0][1])
+        scale = math.cos(math.radians(lat0))
+
+        def xy(p):
+            return ((p[0] - lat0) * 111319.5, (p[1] - lon0) * 111319.5 * scale)
+        segments = [(xy(a), xy(b)) for (a, b) in zip(track, track[1:])]
+        out = []
+        for p in flown:
+            (pn, pe) = xy(p)
+            best = None
+            for ((an, ae), (bn, be)) in segments:
+                (dn, de) = (bn - an, be - ae)
+                squared = dn * dn + de * de
+                t = 0.0
+                if squared > 0:
+                    t = min(max(((pn - an) * dn + (pe - ae) * de) / squared, 0.0), 1.0)
+                d = math.hypot(pn - (an + t * dn), pe - (ae + t * de))
+                if best is None or d < best:
+                    best = d
+            out.append(best)
+        return out
+
+    def heights(self, track, flown):
+        '''metres each flown point is above the nearest point of track,
+        nearest counting height as well, so a spiral is measured against
+        the turn of it at the height flown; below is negative'''
+        (lat0, lon0) = (track[0][0], track[0][1])
+        scale = math.cos(math.radians(lat0))
+
+        def xyz(p):
+            return ((p[0] - lat0) * 111319.5,
+                    (p[1] - lon0) * 111319.5 * scale, p[2])
+        segments = [(xyz(a), xyz(b)) for (a, b) in zip(track, track[1:])]
+        out = []
+        for p in flown:
+            q = xyz(p)
+            best = None
+            for (a, b) in segments:
+                d = [b[i] - a[i] for i in range(3)]
+                squared = sum(x * x for x in d)
+                t = 0.0
+                if squared > 0:
+                    t = sum((q[i] - a[i]) * d[i] for i in range(3)) / squared
+                    t = min(max(t, 0.0), 1.0)
+                nearest = [a[i] + t * d[i] for i in range(3)]
+                distance = math.dist(q, nearest)
+                if best is None or distance < best[0]:
+                    best = (distance, q[2] - nearest[2])
+            out.append(best[1])
+        return out
+
+    # items which end a mission's flight: nothing after one is flown to
+    ENDINGS = (mavlink.MAV_CMD_NAV_RETURN_TO_LAUNCH,
+               mavlink.MAV_CMD_NAV_LOITER_UNLIM,
+               mavlink.MAV_CMD_NAV_LAND,
+               mavlink.MAV_CMD_NAV_VTOL_LAND)
+
+    def arrivals(self, path, items, flight_params):
+        '''for each item flown to, in mission order, the index into path of
+        the first point near it after the item before was reached: a
+        waypoint's is within the distance a turn is started out, a loiter's
+        within its circle, which is ArduPlane's default where it gives
+        none.  An item reached out of turn leaves the ones after it
+        unreached, as None; so does a flight which ends short.
+        Items with no position, those ArduPlane skips, takeoffs, which the
+        flight starts from, VTOL landings, and anything after the item which
+        ends the flight, are left out'''
+        out = []
+        after = 0
+        for (seq, (command, lat, lon, amsl, params)) in enumerate(items, 1):
+            if seq > 1 and items[seq - 2][0] in self.ENDINGS:
+                break
+            if ((lat == 0 and lon == 0) or
+                    command in plane_track.SKIPPED_COMMANDS or
+                    command in plane_track.TAKEOFF_COMMANDS or
+                    command == mavlink.MAV_CMD_NAV_VTOL_LAND):
+                continue
+            near = 120.0
+            if command == mavlink.MAV_CMD_NAV_LOITER_TO_ALT:
+                radius = abs(params[1] or 0.0)
+                if radius <= 1:
+                    radius = plane_track.default_loiter_radius(
+                        plane_track.parameter(flight_params, 'WP_LOITER_RAD'))
+                near = radius * 1.4
+            index = None
+            if after is not None:
+                for i in range(after, len(path)):
+                    if mp_util.gps_distance(path[i][0], path[i][1],
+                                            lat, lon) < near:
+                        index = i
+                        break
+            out.append((seq, index))
+            after = index
+        return out
+
+    # a fixed-wing launch goes whichever way the aircraft is thrown or the
+    # runway points.  Where the recording says which course it was flown on,
+    # the launch is drawn on that, and is held to as near as the rest of the
+    # flight; where it does not, it is drawn towards the first waypoint,
+    # anywhere within 45 degrees or so of the way flown, so until the
+    # aircraft gets there it can be that far across from the line drawn
+    LAUNCH_LIMIT = 10.0
+    LAUNCH_SPREAD = math.sin(math.radians(45)) + 0.05
+    LAUNCH_SLACK = 30.0
+
+    def launch(self, data, items, flown):
+        '''the flight split into its fixed-wing launch, up to where it gets
+        to the first waypoint after it, and the rest.  A VTOL takeoff goes
+        up where it is, and is left with the rest'''
+        first = items[0][0] if items else None
+        if first not in plane_track.TAKEOFF_COMMANDS:
+            return ([], flown)
+        flight = plane_track.MissionFlight(
+            (0.0, 0.0), (0.0, 0.0, 0.0), list(items), data['params'])
+        if flight.vtol_takeoff(first):
+            return ([], flown)
+        arrived = [i for (seq, i) in self.arrivals(flown, items, data['params'])
+                   if i is not None]
+        if not arrived:
+            return (flown, [])
+        return (flown[:arrived[0]], flown[arrived[0]:])
+
+    def length(self, path, start, end):
+        return sum(mp_util.gps_distance(a[0], a[1], b[0], b[1])
+                   for (a, b) in zip(path[start:end], path[start + 1:end + 1]))
+
+    def test_the_path_is_flown_in_the_order_flown(self, flight):
+        # the distances alone would not notice legs flown in the wrong order,
+        # backwards or with extra loops, so long as the lines were there
+        (data, _) = flight
+        (items, track) = self.drawn(data)
+        flown = data['flown']
+        drawn = self.arrivals(track, items, data['params'])
+        seen = self.arrivals(flown, items, data['params'])
+        # the flight kept ends short of the last waypoint
+        seen = [(seq, i) for (seq, i) in seen if i is not None]
+        order = [seq for (seq, i) in sorted(seen, key=lambda x: x[1])]
+        assert order == [seq for (seq, i) in seen]
+        assert None not in [i for (seq, i) in drawn]
+        assert ([seq for (seq, i) in sorted(drawn, key=lambda x: x[1])] ==
+                [seq for (seq, i) in drawn])
+        # and about as far between each of them as was flown: an extra lap
+        # of a loiter, or a leg flown twice, would not be
+        drawn = dict(drawn)
+        stages = [seq for (seq, i) in seen]
+        total_drawn = self.length(track, drawn[stages[0]], drawn[stages[-1]])
+        total_flown = self.length(flown, dict(seen)[stages[0]],
+                                  dict(seen)[stages[-1]])
+        assert total_drawn == pytest.approx(total_flown, rel=0.1)
+        seen = dict(seen)
+        for (a, b) in zip(stages, stages[1:]):
+            flown_stage = self.length(flown, seen[a], seen[b])
+            if flown_stage < 1000:
+                continue
+            assert self.length(track, drawn[a], drawn[b]) == pytest.approx(
+                flown_stage, rel=0.2), (a, b)
+
+    def test_the_path_is_the_one_flown(self, flight):
+        (data, (median_limit, p90_limit, worst_limit, later_limit, _,
+                _)) = flight
+        (items, track) = self.drawn(data)
+        assert track is not None
+        (launch, flown) = self.launch(data, items, data['flown'])
+        # the launch, drawn on the course flown where that is known, and
+        # otherwise only going the right general way
+        start = launch[0] if launch else None
+        known = data.get('takeoff_course') is not None
+        for (p, d) in zip(launch, self.unsorted_distances(track, launch)):
+            if known:
+                assert d < self.LAUNCH_LIMIT
+                continue
+            out = mp_util.gps_distance(start[0], start[1], p[0], p[1])
+            assert d < self.LAUNCH_SPREAD * out + self.LAUNCH_SLACK
+        distances = self.distances(track, flown)
+        median = distances[len(distances) // 2]
+        p90 = distances[int(len(distances) * 0.9)]
+        # the tangent-and-circle drawing this replaced was 6m out at the
+        # median and 22m at the 90th percentile over the first flight of the
+        # canyon run
+        assert median < median_limit
+        assert p90 < p90_limit
+        # a QuadPlane climbs out of its VTOL takeoff and transitions on the
+        # way to the first item, and a plane rolls down the runway, neither
+        # of which is modelled; after that the path stays closer
+        assert distances[-1] < worst_limit
+        later = self.distances(track, flown[30:])
+        assert later[-1] < later_limit
+
+    def test_the_path_is_flown_at_the_height_flown(self, flight):
+        # the distances above are across the ground only
+        (data, (_, _, _, _, p90_limit, worst_limit)) = flight
+        (items, track) = self.drawn(data)
+        heights = sorted(abs(h) for h in self.heights(track, data['flown']))
+        assert heights[int(len(heights) * 0.9)] < p90_limit
+        assert heights[-1] < worst_limit
 
 
 class TestDrawnTrack(object):
