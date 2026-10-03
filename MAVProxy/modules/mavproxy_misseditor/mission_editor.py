@@ -12,6 +12,7 @@ from MAVProxy.modules.lib import win_layout
 from MAVProxy.modules.mavproxy_misseditor import me_event
 import queue
 import copy
+from types import SimpleNamespace
 MissionEditorEvent = me_event.MissionEditorEvent
 
 from pymavlink import mavutil
@@ -268,6 +269,7 @@ class MissionEditorEventThread(threading.Thread):
 class MissionEditorMain(object):
     def __init__(self, mpstate, elemodel):
         self.mpstate = mpstate
+        self.time_to_quit = False
         self.num_wps_expected = 0 #helps me to know if all my waypoints I'm expecting have arrived
         self.wps_received = {}
 
@@ -281,19 +283,22 @@ class MissionEditorMain(object):
         self.close_window = multiproc.Semaphore()
         self.close_window.acquire()
 
-        self.child = multiproc.Process(target=self.child_task,args=(self.event_queue,self.event_queue_lock,self.gui_event_queue,self.gui_event_queue_lock,self.close_window, elemodel))
+        # Spawn/forkserver must not serialize this editor or live MAVProxy state.
+        self.child = multiproc.Process(
+            target=self.child_task,
+            args=(self.event_queue, self.event_queue_lock,
+                  self.gui_event_queue, self.gui_event_queue_lock,
+                  self.close_window, elemodel, self.object_queue))
         self.child.start()
 
         self.event_thread = MissionEditorEventThread(self, self.event_queue, self.event_queue_lock)
         self.event_thread.start()
 
-        self.mpstate = mpstate
         self.mpstate.miss_editor = self
 
         self.last_unload_check_time = time.time()
         self.unload_check_interval = 0.1 # seconds
 
-        self.time_to_quit = False
         self.mavlink_message_queue = multiproc.Queue()
         self.mavlink_message_queue_handler = threading.Thread(target=self.mavlink_message_queue_handler)
         self.mavlink_message_queue_handler.start()
@@ -410,7 +415,8 @@ class MissionEditorMain(object):
                         # a count we don't expect we don't spew errors
                         self.num_wps_expected = -1
 
-    def child_task(self, q, l, gq, gl, cw_sem, elemodel):
+    @staticmethod
+    def child_task(q, l, gq, gl, cw_sem, elemodel, object_queue):
         '''child process - this holds GUI elements'''
         mp_util.child_close_fds()
 
@@ -418,17 +424,18 @@ class MissionEditorMain(object):
         from ..lib.wx_loader import wx
         from MAVProxy.modules.mavproxy_misseditor import missionEditorFrame
 
-        self.app = wx.App(False)
-        self.app.frame = missionEditorFrame.MissionEditorFrame(self,parent=None,id=wx.ID_ANY, elemodel=elemodel)
+        app = wx.App(False)
+        state = SimpleNamespace(object_queue=object_queue)
+        app.frame = missionEditorFrame.MissionEditorFrame(state, parent=None, id=wx.ID_ANY, elemodel=elemodel)
 
-        self.app.frame.set_event_queue(q)
-        self.app.frame.set_event_queue_lock(l)
-        self.app.frame.set_gui_event_queue(gq)
-        self.app.frame.set_gui_event_queue_lock(gl)
-        self.app.frame.set_close_window_semaphore(cw_sem)
+        app.frame.set_event_queue(q)
+        app.frame.set_event_queue_lock(l)
+        app.frame.set_gui_event_queue(gq)
+        app.frame.set_gui_event_queue_lock(gl)
+        app.frame.set_close_window_semaphore(cw_sem)
 
-        self.app.SetExitOnFrameDelete(True)
-        self.app.frame.Show()
+        app.SetExitOnFrameDelete(True)
+        app.frame.Show()
 
         # start a thread to monitor the "close window" semaphore:
         class CloseWindowSemaphoreWatcher(threading.Thread):
@@ -438,11 +445,11 @@ class MissionEditorMain(object):
                 self.sem = sem
             def run(self):
                 self.sem.acquire(True)
-                self.task.app.ExitMainLoop()
-        watcher_thread = CloseWindowSemaphoreWatcher(self, cw_sem)
+                wx.CallAfter(self.task.ExitMainLoop)
+        watcher_thread = CloseWindowSemaphoreWatcher(app, cw_sem)
         watcher_thread.start()
 
-        self.app.MainLoop()
+        app.MainLoop()
         # tell the watcher it is OK to quit:
         cw_sem.release()
         watcher_thread.join()
