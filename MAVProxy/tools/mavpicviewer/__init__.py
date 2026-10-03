@@ -1,0 +1,1 @@
+'''MAVProxy picture viewer tool'''
