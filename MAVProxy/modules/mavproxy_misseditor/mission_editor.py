@@ -158,7 +158,7 @@ class MissionEditorEventThread(threading.Thread):
                         self.module('wp').wploader.expected_count = event.get_arg("count")
                         if not self.write_use_ftp:
                             self.master().waypoint_count_send(event.get_arg("count"))
-                        self.mp_misseditor.num_wps_expected = event.get_arg("count")
+                        self.mp_misseditor.num_wps_expected = 0
                         self.mp_misseditor.wps_received = {}
                     elif event_type == me_event.MEE_WRITE_WP_NUM:
                         w = mavutil.mavlink.MAVLink_mission_item_message(
@@ -189,9 +189,6 @@ class MissionEditorEventThread(threading.Thread):
 
                         #tell the wp module to expect some waypoints
                         self.module('wp').loading_waypoints = True
-
-                    elif event_type == me_event.MEE_LOAD_WP_FILE:
-                        self.module('wp').cmd_wp(['load',event.get_arg("path")])
 
                     elif event_type == me_event.MEE_SAVE_WP_FILE:
                         self.module('wp').cmd_wp(['save',event.get_arg("path")])
@@ -392,64 +389,25 @@ class MissionEditorMain(object):
         if (getattr(m, 'mission_type', None) is not None and
             m.mission_type != mavutil.mavlink.MAV_MISSION_TYPE_MISSION):
             return
-        if self.reading_mission:
-            # Deliver a complete read atomically, preserving newer local edits
-            # just as the MAVFTP path does. Do not show partial mission tables.
-            if mtype == 'MISSION_COUNT':
-                self.num_wps_expected = m.count
-                self.wps_received = {}
-            elif mtype == 'MISSION_ITEM' and 0 <= m.seq < self.num_wps_expected:
-                self.wps_received[m.seq] = m
-            else:
-                return
-            if len(self.wps_received) == self.num_wps_expected:
-                loader = mavwp.MAVWPLoader()
-                for seq in range(self.num_wps_expected):
-                    loader.add(self.wps_received[seq])
-                self.gui_event_queue.put(MissionEditorEvent(me_event.MEGE_READ_MISSION, wploader=loader))
-                self.reading_mission = False
-                self.num_wps_expected = 0
+        # Only an explicit editor Read may replace the table through mission
+        # packets. Console reads and upload responses must not bypass the GUI's
+        # revision/dirty guards through the old incremental receive path.
+        if not self.reading_mission:
             return
-        if mtype in ['MISSION_COUNT']:
-            if (self.num_wps_expected == 0):
-                #I haven't asked for WPs, or these messages are duplicates
-                #of msgs I've already received.
-                self.mpstate.console.error("No waypoint load started (from Editor).")
-            #I only clear the mission in the Editor if this was a read event
-            elif (self.num_wps_expected == -1):
-                self.gui_event_queue.put(MissionEditorEvent(
-                    me_event.MEGE_CLEAR_MISS_TABLE))
-                self.num_wps_expected = m.count
-                self.wps_received = {}
-
-                if m.count > 1:
-                    self.gui_event_queue.put(MissionEditorEvent(
-                        me_event.MEGE_ADD_MISS_TABLE_ROWS,num_rows=m.count-1))
-            #write has been sent by the mission editor:
-            elif (self.num_wps_expected > 1):
-                if (m.count != self.num_wps_expected):
-                    self.mpstate.console.error("wpedit: mission is stale")
-                #since this is a write operation from the Editor there
-                #should be no need to update number of table rows
-
-        elif mtype in ['MISSION_ITEM']:
-            #still expecting wps?
-            if (len(self.wps_received) < self.num_wps_expected):
-                #if we haven't already received this wp, write it to the GUI:
-                if (m.seq not in self.wps_received.keys()):
-                    self.gui_event_queue.put(MissionEditorEvent(
-                        me_event.MEGE_SET_MISS_ITEM,
-                        num=m.seq,command=m.command,param1=m.param1,
-                        param2=m.param2,param3=m.param3,param4=m.param4,
-                        lat=m.x,lon=m.y,alt=m.z,frame=m.frame))
-
-                    self.wps_received[m.seq] = True
-                    if len(self.wps_received) == self.num_wps_expected:
-                        # if we have received everything then reset
-                        # our state to indicate we're not currently
-                        # expecting waypoints.  That way if we receive
-                        # a count we don't expect we don't spew errors
-                        self.num_wps_expected = -1
+        if mtype == 'MISSION_COUNT':
+            self.num_wps_expected = m.count
+            self.wps_received = {}
+        elif mtype == 'MISSION_ITEM' and 0 <= m.seq < self.num_wps_expected:
+            self.wps_received[m.seq] = m
+        else:
+            return
+        if len(self.wps_received) == self.num_wps_expected:
+            loader = mavwp.MAVWPLoader()
+            for seq in range(self.num_wps_expected):
+                loader.add(self.wps_received[seq])
+            self.gui_event_queue.put(MissionEditorEvent(me_event.MEGE_READ_MISSION, wploader=loader))
+            self.reading_mission = False
+            self.num_wps_expected = 0
 
     @staticmethod
     def child_task(q, l, gq, gl, cw_sem, elemodel, object_queue):

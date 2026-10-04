@@ -982,6 +982,8 @@ Usage: map circle <radius> <colour>
 
     def idle_task(self):
         self.update_roi_menu()
+        # Local editor drafts also change when there is no telemetry traffic.
+        self.check_redisplay_waypoints()
         now = time.time()
         if self.last_unload_check_time + self.unload_check_interval < now:
             self.last_unload_check_time = now

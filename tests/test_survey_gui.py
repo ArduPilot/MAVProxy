@@ -478,3 +478,64 @@ def test_unknown_home_does_not_publish_a_fabricated_home(gui, editor):
     editor.set_modified_state(True)
     assert last_map_mission(editor) is None
     assert editor.mission_modified
+
+
+@pytest.mark.parametrize('ftp', [True, False])
+def test_load_file_replaces_dirty_draft_locally_and_rejects_older_read(gui, editor, tmp_path, ftp):
+    from MAVProxy.modules.mavproxy_misseditor import me_event
+    editor.checkbox_mavftp.SetValue(ftp)
+    editor.read_wp_pushed(mock.Mock())
+    editor.grid_mission.SetCellValue(0, 7, '200')
+    editor.set_modified_state(True)
+    replacement = mission()
+    replacement.wp(1).z = 321
+    path = tmp_path / 'replacement.waypoints'
+    replacement.save(str(path))
+    # Isolate all events emitted by Load File, including map updates.
+    while not editor.event_queue.empty():
+        editor.event_queue.get_nowait()
+    with mock.patch.object(gui.wx, 'FileDialog') as dialog:
+        dialog.return_value.ShowModal.return_value = gui.wx.ID_OK
+        dialog.return_value.GetPath.return_value = str(path)
+        editor.load_wp_file_pushed(mock.Mock())
+        dialog.return_value.Destroy.assert_called_once()
+    assert editor.grid_mission.GetCellValue(0, 7) == '321.00'
+    assert editor.last_mission_file_path == str(path)
+    assert editor.mission_modified
+    assert editor.label_sync_state.GetLabel() == 'MODIFIED'
+    assert last_map_mission(editor).wp(1).z == 321
+    assert all(event.type == me_event.MEE_MAP_MISSION for event in list(editor.event_queue.queue))
+
+    # A download that began before the file selection must not undo it.
+    editor.process_gui_event(me_event.MissionEditorEvent(
+        me_event.MEGE_FTP_MISSION if ftp else me_event.MEGE_READ_MISSION, wploader=mission()))
+    assert editor.grid_mission.GetCellValue(0, 7) == '321.00'
+    assert editor.mission_modified
+    editor.read_wp_pushed(mock.Mock())
+    editor.process_gui_event(me_event.MissionEditorEvent(
+        me_event.MEGE_FTP_MISSION if ftp else me_event.MEGE_READ_MISSION, wploader=mission()))
+    assert editor.grid_mission.GetCellValue(0, 7) == '120.00'
+    assert not editor.mission_modified
+
+
+@pytest.mark.parametrize('failure', ['cancel', 'missing', 'invalid', 'empty'])
+def test_failed_file_load_keeps_existing_draft(gui, editor, tmp_path, failure):
+    editor.grid_mission.SetCellValue(0, 7, '200')
+    editor.set_modified_state(True)
+    before = editor.survey_snapshot()
+    previous_map = last_map_mission(editor)
+    path = tmp_path / 'bad.waypoints'
+    if failure == 'invalid':
+        path.write_text('not a waypoint file\n')
+    elif failure == 'empty':
+        path.write_text('QGC WPL 110\n')
+    with mock.patch.object(gui.wx, 'FileDialog') as dialog:
+        dialog.return_value.ShowModal.return_value = gui.wx.ID_CANCEL if failure == 'cancel' else gui.wx.ID_OK
+        dialog.return_value.GetPath.return_value = str(path)
+        editor.load_wp_file_pushed(mock.Mock())
+        dialog.return_value.Destroy.assert_called_once()
+    assert editor.survey_snapshot() == before
+    assert editor.mission_modified
+    assert last_map_mission(editor) is previous_map
+    if failure != 'cancel':
+        assert 'Unable to load mission' in editor.GetStatusBar().GetStatusText()
