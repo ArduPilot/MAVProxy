@@ -347,7 +347,7 @@ class MissionEditorFrame(wx.Frame):
             self.grid_mission.SetColSize(column, 0)
         self.Layout()
 
-    def load_wploader(self, wploader):
+    def load_wploader(self, wploader, modified=False):
         '''Populate the table directly from a MAVWPLoader.'''
         if wploader is None:
             return
@@ -364,7 +364,7 @@ class MissionEditorFrame(wx.Frame):
                 param1=item.param1, param2=item.param2,
                 param3=item.param3, param4=item.param4,
                 lat=item.x, lon=item.y, alt=item.z, frame=item.frame))
-        self.set_modified_state(False)
+        self.set_modified_state(modified)
 
     def __set_properties(self):
         # begin wxGlade: MissionEditorFrame.__set_properties
@@ -810,16 +810,26 @@ class MissionEditorFrame(wx.Frame):
     def load_wp_file_pushed(self, event):  # wxGlade: MissionEditorFrame.<event_handler>
         fd = wx.FileDialog(self, "Open Mission File", os.getcwd(), "",
                 "MissionFiles(*.txt.*.wp,*.waypoints)|*.txt;*.wp;*.waypoints", wx.FD_OPEN | wx.FD_FILE_MUST_EXIST)
-        if (fd.ShowModal() == wx.ID_CANCEL):
-            return #user changed their mind...
-
-        self.event_queue_lock.acquire()
-        self.event_queue.put(MissionEditorEvent(me_event.MEE_LOAD_WP_FILE,
-            path=fd.GetPath()))
-        self.event_queue_lock.release()
-
-        self.last_mission_file_path = fd.GetPath()
-
+        try:
+            if fd.ShowModal() == wx.ID_CANCEL:
+                return
+            path = fd.GetPath()
+        finally:
+            fd.Destroy()
+        # Parse into a separate loader before replacing any local edits. File
+        # loading is a draft replacement, not the uploading `wp load` command.
+        loader = mavwp.MAVWPLoader()
+        try:
+            loader.load(path)
+            if loader.count() == 0:
+                raise ValueError('Mission file contains no home waypoint')
+        except Exception as ex:
+            self.SetStatusText('Unable to load mission: %s' % ex)
+            return
+        self.grid_mission.DisableCellEditControl()
+        self.load_wploader(loader, modified=True)
+        self.last_mission_file_path = path
+        self.SetStatusText('Loaded %u waypoints locally; Write WPs to upload.' % loader.count())
         event.Skip()
 
     def add_wp_below_pushed(self, event):  # wxGlade: MissionEditorFrame.<event_handler>

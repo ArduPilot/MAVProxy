@@ -84,13 +84,13 @@ def test_map_replaces_route_and_labels_then_restores_controller_mission(backend)
         display = mavproxy_map.MapModule(backend.state)
     display.map_settings.showwpnum = True
     display.map_settings.loitercircle = True
-    display.check_redisplay_waypoints()
+    display.idle_task()
     draft = mission(5)
     draft.wp(4).command = mavutil.mavlink.MAV_CMD_NAV_LOITER_UNLIM
     draft.wp(4).param3 = 50
     backend.process(me_event.MEE_MAP_MISSION, wploader=draft)
     display.map.add_object.reset_mock()
-    display.check_redisplay_waypoints()
+    display.idle_task()
     objects = [call.args[0] for call in display.map.add_object.call_args_list]
     polygons = [obj for obj in objects if isinstance(obj, mp_slipmap.SlipPolygon)]
     assert polygons[0].points == draft.polygon_list()[0]
@@ -102,11 +102,11 @@ def test_map_replaces_route_and_labels_then_restores_controller_mission(backend)
     # Deleting everything still clears the old route.
     backend.process(me_event.MEE_MAP_MISSION, wploader=mission(1))
     display.map.add_object.reset_mock()
-    display.check_redisplay_waypoints()
+    display.idle_task()
     assert any(isinstance(call.args[0], mp_slipmap.SlipClearLayer)
                for call in display.map.add_object.call_args_list)
     backend.process(me_event.MEE_MAP_MISSION, wploader=None)
-    display.check_redisplay_waypoints()
+    display.idle_task()
     assert display.mission_list == backend.wp.wploader.view_list()
     assert backend.master.mock_calls == []
 
@@ -126,3 +126,31 @@ def test_mavlink_read_delivers_complete_mission_atomically(backend, count):
     assert [w.seq for w in event.get_arg('wploader').wpoints] == list(range(count))
     assert backend.editor.gui_event_queue.empty()
     assert not backend.editor.reading_mission
+
+
+def test_console_read_after_editor_upload_cannot_overwrite_draft(backend):
+    backend.state.settings.wp_use_mission_int = False
+    backend.process(me_event.MEE_WRITE_WPS, use_ftp=False, count=2)
+    for seq in range(2):
+        backend.process(me_event.MEE_WRITE_WP_NUM, num=seq, frame=3, cmd_id=16,
+                        p1=0, p2=0, p3=0, p4=0, lat=-35, lon=149, alt=100)
+    assert backend.master.mav.send.call_count == 2
+    draft = mission(5)
+    backend.process(me_event.MEE_MAP_MISSION, wploader=draft)
+    backend.master.reset_mock()
+
+    backend.editor.process_mavlink_packet(mavutil.mavlink.MAVLink_mission_count_message(1, 1, 2))
+    for item in mission(2).wpoints:
+        backend.editor.process_mavlink_packet(item)
+    assert backend.editor.gui_event_queue.empty()
+    assert get_mission_for_map(backend.state) is draft
+    assert backend.master.mock_calls == []
+
+
+@pytest.mark.parametrize('old_count', [-1, 3])
+def test_stale_receive_counters_cannot_enable_incremental_gui_updates(backend, old_count):
+    backend.editor.num_wps_expected = old_count
+    backend.editor.process_mavlink_packet(mavutil.mavlink.MAVLink_mission_count_message(1, 1, 3))
+    for item in mission(3).wpoints:
+        backend.editor.process_mavlink_packet(item)
+    assert backend.editor.gui_event_queue.empty()
