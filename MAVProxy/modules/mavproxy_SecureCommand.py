@@ -18,7 +18,7 @@ except ImportError:
 class SecureCommandModule(mp_module.MPModule):
 
     def __init__(self, mpstate):
-        super(SecureCommandModule, self).__init__(mpstate, "SecureCommand", "SecureCommand Support", public = True)
+        super().__init__(mpstate, "SecureCommand", "SecureCommand Support", public = True)
         self.add_command('securecommand', self.cmd_securecommand, "SecureCommand control",
                          ["<getsessionkey|getpublickeys|setpublickeys|removepublickeys|setconfig>", "set (SECURECOMMANDSETTING)"])
 

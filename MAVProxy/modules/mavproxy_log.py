@@ -12,7 +12,7 @@ from MAVProxy.modules.lib import mp_module
 
 class LogModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(LogModule, self).__init__(mpstate, "log", "log transfer")
+        super().__init__(mpstate, "log", "log transfer")
         self.add_command('log', self.cmd_log, "log file handling", ['<download|status|erase|resume|cancel|list>'])
         self.reset()
 

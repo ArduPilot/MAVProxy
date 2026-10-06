@@ -558,7 +558,7 @@ class MagFit(MPDataLogChildTask):
             An object capturing timestamp limits
         '''
 
-        super(MagFit, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         # all attributes are implicitly passed to the child process 
         self.title = kwargs['title']
@@ -584,7 +584,7 @@ class MagFit(MPDataLogChildTask):
 
 class MagFitUI(wx.Dialog):
     def __init__(self, title, close_event, mlog, timestamp_in_range):
-        super(MagFitUI, self).__init__(None, title=title, size=(600, 900), style=wx.DEFAULT_DIALOG_STYLE|wx.RESIZE_BORDER)
+        super().__init__(None, title=title, size=(600, 900), style=wx.DEFAULT_DIALOG_STYLE|wx.RESIZE_BORDER)
 
         # capture the close event, log and timestamp range function
         self.close_event = close_event

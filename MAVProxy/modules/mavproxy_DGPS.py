@@ -19,7 +19,7 @@ class DGPSModule(mp_module.MPModule):
             ])
 
     def __init__(self, mpstate):
-        super(DGPSModule, self).__init__(mpstate, "DGPS", "DGPS injection support for SBP/RTCP/UBC")
+        super().__init__(mpstate, "DGPS", "DGPS injection support for SBP/RTCP/UBC")
         self.dgps_settings = DGPSModule.default_settings()
         self.inject_seq_nr = 0
         self.cmdname = "dgps"

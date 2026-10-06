@@ -13,7 +13,7 @@ import errno
 class UcenterModule(mp_module.MPModule):
 
     def __init__(self, mpstate):
-        super(UcenterModule, self).__init__(mpstate, "ucenter", "ucenter forwarding")
+        super().__init__(mpstate, "ucenter", "ucenter forwarding")
 
         self.add_command('ucenter', self.cmd_ucenter, "ucenter control",
                          ["<start|stop|restart>","set (UCENTERSETTING)"])

@@ -955,7 +955,7 @@ class ParamState:
 
 class ParamModule(mp_module.MPModule):
     def __init__(self, mpstate, **kwargs):
-        super(ParamModule, self).__init__(mpstate, "param", "parameter handling", public=True, multi_vehicle=True)
+        super().__init__(mpstate, "param", "parameter handling", public=True, multi_vehicle=True)
         self.xml_filepath = kwargs.get("xml-filepath", None)
         self.pstate = {}
         self.check_new_target_system()

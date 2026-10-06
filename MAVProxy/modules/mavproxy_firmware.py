@@ -17,7 +17,7 @@ from MAVProxy.modules.lib import mp_settings
 class FirmwareModule(mp_module.MPModule):
 
     def __init__(self, mpstate):
-        super(FirmwareModule, self).__init__(mpstate, "firmware", "firmware handling", public = True)
+        super().__init__(mpstate, "firmware", "firmware handling", public = True)
         self.firmware_settings = mp_settings.MPSettings(
             [('uploader', str, "uploader.py"),
             ])

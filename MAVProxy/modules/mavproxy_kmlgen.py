@@ -28,7 +28,7 @@ from pymavlink.dialects.v20 import common as mavlink2
 class KMLGenModule(mp_module.MPModule):
 
     def __init__(self, mpstate):
-        super(KMLGenModule, self).__init__(mpstate, "kmlgen", "KML mission viewer")
+        super().__init__(mpstate, "kmlgen", "KML mission viewer")
 
         self.kml_settings = mp_settings.MPSettings([
             ('bind_address', str, '127.0.0.1'),

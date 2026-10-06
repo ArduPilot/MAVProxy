@@ -278,7 +278,7 @@ class MPDataLogChildTask(MPChildTask):
         mlog : DFReader / mavmmaplog
             A dataflash or telemetry log
         '''
-        super(MPDataLogChildTask, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         # all attributes are implicitly passed to the child process 
         self._mlog = kwargs['mlog']

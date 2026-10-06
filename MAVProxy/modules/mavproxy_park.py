@@ -16,7 +16,7 @@ from MAVProxy.modules.lib import mp_util
 class park(mp_module.MPModule):
     def __init__(self, mpstate):
         """Initialise module"""
-        super(park, self).__init__(mpstate, "park", "")
+        super().__init__(mpstate, "park", "")
         # latest coordinates
         self.lat = 0
         self.lon = 0

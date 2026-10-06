@@ -13,7 +13,7 @@ from MAVProxy.modules.lib import mp_module
 
 class GraphModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(GraphModule, self).__init__(mpstate, "graph", "graph control")
+        super().__init__(mpstate, "graph", "graph control")
         self.timespan = 20
         self.tickresolution = 0.2
         self.graphs = []

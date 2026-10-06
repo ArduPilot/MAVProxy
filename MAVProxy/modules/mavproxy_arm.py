@@ -47,7 +47,7 @@ full_arming_mask = 0b1111111111111111111111110
 
 class ArmModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(ArmModule, self).__init__(mpstate, "arm", "arm/disarm handling", public=True)
+        super().__init__(mpstate, "arm", "arm/disarm handling", public=True)
         self.add_command(
             'arm',
             self.cmd_arm,

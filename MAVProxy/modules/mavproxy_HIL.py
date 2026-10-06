@@ -14,7 +14,7 @@ from pymavlink import mavutil
 
 class HILModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(HILModule, self).__init__(mpstate, "HIL", "HIL simulation")
+        super().__init__(mpstate, "HIL", "HIL simulation")
         self.last_sim_send_time = time.time()
         self.last_apm_send_time = time.time()
         self.rc_channels_scaled = mavutil.mavlink.MAVLink_rc_channels_scaled_message(0, 0, 0, 0, -10000, 0, 0, 0, 0, 0, 0)

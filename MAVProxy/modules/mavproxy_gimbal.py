@@ -19,7 +19,7 @@ import pymavlink
 
 class GimbalModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(GimbalModule, self).__init__(mpstate, "gimbal", "gimbal control module")
+        super().__init__(mpstate, "gimbal", "gimbal control module")
         self.add_command(
             'gimbal',
             self.cmd_gimbal,

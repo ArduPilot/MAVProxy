@@ -346,7 +346,7 @@ class Object(object):
 class WavefrontObject(Object):
     def __init__(self, obj):
         vertices, normals, indices, material_sequence = WavefrontObject.calc_arrays(obj)
-        super(WavefrontObject, self).__init__(
+        super().__init__(
             vertices=vertices,
             normals=normals,
             indices=indices,

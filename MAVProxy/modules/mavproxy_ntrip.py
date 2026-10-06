@@ -13,7 +13,7 @@ from MAVProxy.modules.lib import mp_settings
 class NtripModule(mp_module.MPModule):
 
     def __init__(self, mpstate):
-        super(NtripModule, self).__init__(mpstate, "ntrip", "ntrip", public=False)
+        super().__init__(mpstate, "ntrip", "ntrip", public=False)
         self.ntrip_settings = mp_settings.MPSettings(
             [('caster', str, None),
              ('port', int, 2101),

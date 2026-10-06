@@ -23,7 +23,7 @@ class chat(mp_module.MPModule):
     def __init__(self, mpstate):
 
         # call parent class
-        super(chat, self).__init__(mpstate, "chat", "OpenAI chat support")
+        super().__init__(mpstate, "chat", "OpenAI chat support")
 
         # register module and commands
         self.add_command('chat', self.cmd_chat, "chat module", ["show"])

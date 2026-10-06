@@ -21,7 +21,7 @@ from MAVProxy.modules.lib import mp_module
 
 class CameraViewModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(CameraViewModule, self).__init__(mpstate, "cameraview")
+        super().__init__(mpstate, "cameraview")
         self.add_command('cameraview', self.cmd_cameraview, "camera view")
         self.roll = 0
         self.pitch = 0

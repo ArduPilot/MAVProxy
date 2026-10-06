@@ -19,12 +19,12 @@ if mp_util.has_wxpython:
 
 class WPModule(mission_item_protocol.MissionItemProtocolModule):
     def __init__(self, mpstate):
-        super(WPModule, self).__init__(mpstate, "wp", "waypoint handling", public=True)
+        super().__init__(mpstate, "wp", "waypoint handling", public=True)
         # support for setting mission waypoint via command
         self.accepts_DO_SET_MISSION_CURRENT = {}  # keyed by (sysid/compid)
 
     def gui_menu_items(self):
-        ret = super(WPModule, self).gui_menu_items()
+        ret = super().gui_menu_items()
         ret.extend([
             MPMenuItem('Editor', 'Editor', '# wp editor'),
             MPMenuItem(
@@ -108,7 +108,7 @@ class WPModule(mission_item_protocol.MissionItemProtocolModule):
                 elif m.result in [mavutil.mavlink.MAV_RESULT_ACCEPTED]:
                     self.accepts_DO_SET_MISSION_CURRENT[key] = True
 
-        super(WPModule, self).mavlink_packet(m)
+        super().mavlink_packet(m)
 
     def idle_task(self):
         if (self.master is not None and
@@ -121,7 +121,7 @@ class WPModule(mission_item_protocol.MissionItemProtocolModule):
                 0, 0, 0, 0, 0, 0, 0, 0)
             self.last_get_home = time.time()
 
-        super(WPModule, self).idle_task()
+        super().idle_task()
 
     def cmd_moverelhome(self, args, latlon=None):
         '''handle wp move to a point relative to home by dist/bearing'''
@@ -159,7 +159,7 @@ class WPModule(mission_item_protocol.MissionItemProtocolModule):
         print("Moved WP %u %.1fm bearing %.1f from home" % (idx, dist, bearing))
 
     def commands(self):
-        ret = super(WPModule, self).commands()
+        ret = super().commands()
 
         ret.update({
             'add': self.cmd_add,

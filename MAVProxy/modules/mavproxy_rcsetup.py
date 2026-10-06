@@ -9,7 +9,7 @@ from MAVProxy.modules.lib import mp_module
 
 class RCSetupModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(RCSetupModule, self).__init__(mpstate, "rcsetup")
+        super().__init__(mpstate, "rcsetup")
         self.calibrating = False
         self.num_channels = 4
         self.clear_rc_cal()

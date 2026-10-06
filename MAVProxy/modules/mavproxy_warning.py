@@ -8,7 +8,7 @@ from pymavlink import mavutil
 
 class WarningModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(WarningModule, self).__init__(mpstate, "warning", "warning module")
+        super().__init__(mpstate, "warning", "warning module")
         self.add_command('warning', self.cmd_warning, "warning", ["details", "set (WARNINGSETTING)"])
         self.check_time = time.time()
         self.warn_time = time.time()

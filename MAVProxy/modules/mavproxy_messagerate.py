@@ -14,7 +14,7 @@ from pymavlink import mavutil
 class messagerate(mp_module.MPModule):
     def __init__(self, mpstate):
         """Initialise module"""
-        super(messagerate, self).__init__(mpstate, "messagerate", "")
+        super().__init__(mpstate, "messagerate", "")
         self.counts = {}
         self.buckets = []
         self.max_buckets = 5

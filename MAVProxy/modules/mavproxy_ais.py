@@ -47,7 +47,7 @@ class AISVehicle():
 class AISModule(mp_module.MPModule):
 
     def __init__(self, mpstate):
-        super(AISModule, self).__init__(mpstate, "ais", "AIS data support", public=True)
+        super().__init__(mpstate, "ais", "AIS data support", public=True)
         self.threat_vehicles = {}
 
         self.add_command('ais', self.cmd_AIS, "ais control",

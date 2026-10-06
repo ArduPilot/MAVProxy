@@ -12,7 +12,7 @@ from MAVProxy.modules.mavproxy_optitrack import NatNetClient
 class optitrack(mp_module.MPModule):
     def __init__(self, mpstate):
         """Initialise module"""
-        super(optitrack, self).__init__(mpstate, "optitrack", "optitrack")
+        super().__init__(mpstate, "optitrack", "optitrack")
         self.optitrack_settings = mp_settings.MPSettings(
             [('server', str, '127.0.0.1'),
             ('client', str, '127.0.0.1'),

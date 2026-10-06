@@ -71,7 +71,7 @@ class SmartCameraModule(mp_module.MPModule):
 #****************************************************************************
 
     def __init__(self, mpstate):
-        super(SmartCameraModule, self).__init__(mpstate, "SmartCamera", "SmartCamera commands")
+        super().__init__(mpstate, "SmartCamera", "SmartCamera commands")
         self.add_command('camtrigger', self.__vCmdCamTrigger, "Trigger camera")
         self.add_command('connectcams', self.__vCmdConnectCameras, "Connect to Cameras")
         self.add_command('setCamISO', self.__vCmdSetCamISO, "Set Camera ISO")

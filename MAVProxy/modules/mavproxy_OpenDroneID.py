@@ -10,7 +10,7 @@ import time
 class OpenDroneIDModule(mp_module.MPModule):
 
     def __init__(self, mpstate):
-        super(OpenDroneIDModule, self).__init__(mpstate, "OpenDroneID", "OpenDroneID Support", public = True)
+        super().__init__(mpstate, "OpenDroneID", "OpenDroneID Support", public = True)
         self.add_command('opendroneid', self.cmd_opendroneid, "opendroneid control",
                          ["<status>", "set (OPENDRONEIDSETTING)", "vehicle set (OPENDRONEIDVEHICLESETTING)"])
 

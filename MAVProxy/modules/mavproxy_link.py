@@ -77,7 +77,7 @@ preferred_ports = [
 class LinkModule(mp_module.MPModule):
 
     def __init__(self, mpstate):
-        super(LinkModule, self).__init__(mpstate, "link", "link control", public=True, multi_vehicle=True)
+        super().__init__(mpstate, "link", "link control", public=True, multi_vehicle=True)
         self.add_command('link', self.cmd_link, "link control",
                          ["<list|ports|resetstats>",
                           'add (SERIALPORT)',

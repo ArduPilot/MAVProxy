@@ -30,7 +30,7 @@ MAV_CMD_NAV_FENCE_HOME_CIRCLE_INCLUSION = getattr(
 
 class MapModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(MapModule, self).__init__(mpstate, "map", "map display", public=True, multi_instance=True, multi_vehicle=True)
+        super().__init__(mpstate, "map", "map display", public=True, multi_instance=True, multi_vehicle=True)
         cmdname = "map"
         if self.instance > 1:
             cmdname += "%u" % self.instance
@@ -962,7 +962,7 @@ Usage: map circle <radius> <colour>
 
     def unload(self):
         '''unload module'''
-        super(MapModule, self).unload()
+        super().unload()
         self.map.close()
         if self.instance == 1:
             self.mpstate.map = None

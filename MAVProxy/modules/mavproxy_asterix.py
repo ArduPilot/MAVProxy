@@ -52,7 +52,7 @@ class VehiclePos(object):
 class AsterixModule(mp_module.MPModule):
 
     def __init__(self, mpstate):
-        super(AsterixModule, self).__init__(mpstate, "asterix", "asterix SDPS data support")
+        super().__init__(mpstate, "asterix", "asterix SDPS data support")
         self.threat_vehicles = {}
         self.active_threat_ids = []  # holds all threat ids the vehicle is evading
 

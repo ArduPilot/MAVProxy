@@ -7,7 +7,7 @@ from MAVProxy.modules.lib import mp_module
 
 class RelayModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(RelayModule, self).__init__(mpstate, "relay")
+        super().__init__(mpstate, "relay")
         self.add_command('relay', self.cmd_relay, "relay commands")
         self.add_command('servo', self.cmd_servo, "servo commands")
         self.add_command('motortest', self.cmd_motortest, "motortest commands")

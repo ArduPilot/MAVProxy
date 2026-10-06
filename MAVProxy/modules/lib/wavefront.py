@@ -163,7 +163,7 @@ class Parser(object):
 
 class ParserWorker(threading.Thread):
     def __init__(self, parser, progress_callback=None, complete_callback=None):
-        super(ParserWorker, self).__init__()
+        super().__init__()
         self.lock = threading.Lock()
         self.parser = parser
         self.complete_callback = complete_callback

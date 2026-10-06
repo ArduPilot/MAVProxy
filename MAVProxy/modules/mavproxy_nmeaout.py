@@ -18,7 +18,7 @@ from MAVProxy.modules.lib import mp_module
 
 class NMEAOutModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(NMEAOutModule, self).__init__(mpstate, "nmeaout", "NMEA output")
+        super().__init__(mpstate, "nmeaout", "NMEA output")
         self.port = None
         self.baudrate = 4800
         self.data = 8

@@ -13,9 +13,9 @@ class ParamEditorModule(mp_module.MPModule):
     A Graphical parameter editor for use with MAVProxy
     '''
     def __init__(self, mpstate):
-        super(ParamEditorModule, self).__init__(mpstate,
-                                                "paramedit", "param edit",
-                                                public=True)
+        super().__init__(mpstate,
+                         "paramedit", "param edit",
+                         public=True)
 
         # to work around an issue on MacOS this module is a thin wrapper
         # around a separate ParamEditorMain object

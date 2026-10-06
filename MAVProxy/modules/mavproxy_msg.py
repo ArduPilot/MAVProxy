@@ -18,7 +18,7 @@ from MAVProxy.modules.lib import mp_settings
 class msg(mp_module.MPModule):
     def __init__(self, mpstate):
         """Initialise module"""
-        super(msg, self).__init__(mpstate, "msg", "")
+        super().__init__(mpstate, "msg", "")
         self.status_callcount = 0
         self.boredom_interval = 10 # seconds
         self.last_bored = time.time()

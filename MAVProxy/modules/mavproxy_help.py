@@ -19,7 +19,7 @@ if mp_util.has_wxpython:
 
 class HelpModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(HelpModule, self).__init__(mpstate, "mavhelp", "Help and version information", public = True)  # noqa
+        super().__init__(mpstate, "mavhelp", "Help and version information", public = True)  # noqa
         self.enabled = False
         self.add_command('mavhelp', self.cmd_help, "help and version information", "<about|site>")
         self.have_list = False

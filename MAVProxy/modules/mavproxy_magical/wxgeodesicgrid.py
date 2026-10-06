@@ -31,7 +31,7 @@ from MAVProxy.modules.mavproxy_magical import glrenderer
 
 class Renderer(glrenderer.Renderer):
     def __init__(self, background):
-        super(Renderer, self).__init__(background)
+        super().__init__(background)
 
         glEnable(GL_DEPTH_TEST)
         glEnable(GL_MULTISAMPLE)
@@ -79,7 +79,7 @@ class Renderer(glrenderer.Renderer):
         self.mag.model.set_rotation(axis, angle)
 
     def render(self):
-        super(Renderer, self).render()
+        super().render()
 
         if self.vehicle:
             self.vehicle.draw(self.program)
@@ -117,7 +117,7 @@ class Renderer(glrenderer.Renderer):
 
 class GeodesicGrid(glrenderer.GLCanvas):
     def __init__(self, *k, **kw):
-        super(GeodesicGrid, self).__init__(*k, **kw)
+        super().__init__(*k, **kw)
 
         self.vehicle_wavefront = None
         self.dragging = False

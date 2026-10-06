@@ -31,7 +31,7 @@ except ImportError:
 
 class MissionItemProtocolModule(mp_module.MPModule):
     def __init__(self, mpstate, name, description, **args):
-        super(MissionItemProtocolModule, self).__init__(mpstate, name, description, **args)
+        super().__init__(mpstate, name, description, **args)
         self.add_command(self.command_name(),
                          self.cmd_wp,
                          '%s management' % self.itemtype(),
@@ -144,7 +144,7 @@ on'''
         if self.module('map') is not None and self.menu_added_map:
             self.menu_added_map = False
             self.module('map').remove_menu(self.menu)
-        super(MissionItemProtocolModule, self).unload()
+        super().unload()
 
     def create_loader(self):
         c = self.loader_class()

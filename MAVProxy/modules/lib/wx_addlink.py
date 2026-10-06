@@ -12,7 +12,7 @@ import MAVProxy.modules.mavproxy_link
 
 class linkAddDialog(wx.Dialog):
     def __init__(self, *args, **kwds):
-        super(linkAddDialog, self).__init__(*args, **kwds)
+        super().__init__(*args, **kwds)
     
         self.panelGUI = wx.Panel(self, wx.ID_ANY)
 

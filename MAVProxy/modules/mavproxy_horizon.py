@@ -13,7 +13,7 @@ import time
 class HorizonModule(mp_module.MPModule):
     def __init__(self, mpstate):
         # Define module load/unload reference and window title
-        super(HorizonModule, self).__init__(mpstate, "horizon", "Horizon Indicator", public=True)
+        super().__init__(mpstate, "horizon", "Horizon Indicator", public=True)
         self.mpstate.horizonIndicator = wxhorizon.HorizonIndicator(title='Horizon Indicator')
         self.mode = ''
         self.armed = ''

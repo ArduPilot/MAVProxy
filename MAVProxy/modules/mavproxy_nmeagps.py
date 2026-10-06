@@ -16,7 +16,7 @@ except ImportError as e:
 
 class NMEAGPSModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(NMEAGPSModule, self).__init__(mpstate, "NMEAGPS", "NMEA input")
+        super().__init__(mpstate, "NMEAGPS", "NMEA input")
         self.nmeagps_settings = mp_settings.MPSettings([
             ("port", str, None),
             ("baudrate", int, 9600),

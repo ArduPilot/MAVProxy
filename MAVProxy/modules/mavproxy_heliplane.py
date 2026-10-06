@@ -11,7 +11,7 @@ from MAVProxy.modules.lib import mp_settings
 
 class HeliPlaneModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(HeliPlaneModule, self).__init__(mpstate, "heliplane", "HeliPlane", public=False)
+        super().__init__(mpstate, "heliplane", "HeliPlane", public=False)
         self.last_chan_check = 0
 
         self.update_channels()

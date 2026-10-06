@@ -62,7 +62,7 @@ SLOW_MODULE = textwrap.dedent('''
 
     class SlowModule(mp_module.MPModule):
         def __init__(self, mpstate):
-            super(SlowModule, self).__init__(mpstate, 'slowmodule')
+            super().__init__(mpstate, 'slowmodule')
             self.add_command('slowcomplete', self.cmd_slow, 'slow to complete',
                              ['(SLOW)'])
             self.add_completion_function('(SLOW)', self.complete_slow)

@@ -25,7 +25,7 @@ from MAVProxy.modules.lib.mp_util import decode_flight_sw_version
 
 class UserAlertsModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(UserAlertsModule, self).__init__(mpstate, "useralerts", public=True)
+        super().__init__(mpstate, "useralerts", public=True)
 
         self.url = "https://firmware.ardupilot.org/useralerts/manifest.json"
         self.testurl = "https://firmware.ardupilot.org/useralerts/examplemanifest.json"

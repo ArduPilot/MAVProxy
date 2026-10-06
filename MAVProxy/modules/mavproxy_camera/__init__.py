@@ -127,7 +127,7 @@ class CameraModule(mp_module.MPModule):
     """MAVProxy operator interface for standard MAVLink cameras and mounts."""
 
     def __init__(self, mpstate):
-        super(CameraModule, self).__init__(
+        super().__init__(
             mpstate, "camera", "MAVLink camera and gimbal control", public=True, multi_vehicle=True)
         self.camera_settings = mp_settings.MPSettings([
             ("camera_component", int, 0),
@@ -295,7 +295,7 @@ class CameraModule(mp_module.MPModule):
             if self.module(name) is module:
                 for menu in self.menus:
                     module.remove_menu(menu)
-        super(CameraModule, self).unload()
+        super().unload()
 
     def usage(self):
         return """Usage:

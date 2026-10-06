@@ -12,7 +12,7 @@ from pymavlink import mavutil
 class GoProModule(mp_module.MPModule):
 
     def __init__(self, mpstate):
-        super(GoProModule, self).__init__(mpstate, "gopro", "gopro handling")
+        super().__init__(mpstate, "gopro", "gopro handling")
 
         self.add_command('gopro', self.cmd_gopro,   'gopro control', [
                                         'status',

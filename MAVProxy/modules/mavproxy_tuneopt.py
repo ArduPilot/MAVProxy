@@ -46,7 +46,7 @@ tune_options = {
 
 class TuneoptModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(TuneoptModule, self).__init__(mpstate, "tuneopt", "tuneopt command handling")
+        super().__init__(mpstate, "tuneopt", "tuneopt command handling")
         self.add_command('tuneopt', self.cmd_tuneopt,  'Select option for Tune Pot on Channel 6 (quadcopter only)')
 
     def tune_show(self):

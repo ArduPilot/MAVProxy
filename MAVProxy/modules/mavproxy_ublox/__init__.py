@@ -22,7 +22,7 @@ from MAVProxy.modules.lib import mp_settings
 class ublox(mp_module.MPModule):
     def __init__(self, mpstate):
         """Initialise module"""
-        super(ublox, self).__init__(mpstate, "ublox", "")
+        super().__init__(mpstate, "ublox", "")
         self.auto = True
         self.verbose = False
         self.api_token = self.read_api_token()
