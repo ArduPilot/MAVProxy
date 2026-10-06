@@ -154,7 +154,7 @@ class SpeechBackend():
         
 class SpeechModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(SpeechModule, self).__init__(mpstate, "speech", "speech output")
+        super().__init__(mpstate, "speech", "speech output")
         self.add_command('speech', self.cmd_speech, "text-to-speech", ['<say|list_voices>'])
 
         self.old_mpstate_say_function = self.mpstate.functions.say

@@ -66,7 +66,7 @@ class Renderer(object):
 class GLCanvas(glcanvas.GLCanvas):
     def __init__(self, *k, **kw):
         kw['attribList'] = (glcanvas.WX_GL_SAMPLES, 4)
-        super(GLCanvas, self).__init__(*k, **kw)
+        super().__init__(*k, **kw)
         self.context = glcanvas.GLContext(self)
         self.renderer = None
 

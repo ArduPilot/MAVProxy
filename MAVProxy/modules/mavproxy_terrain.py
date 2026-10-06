@@ -11,7 +11,7 @@ from MAVProxy.modules.lib import mp_settings
 
 class TerrainModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(TerrainModule, self).__init__(mpstate, "terrain", "terrain handling", public=True)
+        super().__init__(mpstate, "terrain", "terrain handling", public=True)
 
         self.current_request = None
         self.sent_mask = 0

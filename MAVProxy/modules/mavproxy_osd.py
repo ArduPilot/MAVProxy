@@ -19,7 +19,7 @@ from MAVProxy.modules.lib import mp_settings
 class osd(mp_module.MPModule):
     def __init__(self, mpstate):
         """Initialise OSD module"""
-        super(osd, self).__init__(mpstate, "osd", "")
+        super().__init__(mpstate, "osd", "")
 
         self.request_id = 1
         self.add_command('osd', self.cmd_osd, "OSD module",

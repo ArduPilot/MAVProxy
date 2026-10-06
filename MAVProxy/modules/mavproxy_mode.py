@@ -13,7 +13,7 @@ AP_FLAKE8_CLEAN
 
 class ModeModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(ModeModule, self).__init__(mpstate, "mode", public=True)
+        super().__init__(mpstate, "mode", public=True)
         self.add_command('mode', self.cmd_mode, "mode change", [
             '(MODE)'
         ])

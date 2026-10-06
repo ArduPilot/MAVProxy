@@ -8,7 +8,7 @@ from MAVProxy.modules.lib import mp_module
 
 class CalibrationModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(CalibrationModule, self).__init__(mpstate, "calibration")
+        super().__init__(mpstate, "calibration")
         self.add_command('ground', self.cmd_ground,   'do a ground start')
         self.add_command('level', self.cmd_level,    'set level on a multicopter')
         self.add_command('compassmot', self.cmd_compassmot, 'do compass/motor interference calibration')

@@ -292,7 +292,7 @@ class Weather(DNFZ):
 class GenobstaclesModule(mp_module.MPModule):
 
     def __init__(self, mpstate):
-        super(GenobstaclesModule, self).__init__(mpstate, "genobstacles", "OBC 2018 obstacle generator")
+        super().__init__(mpstate, "genobstacles", "OBC 2018 obstacle generator")
 
         self.add_command('genobstacles', self.cmd_genobstacles, "obstacle generator",
                          ["<start|stop|restart|clearall|status>",

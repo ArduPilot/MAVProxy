@@ -19,7 +19,7 @@ class SailModule(mp_module.MPModule):
     '''SailModule provides a dashboard to display sailing instrument data'''
 
     def __init__(self, mpstate):
-        super(SailModule, self).__init__(mpstate, "sail", "sailing module")
+        super().__init__(mpstate, "sail", "sailing module")
 
         # dashboard GUI
         self.sail_dash = SailingDashboard(title="Sailing Dashboard")

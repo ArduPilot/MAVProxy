@@ -16,7 +16,7 @@ OFFLINE_MBX = "https://firmware.ardupilot.org/AssistNow/OFFLINE.UBX"
 class GPSInjectModule(mp_module.MPModule):
 
     def __init__(self, mpstate):
-        super(GPSInjectModule, self).__init__(mpstate, "gpsinject", "gpsinject", public=False)
+        super().__init__(mpstate, "gpsinject", "gpsinject", public=False)
         self.gpsinject_settings = mp_settings.MPSettings(
             [('source', str, OFFLINE_MBX),
              ('send_rate_kps', float, 2.0),

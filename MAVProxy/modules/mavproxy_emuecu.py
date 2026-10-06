@@ -10,7 +10,7 @@ from MAVProxy.modules.lib import mp_settings
 class EMUECUModule(mp_module.MPModule):
 
     def __init__(self, mpstate):
-        super(EMUECUModule, self).__init__(mpstate, "emuecu", "emuecu", public=False)
+        super().__init__(mpstate, "emuecu", "emuecu", public=False)
         self.emuecu_settings = mp_settings.MPSettings(
             [('port', int, 102)])
         self.add_command('emu', self.cmd_emu, 'EMUECU control',

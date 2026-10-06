@@ -31,7 +31,7 @@ class MPMsgStats(MPDataLogChildTask):
             A dataflash or telemetry log
         '''
 
-        super(MPMsgStats, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     # @override
     def child_task(self):

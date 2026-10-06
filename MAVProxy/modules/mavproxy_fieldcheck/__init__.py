@@ -513,10 +513,10 @@ class FieldSpringValleyBottom(FieldCheck):
 class FieldCheckModule(mp_module.MPModule):
     def __init__(self, mpstate):
 
-        super(FieldCheckModule, self).__init__(mpstate,
-                                               "FieldCheck",
-                                               "FieldCheck Checks",
-                                               public=True)
+        super().__init__(mpstate,
+                         "FieldCheck",
+                         "FieldCheck Checks",
+                         public=True)
 
         self.fields = [
             FieldCMAC(),

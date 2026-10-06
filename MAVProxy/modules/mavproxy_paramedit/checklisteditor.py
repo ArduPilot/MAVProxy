@@ -51,7 +51,7 @@ class GridCheckListEditor(gridlib.PyGridCellEditor):
                                wx.SIZE_ALLOW_MINUS_ONE)
 
     def Show(self, show, attr):
-        super(GridCheckListEditor, self).Show(show, attr)
+        super().Show(show, attr)
 
     def BeginEdit(self, row, col, grid):
         self._tc.SetChecked(self.startValue)
@@ -84,7 +84,7 @@ class GridCheckListEditor(gridlib.PyGridCellEditor):
         evt.Skip()
 
     def Destroy(self):
-        super(GridCheckListEditor, self).Destroy()
+        super().Destroy()
 
     def Clone(self):
         return GridCheckListEditor(self.choices, self.pvalcol, self.startValue)
@@ -118,7 +118,7 @@ class GridDropListEditor(gridlib.PyGridCellEditor):
             self._tc.PushEventHandler(evtHandler)
 
     def Show(self, show, attr):
-        super(GridDropListEditor, self).Show(show, attr)
+        super().Show(show, attr)
 
     def SetSize(self, rect):
         self._tc.SetDimensions(rect.x, rect.y, rect.width+2, 30,
@@ -146,7 +146,7 @@ class GridDropListEditor(gridlib.PyGridCellEditor):
         evt.Skip()
 
     def Destroy(self):
-        super(GridDropListEditor, self).Destroy()
+        super().Destroy()
 
     def Clone(self):
         return GridDropListEditor(self.choices, self.pvalcol, self.startValue)
@@ -184,7 +184,7 @@ class GridScrollEditor(gridlib.PyGridCellEditor):
             self._tc.PushEventHandler(evtHandler)
 
     def Show(self, show, attr):
-        super(GridScrollEditor, self).Show(show, attr)
+        super().Show(show, attr)
 
     def BeginEdit(self, row, col, grid):
         self._tc.SetValue(self.startValue)
@@ -208,7 +208,7 @@ class GridScrollEditor(gridlib.PyGridCellEditor):
         evt.Skip()
 
     def Destroy(self):
-        super(GridScrollEditor, self).Destroy()
+        super().Destroy()
 
     def Clone(self):
         return GridScrollEditor(self.Range, self.pvalcol, self.startValue)

@@ -23,7 +23,7 @@ from pymavlink import mavutil
 
 class SilvusModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(SilvusModule, self).__init__(mpstate, "Silvus", "Silvus output")
+        super().__init__(mpstate, "Silvus", "Silvus output")
         # filter_dist is distance in metres
         self.silvus_settings = mp_settings.MPSettings([("gnd_ip", str, ""),
                                                        ("air_ip", str, ""),

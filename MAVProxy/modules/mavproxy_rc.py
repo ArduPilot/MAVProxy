@@ -20,7 +20,7 @@ if mp_util.has_wxpython:
 
 class RCModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(RCModule, self).__init__(mpstate, "rc", "rc command handling", public=True)
+        super().__init__(mpstate, "rc", "rc command handling", public=True)
         self.count = 18
         self.override = [0] * self.count
         self.last_override = [0] * self.count
@@ -84,7 +84,7 @@ class RCModule(mp_module.MPModule):
         if self.module('console') is not None and self.menu_added_console:
             self.menu_added_console = False
             self.module('console').remove_menu(self.menu)
-        super(RCModule, self).unload()
+        super().unload()
 
     def idle_task(self):
         self.override_period.frequency = self.rc_settings.override_hz

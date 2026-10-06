@@ -20,7 +20,7 @@ class RallyModule(mission_item_protocol.MissionItemProtocolModule):
 
     def __init__(self, mpstate):
         '''initialise module'''
-        super(RallyModule, self).__init__(
+        super().__init__(
             mpstate,
             "rally",
             "rally point management",
@@ -95,7 +95,7 @@ class RallyModule(mission_item_protocol.MissionItemProtocolModule):
 
     def commands(self):
         '''returns map from command name to handling function'''
-        ret = super(RallyModule, self).commands()
+        ret = super().commands()
         ret.update({
             'add': self.cmd_rally_add,
             "move": self.cmd_move,  # handled in parent class
@@ -123,10 +123,10 @@ class RallyModule(mission_item_protocol.MissionItemProtocolModule):
         return 'rally item'
 
     def mavlink_packet(self, p):
-        super(RallyModule, self).mavlink_packet(p)
+        super().mavlink_packet(p)
 
     def gui_menu_items(self):
-        ret = super(RallyModule, self).gui_menu_items()
+        ret = super().gui_menu_items()
         ret.extend([
             MPMenuItem(
                 'Add', 'Add', '# rally add ',

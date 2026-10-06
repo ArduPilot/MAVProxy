@@ -16,7 +16,7 @@ from MAVProxy.modules.lib import mp_util
 
 class OutputModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(OutputModule, self).__init__(mpstate, "output", "output control", public=True)
+        super().__init__(mpstate, "output", "output control", public=True)
         self.add_command('output', self.cmd_output, "output control",
                          ["<list|add|remove|sysid|discardcompid>"])
 

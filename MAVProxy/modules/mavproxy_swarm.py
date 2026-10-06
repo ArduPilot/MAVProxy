@@ -737,8 +737,8 @@ class swarm(mp_module.MPModule):
     '''
     def __init__(self, mpstate):
         '''Initialise module'''
-        super(swarm, self).__init__(mpstate, "swarm",
-                                    "swarm module", multi_vehicle=True)
+        super().__init__(mpstate, "swarm",
+                         "swarm module", multi_vehicle=True)
 
         # array of tuples for (SYSID, COMPID, FOLL_SYSID, veh_type) of all detected vehicles
         self.vehicleListing = []

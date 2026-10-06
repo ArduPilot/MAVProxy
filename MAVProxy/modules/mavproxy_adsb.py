@@ -105,7 +105,7 @@ class ADSBVehicle(object):
 class ADSBModule(mp_module.MPModule):
 
     def __init__(self, mpstate):
-        super(ADSBModule, self).__init__(mpstate, "adsb", "ADS-B data support", public = True)
+        super().__init__(mpstate, "adsb", "ADS-B data support", public = True)
         self.threat_vehicles = {}
         self.active_threat_ids = []  # holds all threat ids the vehicle is evading
 

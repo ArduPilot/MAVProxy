@@ -14,7 +14,7 @@ class SailingDashboardFrame(wx.Frame):
     '''The main frame of the sailing dashboard'''
 
     def __init__(self, state, title, size):
-        super(SailingDashboardFrame, self).__init__(None, title=title, size=size)
+        super().__init__(None, title=title, size=size)
         self._state = state
         self._title = title
 
@@ -171,7 +171,7 @@ class WindMeter(SM.SpeedMeter):
             |SM.SM_DRAW_MIDDLE_TEXT)
 
         # initialise super class
-        super(WindMeter, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         # non-public attributes 
         self._wind_reference = WindReference.RELATIVE
@@ -291,7 +291,7 @@ class InstrumentDisplay(wx.Panel):
         kwargs.setdefault('style', wx.TE_READONLY)
 
         # initialise super class
-        super(InstrumentDisplay, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         # set the background colour (also for text controls)
         # self.SetBackgroundColour(wx.WHITE)

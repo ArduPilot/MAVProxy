@@ -11,7 +11,7 @@ from MAVProxy.modules.lib import mp_module
 
 class AntennaModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(AntennaModule, self).__init__(mpstate, "antenna", "antenna pointing module")
+        super().__init__(mpstate, "antenna", "antenna pointing module")
         self.gcs_location = None
         self.last_bearing = 0
         self.last_announce = 0

@@ -21,7 +21,7 @@ from pyvicon import pyvicon
 class ViconModule(mp_module.MPModule):
 
     def __init__(self, mpstate):
-        super(ViconModule, self).__init__(mpstate, "vicon", "vicon", public=False)
+        super().__init__(mpstate, "vicon", "vicon", public=False)
         self.console.set_status('VPos', 'VPos -- -- --', row=5)
         self.console.set_status('VAtt', 'VAtt -- -- --', row=5)
         self.vicon_settings = mp_settings.MPSettings(

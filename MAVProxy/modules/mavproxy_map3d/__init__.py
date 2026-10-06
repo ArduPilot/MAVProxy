@@ -45,7 +45,7 @@ class Map3DModule(mp_module.MPModule):
         # modules use that wildcard for the 2D SlipMap API (add_object,
         # remove_object, set_position), which Map3D intentionally does not
         # implement.
-        super(Map3DModule, self).__init__(mpstate, "map3d", "3D map display")
+        super().__init__(mpstate, "map3d", "3D map display")
         self.map3d_settings = mp_settings.MPSettings([
             ('service', str, 'MicrosoftSat'),
             ('zexag', float, 1.0),

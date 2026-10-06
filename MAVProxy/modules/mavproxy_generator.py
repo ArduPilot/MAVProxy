@@ -19,7 +19,7 @@ from MAVProxy.modules.lib import mp_settings
 class generator(mp_module.MPModule):
     def __init__(self, mpstate):
         """Initialise module"""
-        super(generator, self).__init__(mpstate, "generator", "")
+        super().__init__(mpstate, "generator", "")
 
         self.generator_settings = mp_settings.MPSettings(
             [ ('verbose', bool, False),

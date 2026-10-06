@@ -29,7 +29,7 @@ from wx import glcanvas
 
 class Renderer(glrenderer.Renderer):
     def __init__(self, background):
-        super(Renderer, self).__init__(background)
+        super().__init__(background)
 
         glEnable(GL_DEPTH_TEST)
         glEnable(GL_MULTISAMPLE)
@@ -37,7 +37,7 @@ class Renderer(glrenderer.Renderer):
         self.vehicle = None
 
     def render(self):
-        super(Renderer, self).render()
+        super().render()
 
         if self.vehicle:
             self.vehicle.draw(self.program)
@@ -54,7 +54,7 @@ class Vehicle(glrenderer.GLCanvas):
     )
     def __init__(self, *k, **kw):
         kw['attribList'] = (glcanvas.WX_GL_SAMPLES, 4)
-        super(Vehicle, self).__init__(*k, **kw)
+        super().__init__(*k, **kw)
 
         self.context = glcanvas.GLContext(self)
         self.vehicle_wavefront = None

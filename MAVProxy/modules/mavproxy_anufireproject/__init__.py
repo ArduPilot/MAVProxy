@@ -18,7 +18,7 @@ from MAVProxy.modules.lib import mp_util
 
 class ANUFireProject(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(ANUFireProject, self).__init__(mpstate, "anufireproject", "")
+        super().__init__(mpstate, "anufireproject", "")
 
         self.kml_module_initialised = False
 

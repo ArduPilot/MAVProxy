@@ -32,13 +32,13 @@ class FenceModule(mission_item_protocol.MissionItemProtocolModule):
     '''
 
     def __init__(self, mpstate):
-        super(FenceModule, self).__init__(mpstate, "fence", "fence point management (new)", public=True)
+        super().__init__(mpstate, "fence", "fence point management (new)", public=True)
         self.present = False
         self.enabled = False
         self.healthy = True
 
     def gui_menu_items(self):
-        ret = super(FenceModule, self).gui_menu_items()
+        ret = super().gui_menu_items()
         ret.extend([
             MPMenuItem(
                 'Add Inclusion Circle', 'Add Inclusion Circle', '# fence addcircle inc ',
@@ -245,7 +245,7 @@ class FenceModule(mission_item_protocol.MissionItemProtocolModule):
     def mavlink_packet(self, m):
         if m.get_type() == 'SYS_STATUS' and self.message_is_from_primary_vehicle(m):
             self.handle_sys_status(m)
-        super(FenceModule, self).mavlink_packet(m)
+        super().mavlink_packet(m)
 
     def apply_function_to_points(self, function):
         if not self.check_have_list():
@@ -831,7 +831,7 @@ class FenceModule(mission_item_protocol.MissionItemProtocolModule):
 
     def commands(self):
         '''returns map from command name to handling function'''
-        ret = super(FenceModule, self).commands()
+        ret = super().commands()
         ret.update({
             'addcircle': (self.cmd_addcircle, ["<inclusion|inc|exclusion|exc>", "RADIUS"]),
             'addhomecircle': (self.cmd_addhomecircle, ["RADIUS"]),

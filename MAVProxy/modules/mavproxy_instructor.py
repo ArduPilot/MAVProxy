@@ -17,7 +17,7 @@ class InstructorModule(mp_module.MPModule):
     def __init__(self, mpstate):
         #self.in_pipe, self.out_pipe = multiproc.Pipe()
 
-        super(InstructorModule, self).__init__(mpstate, "instructor", "instructor module")
+        super().__init__(mpstate, "instructor", "instructor module")
         self.instructor = mp_instructor.InstructorUI()
 
         self.voltage_is_dropping = False

@@ -79,7 +79,7 @@ def find_note_dates(logs_dir, today):
 
 class NotesModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(NotesModule, self).__init__(mpstate, "notes", "flight notes")
+        super().__init__(mpstate, "notes", "flight notes")
         self.ui = None
         self.menu_added_console = False
         self.add_command('notes', self.cmd_notes, "flight notes",
@@ -163,7 +163,7 @@ class NotesModule(mp_module.MPModule):
         if console is not None and self.menu_added_console:
             console.cmd_menu_remove(['MAVProxy:Notes'])
         self.menu_added_console = False
-        super(NotesModule, self).unload()
+        super().unload()
 
 
 def init(mpstate):

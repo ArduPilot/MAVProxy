@@ -13,7 +13,7 @@ if mp_util.has_wxpython:
 
 class RallyModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(RallyModule, self).__init__(mpstate, "rally", "rally point control", public = True)
+        super().__init__(mpstate, "rally", "rally point control", public = True)
         self.rallyloader_by_sysid = {}
         self.add_command('rally', self.cmd_rally, "old rally point control", ["<add|clear|land|list|move|remove|>",
                                     "<load|save> (FILENAME)"])
@@ -295,7 +295,7 @@ class RallyModule(mp_module.MPModule):
         if self.module('map') is not None and self.menu_added_map:
             self.menu_added_map = False
             self.module('map').remove_menu(self.menu)
-        super(RallyModule, self).unload()
+        super().unload()
 
     def send_rally_point(self, i):
         '''send rally points from fenceloader'''

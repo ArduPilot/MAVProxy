@@ -25,7 +25,7 @@ except ImportError:
 
 class WPModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(WPModule, self).__init__(mpstate, "wp", "waypoint handling", public=True)
+        super().__init__(mpstate, "wp", "waypoint handling", public=True)
         self.wp_op = None
         self.wp_requested = {}
         self.wp_received = {}

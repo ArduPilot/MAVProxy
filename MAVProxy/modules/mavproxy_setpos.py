@@ -13,7 +13,7 @@ from MAVProxy.modules.lib import mp_settings
 class SetPosModule(mp_module.MPModule):
 
     def __init__(self, mpstate):
-        super(SetPosModule, self).__init__(mpstate, "SetPos", "SetPos", public=False)
+        super().__init__(mpstate, "SetPos", "SetPos", public=False)
         self.add_command('setpos', self.cmd_setpos, "set local pos")
         self.add_command('hop', self.cmd_hop, "hop position")
         self.hop = None

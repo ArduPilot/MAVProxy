@@ -32,7 +32,7 @@ class Button (Control):
     the value is set to `outlow`.'''
 
     def __init__(self, joystick, id, **kwargs):
-        super(Button, self).__init__(joystick, **kwargs)
+        super().__init__(joystick, **kwargs)
         self.id = id
 
     @property
@@ -51,7 +51,7 @@ class ToggleButton (Control):
     Iteration is looped by starting from the beginning when last value is reached.'''
 
     def __init__(self, joystick, id, **kwargs):
-        super(ToggleButton, self).__init__(joystick, **kwargs)
+        super().__init__(joystick, **kwargs)
         self.id = id
         # index of value to set next
         self._current_value_index = 0
@@ -89,7 +89,7 @@ class MultiButton (Control):
     changes is made to the channel.'''
 
     def __init__(self, joystick, buttons, **kwargs):
-        super(MultiButton, self).__init__(joystick, **kwargs)
+        super().__init__(joystick, **kwargs)
         self.buttons = buttons
         self._value = buttons[0]['value']
 
@@ -109,7 +109,7 @@ class Axis (Control):
     `True` in order to reverse the direction of the input.'''
 
     def __init__(self, joystick, id, invert=False, **kwargs):
-        super(Axis, self).__init__(joystick, **kwargs)
+        super().__init__(joystick, **kwargs)
         self.id = id
         self.invert = invert
 
@@ -129,7 +129,7 @@ class Hat (Control):
     to `outputhigh`.  No change is made when the axis returns to 0.'''
 
     def __init__(self, joystick, id, axis, **kwargs):
-        super(Hat, self).__init__(joystick, **kwargs)
+        super().__init__(joystick, **kwargs)
         self.id = id
         self.axis = axis
         self._value = self.outlow

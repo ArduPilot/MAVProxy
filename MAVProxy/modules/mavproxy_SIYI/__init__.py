@@ -336,7 +336,7 @@ def rate_mapping(desired_rate):
 class SIYIModule(mp_module.MPModule):
 
     def __init__(self, mpstate):
-        super(SIYIModule, self).__init__(mpstate, "SIYI", "SIYI camera support")
+        super().__init__(mpstate, "SIYI", "SIYI camera support")
 
         self.add_command('siyi', self.cmd_siyi, "SIYI camera control",
                          ["<rates|connect|autofocus|focus|zoom|yaw|pitch|center|getconfig|angle|photo|hdr|recording|lock|follow|fpv|settarget|notarget|thermal|rgbview|tempsnap|get_thermal_mode|thermal_gain|get_thermal_gain|settime>",

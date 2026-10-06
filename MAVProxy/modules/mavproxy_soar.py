@@ -24,7 +24,7 @@ class soar(mp_module.MPModule):
 
     def __init__(self, mpstate):
         """Initialise module"""
-        super(soar, self).__init__(mpstate, "soar", "")
+        super().__init__(mpstate, "soar", "")
         self._strength = None
         self._radius = None
         self._x = None

@@ -48,7 +48,7 @@ def py_data_func(pFrameOfMocapData, userdata):
 
 class NokovModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(NokovModule, self).__init__(mpstate, "nokov", "nokov")
+        super().__init__(mpstate, "nokov", "nokov")
         global nokov_module
         nokov_module = self
         self.client = None

@@ -22,8 +22,8 @@ class Joystick(mp_module.MPModule):
 
     def __init__(self, mpstate):
         """Initialise module"""
-        super(Joystick, self).__init__(mpstate, 'joystick',
-                                       'A flexible joystick driver')
+        super().__init__(mpstate, 'joystick',
+                         'A flexible joystick driver')
 
         self.joystick = None
 

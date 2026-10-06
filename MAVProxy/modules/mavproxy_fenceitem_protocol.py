@@ -10,7 +10,7 @@ if mp_util.has_wxpython:
 
 class FenceModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(FenceModule, self).__init__(mpstate, "fence", "geo-fence management", public = True)
+        super().__init__(mpstate, "fence", "geo-fence management", public = True)
         self.fenceloader_by_sysid = {}
         self.last_fence_breach = 0
         self.last_fence_status = 0
@@ -335,7 +335,7 @@ class FenceModule(mp_module.MPModule):
         if self.module('map') is not None and self.menu_added_map:
             self.menu_added_map = False
             self.module('map').remove_menu(self.menu)
-        super(FenceModule, self).unload()
+        super().unload()
 
 def init(mpstate):
     '''initialise module'''

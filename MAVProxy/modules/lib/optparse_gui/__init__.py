@@ -36,7 +36,7 @@ class OptparseDialog( wx.Dialog ):
             name='OptparseDialog',
             *args, **kwargs):
 
-        super(OptparseDialog, self).__init__(self, *args, **kwargs)
+        super().__init__(self, *args, **kwargs)
         provider = wx.SimpleHelpProvider()
         wx.HelpProvider_Set(provider)
 

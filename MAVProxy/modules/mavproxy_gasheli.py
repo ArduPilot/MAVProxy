@@ -11,7 +11,7 @@ from MAVProxy.modules.lib import mp_settings
 
 class GasHeliModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(GasHeliModule, self).__init__(mpstate, "gas_heli", "Gas Heli", public=False)
+        super().__init__(mpstate, "gas_heli", "Gas Heli", public=False)
         self.console.set_status('IGN', 'IGN', row=4)
         self.console.set_status('THR', 'THR', row=4)
         self.console.set_status('RPM', 'RPM: 0', row=4)

@@ -10,7 +10,7 @@ from MAVProxy.modules.lib import mp_module
 
 class MMapModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(MMapModule, self).__init__(mpstate, 'mmap', 'modest map display')
+        super().__init__(mpstate, 'mmap', 'modest map display')
         self.lat = None
         self.lon = None
         self.alt = None

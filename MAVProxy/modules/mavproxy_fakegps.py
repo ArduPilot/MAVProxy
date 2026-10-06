@@ -11,7 +11,7 @@ if mp_util.has_wxpython:
 
 class FakeGPSModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(FakeGPSModule, self).__init__(mpstate, "fakegps", public = True)
+        super().__init__(mpstate, "fakegps", public = True)
         self.last_send = time.time()
         self.FakeGPS_settings = mp_settings.MPSettings([("nsats", int, 16),
                                                         ("lat", float, -35.363261),

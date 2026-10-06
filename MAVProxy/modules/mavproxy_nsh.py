@@ -8,7 +8,7 @@ from MAVProxy.modules.lib import mp_module
 
 class NSHModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(NSHModule, self).__init__(mpstate, "nsh", "remote nsh shell")
+        super().__init__(mpstate, "nsh", "remote nsh shell")
         self.add_command('nsh', self.cmd_nsh,
                          'nsh shell control',
                          ['<start|stop>',

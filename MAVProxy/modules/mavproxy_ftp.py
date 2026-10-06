@@ -147,7 +147,7 @@ class FTPWorker(mp_module.MPModule):
     '''
     def __init__(self, manager, session, target_system=None,
                  target_component=None):
-        super(FTPWorker, self).__init__(manager.mpstate, "ftp_worker")
+        super().__init__(manager.mpstate, "ftp_worker")
         self.manager = manager
         self.ftp_settings = manager.ftp_settings
         self.seq = 0
@@ -1440,7 +1440,7 @@ class FTPModule(mp_module.MPModule):
     '''Public FTP module and concurrent-session manager.'''
 
     def __init__(self, mpstate):
-        super(FTPModule, self).__init__(mpstate, "ftp", public=True)
+        super().__init__(mpstate, "ftp", public=True)
         self.add_command('ftp', self.cmd_ftp, "file transfer",
                          ["<list|get|rm|rmdir|rename|mkdir|crc|cancel|status>",
                           "set (FTPSETTING)",
@@ -1870,7 +1870,7 @@ class FTPModule(mp_module.MPModule):
 
     def unload(self):
         self.cmd_cancel()
-        super(FTPModule, self).unload()
+        super().unload()
 
 
 def init(mpstate):

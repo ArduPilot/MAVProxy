@@ -32,7 +32,7 @@ except:
 
 class MagicalModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(MagicalModule, self).__init__(mpstate, 'magical')
+        super().__init__(mpstate, 'magical')
         self.add_command(
             'magical_ui',
             self.cmd_magical_ui,

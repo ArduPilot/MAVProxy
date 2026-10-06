@@ -29,7 +29,7 @@ if mp_util.has_wxpython:
 
 class KmlReadModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(KmlReadModule, self).__init__(mpstate, "kmlread", "Add kml or kmz layers to map", public=True)
+        super().__init__(mpstate, "kmlread", "Add kml or kmz layers to map", public=True)
         self.add_command('kml', self.cmd_param, "kml map handling",
                          ["<clear|snapwp|snapfence>",
                           "<load> (FILENAME)", '<layers>'])

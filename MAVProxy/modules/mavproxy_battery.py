@@ -9,7 +9,7 @@ from MAVProxy.modules.lib.mp_settings import MPSetting
 
 class BatteryModule(mp_module.MPModule):
     def __init__(self, mpstate):
-        super(BatteryModule, self).__init__(mpstate, "battery", "battery commands")
+        super().__init__(mpstate, "battery", "battery commands")
         self.add_command('bat', self.cmd_bat, "show battery information")
         self.last_battery_announce = 0
         self.last_battery_announce_time = 0

@@ -40,7 +40,7 @@ def scale_color(color, scale):
 # Class only for allowing getting a common default foreground color
 class Panel(wx.Panel):
     def __init__(self, *k, **kw):
-        super(Panel, self).__init__(*k, **kw)
+        super().__init__(*k, **kw)
         self.SetForegroundColour(COMMON_FOREGROUND)
 
 # Button with a custom style
@@ -48,7 +48,7 @@ class Button(wx.PyControl):
     def __init__(self, *k, **kw):
         if 'style' not in kw:
             kw['style'] = wx.BORDER_NONE
-        super(Button, self).__init__(*k, **kw)
+        super().__init__(*k, **kw)
 
         self.border_radius = 0
         self.border_width = 0
@@ -139,7 +139,7 @@ class Button(wx.PyControl):
 
 class CountdownText(wx.PyWindow):
     def __init__(self, *k, **kw):
-        super(CountdownText, self).__init__(*k, **kw)
+        super().__init__(*k, **kw)
 
         self.value = 0
         self.border_color = COMMON_FOREGROUND
@@ -203,7 +203,7 @@ class ReportDialog(wx.Dialog):
         failure_color = '#d81313'
 
         def __init__(self, *k, **kw):
-            super(ReportDialog.StatusIcon, self).__init__(*k, **kw)
+            super().__init__(*k, **kw)
             self.success = True
             self.Bind(wx.EVT_PAINT, self.OnPaint)
 
@@ -237,7 +237,7 @@ class ReportDialog(wx.Dialog):
 
     class CompassPanel(Panel):
         def __init__(self, parent, m, *k, **kw):
-            super(ReportDialog.CompassPanel, self).__init__(parent, *k, **kw)
+            super().__init__(parent, *k, **kw)
 
             self.InitUI()
 
@@ -375,7 +375,7 @@ class ReportDialog(wx.Dialog):
                 sizer.Hide(self.parameters_sizer)
 
     def __init__(self, parent, mavlink_messages, *k, **kw):
-        super(ReportDialog, self).__init__(parent, *k, **kw)
+        super().__init__(parent, *k, **kw)
 
         self.compass_parameters_shown = False
         self.mavlink_messages = mavlink_messages
@@ -477,7 +477,7 @@ class ReportDialog(wx.Dialog):
 # had to come up with our one (very simple) widget
 class InstructionText(wx.PyWindow):
     def __init__(self, *k, **kw):
-        super(InstructionText, self).__init__(*k, **kw)
+        super().__init__(*k, **kw)
 
         self.text = ''
         self.min_lines = 1
@@ -574,7 +574,7 @@ class MagicalFrame(wx.Frame):
     ref_rotations_script += (('restart',),)
 
     def __init__(self, conn):
-        super(MagicalFrame, self).__init__(None, title='Magical')
+        super().__init__(None, title='Magical')
 
         self.state = None
         self.grid = None

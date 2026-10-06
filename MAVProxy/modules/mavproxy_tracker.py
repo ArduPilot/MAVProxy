@@ -26,7 +26,7 @@ mode_mapping_antenna = {
 class TrackerModule(mp_module.MPModule):
     def __init__(self, mpstate):
         from pymavlink import mavparm
-        super(TrackerModule, self).__init__(mpstate, "tracker", "antenna tracker control module")
+        super().__init__(mpstate, "tracker", "antenna tracker control module")
         self.connection = None
         self.tracker_param = mavparm.MAVParmDict()
         sysid = 2
