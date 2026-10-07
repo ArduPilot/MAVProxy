@@ -780,13 +780,17 @@ class TestLiveMissionAltitudes(object):
         for frame in (3, 6):
             assert module.item_amsl(100.0, frame) == 684.0
 
-    def test_a_terrain_altitude_without_terrain_is_unknown(self):
-        # send_mission() turns a terrain-frame item into AMSL when it has the
-        # terrain height; one still in frame 10 or 11 has no known height,
-        # and home is not a stand-in for the ground under it
+    def test_a_terrain_altitude_stands_above_home_until_it_is_known(self):
+        # send_mission() turns a terrain-frame item into AMSL when it has
+        # the terrain height; until then home's height stands in for the
+        # ground's, so there is a path to draw, and the mission is drawn
+        # again once the terrain arrives
         module = self.module(584.0)
         for frame in (10, 11):
-            assert module.item_amsl(100.0, frame) is None
+            assert module.item_amsl(100.0, frame) == 684.0
+        # unless home is not known either
+        module = self.module(None)
+        assert module.item_amsl(100.0, 10) is None
 
     def test_a_climb_across_two_frames(self):
         module = self.module(584.0)

@@ -2129,6 +2129,43 @@ class TestDrawnTrack(object):
         home_position(HOME[2] + 100)
         assert len(module.sent) == drawn
 
+    def test_an_items_frame_is_part_of_which_mission_it_is(self):
+        """100m above home and 100m AMSL are not the same item, so a mission
+        changed from one to the other is flown again rather than drawn with
+        the path worked out for the other"""
+        module = self.live_module('plane')
+        loader = module.mpstate.module('wp').wploader
+        last = loader.wpoints[-1]
+        (last.frame, last.z) = (3, 100.0)
+        module.send_mission()
+        above_home = nearest(module.sent[-1], last.x, last.y)[2]
+        assert above_home == pytest.approx(HOME[2] + 100, abs=30.0)
+        (last.frame, last.z) = (0, 100.0)
+        module.send_mission()
+        assert module.sent[-1] is not None
+        # 100m AMSL is a long way below a home at 584m, and the path drawn
+        # for it dives rather than holding the height of the other
+        assert nearest(module.sent[-1], last.x, last.y)[2] < above_home - 300
+
+    def test_a_waypoint_above_terrain_nobody_has_yet_stands_above_home(self):
+        """there is a path to draw before the terrain arrives: home's height
+        stands in for the ground's, and the mission is drawn again once the
+        terrain is known"""
+        module = self.live_module('plane')
+        module.terrain_alt = lambda lat, lon: None
+        loader = module.mpstate.module('wp').wploader
+        last = loader.wpoints[-1]
+        (last.frame, last.z) = (10, 100.0)
+        module.send_mission()
+        assert module.sent[-1] is not None
+        assert nearest(module.sent[-1], last.x, last.y)[2] == \
+            pytest.approx(HOME[2] + 100, abs=30.0)
+        # and once it is known, at the height above that
+        module.terrain_alt = lambda lat, lon: HOME[2] + 300
+        module.send_mission()
+        assert nearest(module.sent[-1], last.x, last.y)[2] == \
+            pytest.approx(HOME[2] + 400, abs=30.0)
+
     def test_the_live_map_redraws_for_a_changed_parameter(self):
         """how the vehicle flies a mission is its parameters' as much as its
         items': a parameter the path is flown by changing, or arriving for
