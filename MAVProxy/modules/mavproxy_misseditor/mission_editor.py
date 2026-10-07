@@ -75,7 +75,6 @@ class MissionEditorEventThread(threading.Thread):
         while not self.time_to_quit:
             queue_access_start_time = time.time()
             self.event_queue_lock.acquire()
-            request_read_after_processing_queue = False
             while (not self.event_queue.empty()) and (time.time() - queue_access_start_time) < 0.6:
                 event = self.event_queue.get()
 
@@ -87,16 +86,14 @@ class MissionEditorEventThread(threading.Thread):
                     event_type = event.get_type()
 
                     if event_type == me_event.MEE_READ_WPS:
-                        self.mp_misseditor.reading_mission = False
-                        if event.get_arg("use_ftp"):
-                            self.mp_misseditor.num_wps_expected = 0
+                        read_id = event.get_arg('read_id')
+                        use_ftp = event.get_arg('use_ftp')
+                        self.mp_misseditor.start_read(read_id, use_ftp)
+                        if use_ftp:
                             self.start_ftp('Read', self.module('wp').wp_ftp_download,
-                                           self.ftp_read_done, [])
+                                           lambda loader, read_id=read_id: self.ftp_read_done(loader, read_id),
+                                           [], read_id=read_id)
                         else:
-                            # A MAVLink read has an initially unknown count.
-                            self.mp_misseditor.reading_mission = True
-                            self.mp_misseditor.num_wps_expected = -1
-                            self.mp_misseditor.wps_received = {}
                             self.module('wp').cmd_wp(['list'])
 
                     elif event_type == me_event.MEE_TIME_TO_QUIT:
@@ -152,14 +149,12 @@ class MissionEditorEventThread(threading.Thread):
                         self.mp_misseditor.mpstate.settings.command(["wpalt",event.get_arg("alt")])
 
                     elif event_type == me_event.MEE_WRITE_WPS:
-                        self.mp_misseditor.reading_mission = False
+                        self.mp_misseditor.start_read(None)
                         self.write_use_ftp = event.get_arg("use_ftp")
                         self.module('wp').wploader.clear()
                         self.module('wp').wploader.expected_count = event.get_arg("count")
                         if not self.write_use_ftp:
                             self.master().waypoint_count_send(event.get_arg("count"))
-                        self.mp_misseditor.num_wps_expected = 0
-                        self.mp_misseditor.wps_received = {}
                     elif event_type == me_event.MEE_WRITE_WP_NUM:
                         w = mavutil.mavlink.MAVLink_mission_item_message(
                             self.mp_misseditor.mpstate.settings.target_system,
@@ -180,7 +175,6 @@ class MissionEditorEventThread(threading.Thread):
                             if loader.count() == loader.expected_count:
                                 self.start_ftp('Write', self.module('wp').ftp_upload,
                                                self.ftp_write_done, copy.deepcopy(loader))
-                                self.mp_misseditor.num_wps_expected = 0
                             continue
                         wsend = self.module('wp').wploader.wp(w.seq)
                         if self.mp_misseditor.mpstate.settings.wp_use_mission_int:
@@ -190,35 +184,25 @@ class MissionEditorEventThread(threading.Thread):
                         #tell the wp module to expect some waypoints
                         self.module('wp').loading_waypoints = True
 
-                    elif event_type == me_event.MEE_SAVE_WP_FILE:
-                        self.module('wp').cmd_wp(['save',event.get_arg("path")])
-
             self.event_queue_lock.release()
-
-            #if event processing operations require a mission referesh in GUI
-            #(e.g., after a load or a verified-completed write):
-            if (request_read_after_processing_queue):
-                self.event_queue_lock.acquire()
-                self.event_queue.put(MissionEditorEvent(me_event.MEE_READ_WPS))
-                self.event_queue_lock.release()
 
             #periodically re-request WPs that were never received:
             #DON'T NEED TO! -- wp module already doing this
 
             time.sleep(0.2)
 
-    def ftp_read_done(self, wploader):
+    def ftp_read_done(self, wploader, read_id):
         '''populate the table before reporting a successful download'''
         if self.time_to_quit:
             return
         if wploader is None:
-            self.ftp_transfer_done(False, "Read failed")
+            self.ftp_transfer_done(False, "Read failed", read_id=read_id)
             return
         # Deliver the whole result atomically so the GUI can reject it if
         # the user edited the mission during the download.
         with self.mp_misseditor.gui_event_queue_lock:
             self.mp_misseditor.gui_event_queue.put(MissionEditorEvent(
-                me_event.MEGE_FTP_MISSION, wploader=copy.deepcopy(wploader)))
+                me_event.MEGE_FTP_MISSION, wploader=copy.deepcopy(wploader), read_id=read_id))
 
     def send_wploader(self, wploader):
         with self.mp_misseditor.gui_event_queue_lock:
@@ -229,40 +213,40 @@ class MissionEditorEventThread(threading.Thread):
         settings = self.mp_misseditor.mpstate.settings
         return settings.target_system, settings.target_component
 
-    def start_ftp(self, operation, transfer, callback, data):
-        self.ftp_requests.put((operation, self.ftp_target(), transfer, callback, data))
+    def start_ftp(self, operation, transfer, callback, data, read_id=None):
+        self.ftp_requests.put((operation, self.ftp_target(), transfer, callback, data, read_id))
 
     def process_ftp_requests(self):
         '''called only by the MAVProxy main loop'''
         while not self.time_to_quit:
             try:
-                operation, target, transfer, callback, data = self.ftp_requests.get_nowait()
+                operation, target, transfer, callback, data, read_id = self.ftp_requests.get_nowait()
             except queue.Empty:
                 return
             if target != self.ftp_target():
-                self.ftp_transfer_done(False, '%s cancelled: vehicle changed' % operation)
+                self.ftp_transfer_done(False, '%s cancelled: vehicle changed' % operation, read_id=read_id)
                 continue
 
-            def completed(result, target=target, callback=callback, operation=operation):
+            def completed(result, target=target, callback=callback, operation=operation, read_id=read_id):
                 if target != self.ftp_target():
-                    self.ftp_transfer_done(False, '%s result discarded: vehicle changed' % operation)
+                    self.ftp_transfer_done(False, '%s result discarded: vehicle changed' % operation, read_id=read_id)
                 else:
                     callback(result)
 
             try:
                 transfer(data, callback=completed)
             except Exception as ex:
-                self.ftp_transfer_done(False, '%s failed: %s' % (operation, ex))
+                self.ftp_transfer_done(False, '%s failed: %s' % (operation, ex), read_id=read_id)
 
     def ftp_write_done(self, dlen):
         self.ftp_transfer_done(dlen is not None,
                                "Write succeeded" if dlen is not None else "Write failed")
 
-    def ftp_transfer_done(self, success, message):
+    def ftp_transfer_done(self, success, message, read_id=None):
         if not self.time_to_quit:
             with self.mp_misseditor.gui_event_queue_lock:
                 self.mp_misseditor.gui_event_queue.put(MissionEditorEvent(
-                    me_event.MEGE_FTP_TRANSFER, success=success, message="MAVFTP: " + message))
+                    me_event.MEGE_FTP_TRANSFER, success=success, message="MAVFTP: " + message, read_id=read_id))
 
 class MissionEditorMain(object):
     def __init__(self, mpstate, elemodel):
@@ -271,6 +255,8 @@ class MissionEditorMain(object):
         self.num_wps_expected = 0 #helps me to know if all my waypoints I'm expecting have arrived
         self.wps_received = {}
         self.reading_mission = False
+        self.read_id = None
+        self.read_lock = threading.Lock()
         self.map_mission = None
 
         self.survey_preview = SurveyPreview()
@@ -316,18 +302,12 @@ class MissionEditorMain(object):
                 time.sleep(0.1)
             m = self.mavlink_message_queue.get()
 
-            #MAKE SURE YOU RELEASE THIS LOCK BEFORE LEAVING THIS METHOD!!!
-            #No "return" statement should be put in this method!
-            self.gui_event_queue_lock.acquire()
-
             try:
                 self.process_mavlink_packet(m)
             except Exception as e:
                 print("Caught exception (%s)" % str(e))
                 import traceback
                 traceback.print_stack()
-
-            self.gui_event_queue_lock.release()
 
     def unload(self):
         '''unload module'''
@@ -380,34 +360,44 @@ class MissionEditorMain(object):
                 m = self.mpstate.module('wp').wp_from_mission_item_int(m)
             self.mavlink_message_queue.put(m)
 
-    def process_mavlink_packet(self, m):
-        '''handle an incoming mavlink packet'''
-        mtype = m.get_type()
+    def start_read(self, read_id, use_ftp=False):
+        """Serialize read replacement/cancellation with MAVLink completion."""
+        with self.read_lock:
+            self.read_id = read_id
+            self.reading_mission = read_id is not None and not use_ftp
+            self.num_wps_expected = -1 if self.reading_mission else 0
+            self.wps_received = {}
 
-        # if you add processing for an mtype here, remember to add it
-        # to mavlink_packet, above
+    def process_mavlink_packet(self, m):
+        """Collect only explicit editor reads, returning a tagged snapshot."""
         if (getattr(m, 'mission_type', None) is not None and
             m.mission_type != mavutil.mavlink.MAV_MISSION_TYPE_MISSION):
             return
-        # Only an explicit editor Read may replace the table through mission
-        # packets. Console reads and upload responses must not bypass the GUI's
-        # revision/dirty guards through the old incremental receive path.
-        if not self.reading_mission:
-            return
-        if mtype == 'MISSION_COUNT':
-            self.num_wps_expected = m.count
-            self.wps_received = {}
-        elif mtype == 'MISSION_ITEM' and 0 <= m.seq < self.num_wps_expected:
-            self.wps_received[m.seq] = m
-        else:
-            return
-        if len(self.wps_received) == self.num_wps_expected:
+        with self.read_lock:
+            if not self.reading_mission:
+                return
+            mtype = m.get_type()
+            if mtype == 'MISSION_COUNT':
+                self.num_wps_expected = m.count
+                self.wps_received = {}
+            elif mtype == 'MISSION_ITEM' and 0 <= m.seq < self.num_wps_expected:
+                self.wps_received[m.seq] = m
+            else:
+                return
+            if len(self.wps_received) != self.num_wps_expected:
+                return
             loader = mavwp.MAVWPLoader()
             for seq in range(self.num_wps_expected):
                 loader.add(self.wps_received[seq])
-            self.gui_event_queue.put(MissionEditorEvent(me_event.MEGE_READ_MISSION, wploader=loader))
+            read_id = self.read_id
             self.reading_mission = False
             self.num_wps_expected = 0
+            self.wps_received = {}
+        # Do not hold the read lock while waiting for the GUI queue. A newer
+        # read may start here; its ID lets the GUI discard this older result.
+        with self.gui_event_queue_lock:
+            self.gui_event_queue.put(MissionEditorEvent(
+                me_event.MEGE_READ_MISSION, wploader=loader, read_id=read_id))
 
     @staticmethod
     def child_task(q, l, gq, gl, cw_sem, elemodel, object_queue):

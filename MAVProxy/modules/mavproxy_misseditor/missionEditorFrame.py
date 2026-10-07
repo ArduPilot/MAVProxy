@@ -211,6 +211,9 @@ class MissionEditorFrame(wx.Frame):
         self.mission_modified = False
         self.home_received = False
         self.ftp_revision = None
+        self.read_id = 0
+        self.active_read_id = None
+        self.read_revision = None
         self.label_sync_state = wx.StaticText(self, wx.ID_ANY, "UNSYNCED   \n", style=wx.ALIGN_CENTRE)
         self.label_wp_radius = wx.StaticText(self, wx.ID_ANY, "WP Radius")
         self.text_ctrl_wp_radius = wx.TextCtrl(self, wx.ID_ANY, "", style=wx.TE_PROCESS_ENTER | wx.TE_PROCESS_TAB)
@@ -518,16 +521,24 @@ class MissionEditorFrame(wx.Frame):
                 return
             self.load_wploader(event.get_arg('wploader'))
         elif event.get_type() in (me_event.MEGE_FTP_MISSION, me_event.MEGE_READ_MISSION):
+            if self.active_read_id is None or event.get_arg('read_id') != self.active_read_id:
+                return
+            self.active_read_id = None
             protocol = 'MAVFTP' if event.get_type() == me_event.MEGE_FTP_MISSION else 'MAVLink'
             self.button_read_wps.Enable()
             self.button_write_wps.Enable()
-            if self.mission_revision != self.ftp_revision:
+            if self.mission_revision != self.read_revision:
                 self.SetStatusText('%s: Read completed; local edits kept. Read again to replace them.' % protocol)
                 return
             loader = event.get_arg('wploader')
             self.load_wploader(loader)
             self.SetStatusText('%s: Read succeeded (%u waypoints)' % (protocol, loader.count()))
         elif event.get_type() == me_event.MEGE_FTP_TRANSFER:
+            read_id = event.arg_dict.get('read_id')
+            if read_id is not None:
+                if read_id != self.active_read_id:
+                    return
+                self.active_read_id = None
             self.SetStatusText(event.get_arg("message"))
             self.button_read_wps.Enable()
             self.button_write_wps.Enable()
@@ -604,7 +615,9 @@ class MissionEditorFrame(wx.Frame):
                     self.grid_mission.SetCellValue(row, ME_FRAME_COL,
                         me_defines.frame_enum[frame_num])
                 else:
-                    self.grid_mission.SetCellValue(row, ME_FRAME_COL, "Und")
+                    # Preserve frames outside the editor's named choices so
+                    # loading and saving a mission does not lose their value.
+                    self.grid_mission.SetCellValue(row, ME_FRAME_COL, str(frame_num))
 
 
         elif event.get_type() == me_event.MEGE_SET_WP_RAD:
@@ -690,44 +703,63 @@ class MissionEditorFrame(wx.Frame):
             self.label_sync_state.SetForegroundColour(wx.Colour(12, 152, 26))
             self.update_map_mission(False)
 
+    def mission_frame(self, row):
+        frame = self.grid_mission.GetCellValue(row, ME_FRAME_COL)
+        if frame in me_defines.frame_enum_rev:
+            return me_defines.frame_enum_rev[frame]
+        return int(frame)
+
+    def mission_wploader(self):
+        """Snapshot the displayed mission for local saves and map previews."""
+        if not self.home_received:
+            raise ValueError('Mission home is unknown; Read WPs or load a mission file first')
+        loader = mavwp.MAVWPLoader()
+        home = [float(label.GetLabel()) for label in
+                (self.label_home_lat_value, self.label_home_lon_value, self.label_home_alt_value)]
+        if not all(math.isfinite(value) for value in home):
+            raise ValueError('Invalid mission home')
+        loader.add(mavutil.mavlink.MAVLink_mission_item_message(
+            0, 0, 0, 0, mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 0, 1, 0, 0, 0, 0, *home))
+        for row in range(self.grid_mission.GetNumberRows()):
+            try:
+                command = self.grid_mission.GetCellValue(row, ME_COMMAND_COL)
+                command_id = me_defines.cmd_reverse_lookup(command) or int(command)
+                params = [float(self.grid_mission.GetCellValue(row, col).strip() or '0')
+                          for col in range(ME_P1_COL, ME_P4_COL + 1)]
+                params += [float(self.grid_mission.GetCellValue(row, col))
+                           for col in range(ME_LAT_COL, ME_ALT_COL + 1)]
+                if not all(math.isfinite(value) for value in params[4:]):
+                    raise ValueError('Location and altitude must be finite')
+                frame = self.mission_frame(row)
+                loader.add(mavutil.mavlink.MAVLink_mission_item_message(
+                    0, 0, row + 1, frame, command_id, 0, 1, *params))
+            except (ValueError, KeyError) as ex:
+                raise ValueError('Invalid waypoint %u: %s' % (row + 1, ex)) from ex
+        return loader
+
     def update_map_mission(self, modified):
-        '''Publish a display-only draft; never change the vehicle transfer loader.'''
+        """Publish a display-only draft; never change the vehicle transfer loader."""
         if self.read_only:
             return
-        if modified and not self.home_received:
+        try:
+            loader = self.mission_wploader() if modified else None
+        except ValueError:
+            # A cell is incomplete: keep the last valid map until corrected.
             return
-        loader = None
-        if modified:
-            loader = mavwp.MAVWPLoader()
-            try:
-                loader.add(mavutil.mavlink.MAVLink_mission_item_message(
-                    0, 0, 0, 0, mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 0, 1,
-                    0, 0, 0, 0, float(self.label_home_lat_value.GetLabel()),
-                    float(self.label_home_lon_value.GetLabel()), float(self.label_home_alt_value.GetLabel())))
-                for row in range(self.grid_mission.GetNumberRows()):
-                    command = self.grid_mission.GetCellValue(row, ME_COMMAND_COL)
-                    command_id = me_defines.cmd_reverse_lookup(command) or int(command)
-                    params = [float(self.grid_mission.GetCellValue(row, col)) for col in range(1, 8)]
-                    if not all(math.isfinite(value) for value in params[4:]):
-                        return
-                    frame = me_defines.frame_enum_rev[self.grid_mission.GetCellValue(row, ME_FRAME_COL)]
-                    loader.add(mavutil.mavlink.MAVLink_mission_item_message(
-                        0, 0, row + 1, frame, command_id, 0, 1, *params))
-            except (ValueError, KeyError):
-                # A cell is incomplete: keep the last valid map until corrected.
-                return
         with self.event_queue_lock:
             self.event_queue.put(MissionEditorEvent(me_event.MEE_MAP_MISSION, wploader=loader))
 
     def read_wp_pushed(self, event):  # wxGlade: MissionEditorFrame.<event_handler>
         self.grid_mission.SaveEditControlValue()
         self.grid_mission.DisableCellEditControl()
-        self.ftp_revision = self.mission_revision
+        self.read_id += 1
+        self.active_read_id = self.read_id
+        self.read_revision = self.mission_revision
         if self.checkbox_mavftp.GetValue():
             self.ftp_transfer_started("Reading waypoints")
         self.event_queue_lock.acquire()
         self.event_queue.put(MissionEditorEvent(
-            me_event.MEE_READ_WPS, use_ftp=self.checkbox_mavftp.GetValue()))
+            me_event.MEE_READ_WPS, use_ftp=self.checkbox_mavftp.GetValue(), read_id=self.active_read_id))
 
         #sneak in some queries about a few other items as well:
         self.event_queue.put(MissionEditorEvent(me_event.MEE_GET_WP_RAD))
@@ -744,6 +776,7 @@ class MissionEditorFrame(wx.Frame):
         self.button_write_wps.Disable()
 
     def write_wp_pushed(self, event):  # wxGlade: MissionEditorFrame.<event_handler>
+        self.active_read_id = None
         if self.checkbox_mavftp.GetValue():
             self.ftp_transfer_started("Writing waypoints")
         self.event_queue_lock.acquire()
@@ -792,7 +825,7 @@ class MissionEditorFrame(wx.Frame):
             except:
                 alt = 0.0
             try:
-                frame = float(me_defines.frame_enum_rev[self.grid_mission.GetCellValue(i,ME_FRAME_COL)])
+                frame = self.mission_frame(i)
             except:
                 frame = 0.0
 
@@ -987,25 +1020,28 @@ class MissionEditorFrame(wx.Frame):
         fd = wx.FileDialog(self, "Save Mission File", os.getcwd(),
                            os.path.basename(self.last_mission_file_path), "MissionFiles(*.txt.*.wp,*.waypoints)|*.txt;*.wp;*.waypoints",
                                wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT)
-        if (fd.ShowModal() == wx.ID_CANCEL):
-            return #user change their mind...
-
-        if self.read_only:
-            try:
-                self.read_only_wploader.save(fd.GetPath())
-            except Exception as ex:
-                wx.MessageBox("Unable to save mission: %s" % ex,
-                              "Save Mission", wx.OK | wx.ICON_ERROR)
+        try:
+            if fd.ShowModal() != wx.ID_OK:
                 return
-        else:
-            # ask mp_misseditor module to save file
-            self.event_queue_lock.acquire()
-            self.event_queue.put(MissionEditorEvent(me_event.MEE_SAVE_WP_FILE,
-                path=fd.GetPath()))
-            self.event_queue_lock.release()
+            path = fd.GetPath()
+        finally:
+            fd.Destroy()
 
-        self.last_mission_file_path = fd.GetPath()
+        try:
+            if self.read_only:
+                loader = self.read_only_wploader
+            else:
+                self.grid_mission.SaveEditControlValue()
+                self.grid_mission.DisableCellEditControl()
+                # Validate the complete grid before opening the destination.
+                loader = self.mission_wploader()
+            loader.save(path)
+        except Exception as ex:
+            self.SetStatusText('Unable to save mission: %s' % ex)
+            return
 
+        self.last_mission_file_path = path
+        self.SetStatusText('Mission saved to %s' % path)
         event.Skip()
 
     def on_mission_grid_cell_select(self, event):  # wxGlade: MissionEditorFrame.<event_handler>

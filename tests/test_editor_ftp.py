@@ -49,10 +49,11 @@ class EditorFTPTests(unittest.TestCase):
         self.wp.wploader_by_sysid = {1: mavwp.MAVWPLoader()}
         self.wp.loading_waypoints = False
         self.modules['wp'] = self.wp
-        self.mission = types.SimpleNamespace(
+        self.mission = mission_editor.MissionEditorMain.__new__(mission_editor.MissionEditorMain)
+        self.mission.__dict__.update(
             mpstate=self.state, gui_event_queue=queue.Queue(),
             gui_event_queue_lock=threading.Lock(), num_wps_expected=0,
-            wps_received={})
+            wps_received={}, read_id=None, reading_mission=False, read_lock=threading.Lock())
         self.mission_events = queue.Queue()
         self.mission_thread = mission_editor.MissionEditorEventThread(
             self.mission, self.mission_events, threading.Lock())
@@ -184,7 +185,7 @@ class EditorFTPTests(unittest.TestCase):
         self.assertEqual(struct.unpack('<HHHHH', data[:10]), (0x763d, 0, 0, 0, 2))
         self.wp.wploader.clear()
         self.run_mission_events([
-            me_event.MissionEditorEvent(me_event.MEE_READ_WPS, use_ftp=True)])
+            me_event.MissionEditorEvent(me_event.MEE_READ_WPS, use_ftp=True, read_id=1)])
         # Simulate completion while the editor event thread is running.
         self.mission_thread.time_to_quit = False
         self.ftp.cmd_get.call_args.kwargs['callback'](io.BytesIO(data))
@@ -202,7 +203,7 @@ class EditorFTPTests(unittest.TestCase):
     def test_mission_standard_transfer_paths(self):
         with mock.patch.object(self.wp, 'cmd_wp') as command:
             self.run_mission_events([
-                me_event.MissionEditorEvent(me_event.MEE_READ_WPS, use_ftp=False)])
+                me_event.MissionEditorEvent(me_event.MEE_READ_WPS, use_ftp=False, read_id=1)])
             command.assert_called_once_with(['list'])
         self.run_mission_events([
             me_event.MissionEditorEvent(me_event.MEE_WRITE_WPS, use_ftp=False, count=1),
@@ -212,10 +213,22 @@ class EditorFTPTests(unittest.TestCase):
         self.ftp.cmd_get.assert_not_called()
         self.ftp.cmd_put.assert_not_called()
 
+    def test_ftp_read_callbacks_keep_their_request_ids(self):
+        with mock.patch.object(self.wp, 'wp_ftp_download') as download:
+            for read_id in (1, 2):
+                self.run_mission_events([
+                    me_event.MissionEditorEvent(me_event.MEE_READ_WPS, use_ftp=True, read_id=read_id)])
+            callbacks = [call.kwargs['callback'] for call in download.call_args_list]
+            callbacks[1](mavwp.MAVWPLoader())
+            callbacks[0](None)
+        results = [self.mission.gui_event_queue.get_nowait() for _ in range(2)]
+        self.assertEqual([e.get_arg('read_id') for e in results], [2, 1])
+        self.assertEqual([e.type for e in results], [me_event.MEGE_FTP_MISSION, me_event.MEGE_FTP_TRANSFER])
+
     def test_empty_and_failed_mission_downloads(self):
         for data in (None, io.BytesIO(struct.pack('<HHHHH', 0x763d, 0, 0, 0, 0))):
             self.run_mission_events([
-                me_event.MissionEditorEvent(me_event.MEE_READ_WPS, use_ftp=True)])
+                me_event.MissionEditorEvent(me_event.MEE_READ_WPS, use_ftp=True, read_id=1)])
             self.mission_thread.time_to_quit = False
             self.ftp.cmd_get.call_args.kwargs['callback'](data)
             self.run_mission_events([])
@@ -242,7 +255,7 @@ class EditorFTPTests(unittest.TestCase):
         self.run_param_event(ph_event.PEE_FETCH, use_ftp=True)
         self.assert_param_status('Read failed')
         self.run_mission_events([
-            me_event.MissionEditorEvent(me_event.MEE_READ_WPS, use_ftp=True)])
+            me_event.MissionEditorEvent(me_event.MEE_READ_WPS, use_ftp=True, read_id=1)])
         self.assert_mission_status(False, 'Read failed')
         self.run_mission_events([
             me_event.MissionEditorEvent(me_event.MEE_WRITE_WPS, use_ftp=True, count=1),
@@ -260,7 +273,7 @@ class EditorFTPTests(unittest.TestCase):
             self.mission_item_event(0)])
         for data in (b'', struct.pack('<HHHHH', 0x763d, 0, 0, 0, 1)):
             self.run_mission_events([
-                me_event.MissionEditorEvent(me_event.MEE_READ_WPS, use_ftp=True)])
+                me_event.MissionEditorEvent(me_event.MEE_READ_WPS, use_ftp=True, read_id=1)])
             self.mission_thread.time_to_quit = False
             self.ftp.cmd_get.call_args.kwargs['callback'](io.BytesIO(data))
             self.assert_mission_status(False, 'Read failed')
@@ -272,7 +285,7 @@ class EditorFTPTests(unittest.TestCase):
         self.run_param_event(ph_event.PEE_FETCH, use_ftp=True)
         self.assert_param_status('Read failed: Disconnected')
         self.run_mission_events([
-            me_event.MissionEditorEvent(me_event.MEE_READ_WPS, use_ftp=True)])
+            me_event.MissionEditorEvent(me_event.MEE_READ_WPS, use_ftp=True, read_id=1)])
         self.assert_mission_status(False, 'Read failed: Disconnected')
         self.run_mission_events([
             me_event.MissionEditorEvent(me_event.MEE_WRITE_WPS, use_ftp=True, count=1),
@@ -329,7 +342,7 @@ class EditorFTPTests(unittest.TestCase):
                 worker.start()
                 worker.join(5)
                 self.assertFalse(worker.is_alive())
-            events = [me_event.MissionEditorEvent(me_event.MEE_READ_WPS, use_ftp=True)]
+            events = [me_event.MissionEditorEvent(me_event.MEE_READ_WPS, use_ftp=True, read_id=1)]
             if operation == 'Write':
                 events = [me_event.MissionEditorEvent(me_event.MEE_WRITE_WPS, use_ftp=True, count=1),
                           self.mission_item_event(0)]
@@ -346,7 +359,7 @@ class EditorFTPTests(unittest.TestCase):
     def test_vehicle_switch_before_submission_cancels_queued_transfers(self):
         self.run_param_event(ph_event.PEE_FETCH, process_ftp=False, use_ftp=True)
         self.run_mission_events([
-            me_event.MissionEditorEvent(me_event.MEE_READ_WPS, use_ftp=True)], process_ftp=False)
+            me_event.MissionEditorEvent(me_event.MEE_READ_WPS, use_ftp=True, read_id=1)], process_ftp=False)
         self.state.settings.target_system = 2
         self.editor.process_ftp_requests()
         self.mission_thread.process_ftp_requests()
@@ -356,7 +369,7 @@ class EditorFTPTests(unittest.TestCase):
 
     def test_mission_download_after_vehicle_switch_does_not_replace_loader(self):
         self.run_mission_events([
-            me_event.MissionEditorEvent(me_event.MEE_READ_WPS, use_ftp=True)])
+            me_event.MissionEditorEvent(me_event.MEE_READ_WPS, use_ftp=True, read_id=1)])
         self.state.settings.target_system = 2
         callback = self.ftp.cmd_get.call_args.kwargs['callback']
         callback(io.BytesIO(struct.pack('<HHHHH', 0x763d, 0, 0, 0, 0)))
