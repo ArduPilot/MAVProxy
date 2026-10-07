@@ -127,6 +127,9 @@ ENDS_THE_FLIGHT = (
 )
 # navigation commands numbered past MAV_CMD_NAV_LAST
 LATE_NAV_COMMANDS = (42702, 42703)     # NAV_SCRIPT_TIME, NAV_ATTITUDE_TIME
+# AP_MISSION_JUMP_REPEAT_FOREVER: the only repeat count which repeats for
+# ever, and the fewest AP_Mission follows at all
+JUMP_FOREVER = -1
 MAV_CMD_JUMP_TAG = 600
 MAV_CMD_DO_JUMP_TAG = 601
 # ArduPlane rejects these, and moves straight on to the item after
@@ -456,17 +459,19 @@ class MissionFlight(object):
         return target - 1
 
     def jumps(self, index):
-        '''whether the jump at index is followed.  AP_Mission follows one
-        its repeat count, or for ever with a count of -1; drawn, each is
-        followed once, so the path goes round a loop the once'''
+        '''whether the jump at index is followed.  AP_Mission follows one its
+        repeat count times, or for ever with a count of -1, and never one
+        asking for fewer than that; drawn, each is followed once, so the path
+        goes round a loop the once'''
         repeats = int(self.items[index][4][1] or 0)
-        return repeats != 0 and index not in self.jumps_taken
+        return repeats >= JUMP_FOREVER and repeats != 0 and \
+            index not in self.jumps_taken
 
     def loops_forever(self, index):
         '''whether the jump at index has already been followed and is
         followed for ever, so that the mission never gets past it'''
         repeats = int(self.items[index][4][1] or 0)
-        return repeats < 0 and index in self.jumps_taken
+        return repeats == JUMP_FOREVER and index in self.jumps_taken
 
     def next_nav_index(self, index, take=False, passed=None):
         '''AP_Mission::get_next_nav_cmd: the index of the next item after
@@ -479,8 +484,14 @@ class MissionFlight(object):
             command = self.items[i][0]
             if command in (mavutil.mavlink.MAV_CMD_DO_JUMP, MAV_CMD_DO_JUMP_TAG):
                 if i in followed:
-                    # round in a circle without navigating anywhere
-                    return None
+                    # round to this jump again without navigating anywhere.
+                    # AP_Mission gives up only while it is looking ahead
+                    # (AP_Mission::get_next_cmd); advancing, it runs the
+                    # jump's repeats out and carries on past it
+                    if not take:
+                        return None
+                    i += 1
+                    continue
                 if self.loops_forever(i):
                     # the aircraft goes round this loop for ever, and has
                     # been drawn going round it once
@@ -1243,14 +1254,15 @@ def is_navigation_command(command):
 def positionless_amsl(alt, frame, home_amsl):
     '''the AMSL altitude an item with no position of its own is flown at,
     or None for the altitude the aircraft is at.  Location::sanitize() puts
-    such an item where the aircraft is, but keeps its altitude unless that
-    is a relative 0; a terrain-relative one needs the terrain under wherever
-    that is, which is not known here'''
-    if alt is None:
+    such an item where the aircraft is, and Plane::set_next_WP() keeps the
+    altitude it has there unless that is zero, in whatever frame, which is
+    the altitude the aircraft is at as well; a terrain-relative one needs
+    the terrain under wherever that is, which is not known here'''
+    if alt is None or alt == 0:
         return None
     if frame in (0, 5):
         return alt
-    if alt == 0 or frame not in (3, 6) or home_amsl is None:
+    if frame not in (3, 6) or home_amsl is None:
         return None
     return home_amsl + alt
 
