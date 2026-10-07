@@ -14,9 +14,9 @@ import time
 import os
 import piexif
 import re
-import mavpicviewer_shared as mpv
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_elevation
+from MAVProxy.tools.mavpicviewer import mavpicviewer_shared as mpv
 
 if mp_util.has_wxpython:
     from MAVProxy.modules.lib.wx_loader import wx
