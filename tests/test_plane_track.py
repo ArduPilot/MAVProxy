@@ -678,6 +678,35 @@ class TestMissionFlight(object):
         far = max(math.hypot(*local(p)) for p in track)
         assert far > PARAMS['WP_LOITER_RAD'] * 0.9
 
+    def test_a_loop_with_nothing_to_navigate_to_is_flown_past(self):
+        """AP_Mission gives up on meeting a jump twice over only while it is
+        looking ahead; advancing, it runs the jump's repeats out and carries
+        on past it, so a loop with no item to navigate to in it does not end
+        the mission"""
+        after = (3000, 0)
+        for loop in ([self.jump(2, 3)],
+                     [change_speed(25), self.jump(2, 3)]):
+            items = [waypoint(1000, 0)] + loop + [waypoint(*after)]
+            assert self.visits(fly(items), *after) == 1
+
+    def test_a_jump_asking_for_fewer_than_for_ever_is_not_followed(self):
+        """AP_Mission repeats for ever on -1 alone, and never follows a jump
+        asking for fewer than that"""
+        items = [waypoint(1000, 0), self.jump(1, -2), waypoint(3000, 0)]
+        assert self.visits(fly(items), 3000, 0) == 1
+        # where -1 is flown round the loop the once and ends there
+        items = [waypoint(1000, 0), self.jump(1, -1), waypoint(3000, 0)]
+        assert self.visits(fly(items), 3000, 0) == 0
+
+    def test_an_item_with_no_altitude_at_all_holds_the_one_flown(self):
+        """Plane::set_next_WP takes a zero altitude, in whatever frame, as
+        the altitude the aircraft is at"""
+        for frame in (0, 3, 10):
+            assert plane_track.positionless_amsl(0.0, frame, HOME[2]) is None
+        # where an altitude of its own is flown at
+        assert plane_track.positionless_amsl(700.0, 0, HOME[2]) == 700.0
+        assert plane_track.positionless_amsl(100.0, 3, HOME[2]) == HOME[2] + 100
+
     def test_a_mission_which_loops_for_ever_does_not_return(self):
         items = [waypoint(2000, 0), waypoint(2000, 2000), waypoint(0, 2000),
                  self.jump(1, -1)]
