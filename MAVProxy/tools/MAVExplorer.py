@@ -630,6 +630,8 @@ def cmd_graphs(args):
         grui[-1].set_xlim(xlimits.last_xlim)
 
 map_timelim_pipes = []
+# the settings the open 3D views were last given
+map3d_pushed = None
 
 def cmd_map(args):
     '''map command'''
@@ -949,9 +951,12 @@ def mission_from_log(mlog, condition=None):
     A telemetry log carries the same things as the MAVLink messages the
     vehicle sent: its position, home and origin, what it said, and the
     mission and rally points as they were downloaded or uploaded while the
-    log was kept.  Only a transfer which arrives whole replaces what was
-    held, so one the log ends part way through leaves the table before it,
-    and a log which starts part way through one holds no mission at all
+    log was kept.  Only a mission which arrives whole replaces the one held,
+    so a transfer the log ends part way through leaves the mission before
+    it, and a log which starts part way through one holds no mission at all;
+    the rally points which arrive are the table, since what the old protocol
+    set before them is gone whether or not the new table ever arrives whole,
+    and they say so
     '''
     path = []
     # the mission and the rally points, as whatever kind of log this is
@@ -1039,9 +1044,13 @@ def mission_from_log(mlog, condition=None):
             after = rally_points(rally_log)
             if after != before or rally_log.arrivals != arrivals:
                 rally = after
-                # a table which never arrived whole is what is known of the
-                # one the vehicle holds, and all that is known: the points
-                # the old protocol set before it are gone
+            if mtype in ('MISSION_COUNT', 'MISSION_CLEAR_ALL') or \
+                    after != before:
+                # what arrived is what is known of the table the vehicle
+                # holds, and all that is known: the points the old protocol
+                # set before it are gone.  A download which says how many to
+                # expect and ends before any of them arrive leaves none of
+                # it, which is not the table either
                 rally_whole = not rally_log.partial()
         if mtype in log_mission.MISSION_TYPES:
             # the mission itself, which LogMission keeps: only the last one
@@ -1086,8 +1095,10 @@ def mission_from_log(mlog, condition=None):
                     pass
             elif m.Message == 'New rally':
                 # written before the whole table, even an empty one: a
-                # cleared table is this and no points at all
+                # cleared table is this and no points at all, which is the
+                # whole of it
                 rally = {}
+                rally_whole = True
             elif (len(fields) > 1 and fields[0] == 'Mission:' and
                     fields[1].isdigit() and path):
                 flown_from.setdefault(int(fields[1]), (path[-1][0], path[-1][1]))
@@ -1412,6 +1423,8 @@ def cmd_set(args):
 
 def update_map3d_views():
     '''push the settings the open 3D views care about'''
+    global map3d_pushed
+    map3d_pushed = map3d_settings()
     for view in map3d_views:
         if view.is_alive():
             view.set_mission_arrows(mestate.settings.showdirection)
@@ -1433,11 +1446,19 @@ def say_unflown():
           "finishes an item, uses a command which cannot be flown here, or "
           "which the log does not hold all of; drawing its geometry")
 
+def map3d_settings():
+    '''the settings the open 3D views are drawn by'''
+    return (mestate.settings.showdirection, mestate.settings.showlabels,
+            mestate.settings.labelsize, mestate.settings.missionpath)
+
+
 def poll_map3d_views():
-    '''take what the open 3D views' own controls have been set to.  A view
-    which has died is drained too, so we do not lose the reason it failed
-    to start'''
-    changed = False
+    '''take what the open 3D views' own controls have been set to, and give
+    them any setting changed since they were last told -- by the settings
+    dialog as much as by a set command.  A view which has died is drained
+    too, so we do not lose the reason it failed to start'''
+    global map3d_pushed
+    changed = map3d_settings() != map3d_pushed
     for view in map3d_views:
         for event in view.check_events():
             if event[0] == 'startup_error':
