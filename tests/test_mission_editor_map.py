@@ -26,6 +26,8 @@ def backend():
     editor.time_to_quit = False
     editor.map_mission = None
     editor.reading_mission = False
+    editor.read_id = None
+    editor.read_lock = threading.Lock()
     editor.num_wps_expected = 0
     editor.wps_received = {}
     editor.gui_event_queue = queue.Queue()
@@ -113,7 +115,7 @@ def test_map_replaces_route_and_labels_then_restores_controller_mission(backend)
 
 @pytest.mark.parametrize('count', [0, 3])
 def test_mavlink_read_delivers_complete_mission_atomically(backend, count):
-    backend.process(me_event.MEE_READ_WPS, use_ftp=False)
+    backend.process(me_event.MEE_READ_WPS, use_ftp=False, read_id=1)
     backend.wp.cmd_wp.assert_called_once_with(['list'])
     backend.editor.process_mavlink_packet(mavutil.mavlink.MAVLink_mission_count_message(1, 1, count))
     original = mission(count)
@@ -122,6 +124,7 @@ def test_mavlink_read_delivers_complete_mission_atomically(backend, count):
         backend.editor.process_mavlink_packet(original.wp(seq))
     event = backend.editor.gui_event_queue.get_nowait()
     assert event.type == me_event.MEGE_READ_MISSION
+    assert event.get_arg("read_id") == 1
     assert event.get_arg('wploader').count() == count
     assert [w.seq for w in event.get_arg('wploader').wpoints] == list(range(count))
     assert backend.editor.gui_event_queue.empty()
@@ -154,3 +157,35 @@ def test_stale_receive_counters_cannot_enable_incremental_gui_updates(backend, o
     for item in mission(3).wpoints:
         backend.editor.process_mavlink_packet(item)
     assert backend.editor.gui_event_queue.empty()
+
+
+def test_new_read_survives_older_completion_waiting_for_gui(backend):
+    backend.process(me_event.MEE_READ_WPS, use_ftp=False, read_id=1)
+    delivering = threading.Event()
+    resume = threading.Event()
+    put = backend.editor.gui_event_queue.put
+
+    def delayed_put(event):
+        delivering.set()
+        assert resume.wait(5)
+        put(event)
+
+    with mock.patch.object(backend.editor.gui_event_queue, 'put', side_effect=delayed_put):
+        completion = threading.Thread(target=backend.editor.process_mavlink_packet,
+                                      args=(mavutil.mavlink.MAVLink_mission_count_message(1, 1, 0),))
+        completion.start()
+        try:
+            assert delivering.wait(5)
+            backend.process(me_event.MEE_READ_WPS, use_ftp=False, read_id=2)
+        finally:
+            resume.set()
+            completion.join(5)
+        assert not completion.is_alive()
+    assert backend.editor.reading_mission
+    assert backend.editor.num_wps_expected == -1
+    backend.editor.process_mavlink_packet(mavutil.mavlink.MAVLink_mission_count_message(1, 1, 1))
+    backend.editor.process_mavlink_packet(mission(1).wp(0))
+    results = [backend.editor.gui_event_queue.get_nowait() for _ in range(2)]
+    assert [event.get_arg('read_id') for event in results] == [1, 2]
+    assert [event.get_arg('wploader').count() for event in results] == [0, 1]
+    assert not backend.editor.reading_mission

@@ -403,7 +403,8 @@ def test_read_restores_original_mission_unless_edited_during_download(gui, edito
         editor.grid_mission.SetCellValue(0, 7, '123')
         editor.set_modified_state(True)
     editor.process_gui_event(me_event.MissionEditorEvent(
-        me_event.MEGE_FTP_MISSION if ftp else me_event.MEGE_READ_MISSION, wploader=mission()))
+        me_event.MEGE_FTP_MISSION if ftp else me_event.MEGE_READ_MISSION,
+        wploader=mission(), read_id=editor.active_read_id))
     if edit_during_read:
         assert editor.label_sync_state.GetLabel() == 'MODIFIED'
         assert last_map_mission(editor).wp(1).z == 123
@@ -442,14 +443,15 @@ def test_incomplete_edit_survives_read_and_automatic_loader_refresh(gui, editor,
     assert last_map_mission(editor) is None  # invalid draft was not published
     for kind in (me_event.MEGE_FTP_MISSION if ftp else me_event.MEGE_READ_MISSION,
                  me_event.MEGE_LOAD_MISSION):
-        editor.process_gui_event(me_event.MissionEditorEvent(kind, wploader=mission()))
+        editor.process_gui_event(me_event.MissionEditorEvent(kind, wploader=mission(), read_id=editor.active_read_id))
         assert editor.grid_mission.GetCellValue(0, 5) == ''
         assert editor.mission_modified
         assert editor.label_sync_state.GetLabel() == 'MODIFIED'
     # A subsequent explicit Read still replaces the incomplete edit.
     editor.read_wp_pushed(mock.Mock())
     editor.process_gui_event(me_event.MissionEditorEvent(
-        me_event.MEGE_FTP_MISSION if ftp else me_event.MEGE_READ_MISSION, wploader=mission()))
+        me_event.MEGE_FTP_MISSION if ftp else me_event.MEGE_READ_MISSION,
+        wploader=mission(), read_id=editor.active_read_id))
     assert not editor.mission_modified
     assert float(editor.grid_mission.GetCellValue(0, 5)) == mission().wp(1).x
 
@@ -508,12 +510,14 @@ def test_load_file_replaces_dirty_draft_locally_and_rejects_older_read(gui, edit
 
     # A download that began before the file selection must not undo it.
     editor.process_gui_event(me_event.MissionEditorEvent(
-        me_event.MEGE_FTP_MISSION if ftp else me_event.MEGE_READ_MISSION, wploader=mission()))
+        me_event.MEGE_FTP_MISSION if ftp else me_event.MEGE_READ_MISSION,
+        wploader=mission(), read_id=editor.active_read_id))
     assert editor.grid_mission.GetCellValue(0, 7) == '321.00'
     assert editor.mission_modified
     editor.read_wp_pushed(mock.Mock())
     editor.process_gui_event(me_event.MissionEditorEvent(
-        me_event.MEGE_FTP_MISSION if ftp else me_event.MEGE_READ_MISSION, wploader=mission()))
+        me_event.MEGE_FTP_MISSION if ftp else me_event.MEGE_READ_MISSION,
+        wploader=mission(), read_id=editor.active_read_id))
     assert editor.grid_mission.GetCellValue(0, 7) == '120.00'
     assert not editor.mission_modified
 
@@ -539,3 +543,142 @@ def test_failed_file_load_keeps_existing_draft(gui, editor, tmp_path, failure):
     assert last_map_mission(editor) is previous_map
     if failure != 'cancel':
         assert 'Unable to load mission' in editor.GetStatusBar().GetStatusText()
+
+
+def test_load_edit_save_uses_grid_offline_and_keeps_draft_modified(gui, editor, tmp_path):
+    from MAVProxy.modules.mavproxy_misseditor import me_event
+    path = tmp_path / 'mission.waypoints'
+    source = mission()
+    source.wp(1).z = 321
+    source.save(str(path))
+    with mock.patch.object(gui.wx, 'FileDialog') as dialog:
+        dialog.return_value.ShowModal.return_value = gui.wx.ID_OK
+        dialog.return_value.GetPath.return_value = str(path)
+        editor.load_wp_file_pushed(mock.Mock())
+        editor.grid_mission.SetCellValue(0, 7, '444')
+        editor.grid_mission.SetCellValue(0, 8, 'AGL')
+        editor.grid_mission.SetCellValue(0, 4, 'nan')  # valid unspecified yaw
+        editor.set_modified_state(True)
+        expected = editor.mission_wploader()
+        revision = editor.mission_revision
+        editor.save_wp_file_pushed(mock.Mock())
+        assert dialog.return_value.Destroy.call_count == 2
+    saved = mavwp.MAVWPLoader()
+    saved.load(str(path))
+    assert saved.count() == expected.count()
+    assert saved.wp(1).z == 444
+    assert saved.wp(1).frame == mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT
+    # Compare the entire saved mission, including home, frame, command and parameters.
+    expected_path = tmp_path / 'expected.waypoints'
+    expected.save(str(expected_path))
+    assert path.read_text() == expected_path.read_text()
+    assert editor.mission_revision == revision
+    assert editor.mission_modified
+    assert editor.label_sync_state.GetLabel() == 'MODIFIED'
+    assert last_map_mission(editor).wp(1).z == 444
+    assert all(event.type == me_event.MEE_MAP_MISSION for event in list(editor.event_queue.queue))
+
+
+def test_save_commits_active_cell_editor(gui, editor, tmp_path):
+    path = tmp_path / 'edited.waypoints'
+    editor.Show()
+    editor.grid_mission.SetGridCursor(0, 7)
+    editor.grid_mission.EnableCellEditControl()
+    cell_editor = editor.grid_mission.GetCellEditor(0, 7)
+    cell_editor.GetControl().SetValue('444')
+    try:
+        with mock.patch.object(gui.wx, 'FileDialog') as dialog:
+            dialog.return_value.ShowModal.return_value = gui.wx.ID_OK
+            dialog.return_value.GetPath.return_value = str(path)
+            editor.save_wp_file_pushed(mock.Mock())
+        saved = mavwp.MAVWPLoader()
+        saved.load(str(path))
+        assert saved.wp(1).z == 444
+        assert editor.mission_modified
+        assert last_map_mission(editor).wp(1).z == 444
+    finally:
+        cell_editor.DecRef()
+
+
+@pytest.mark.parametrize('failure', ['cancel', 'invalid', 'nonfinite', 'no_home', 'disk'])
+def test_failed_save_preserves_file_and_dirty_state(gui, editor, tmp_path, failure):
+    path = tmp_path / 'existing.waypoints'
+    mission().save(str(path))
+    original = path.read_bytes()
+    editor.grid_mission.SetCellValue(0, 7, {'invalid': '', 'nonfinite': 'inf'}.get(failure, '444'))
+    if failure == 'no_home':
+        editor.home_received = False
+    editor.set_modified_state(True)
+    previous_path = editor.last_mission_file_path
+    with mock.patch.object(gui.wx, 'FileDialog') as dialog:
+        dialog.return_value.ShowModal.return_value = gui.wx.ID_CANCEL if failure == 'cancel' else gui.wx.ID_OK
+        dialog.return_value.GetPath.return_value = str(tmp_path / 'missing' / 'mission.wp') if failure == 'disk' else str(path)
+        editor.save_wp_file_pushed(mock.Mock())
+        dialog.return_value.Destroy.assert_called_once()
+    assert path.read_bytes() == original
+    assert editor.last_mission_file_path == previous_path
+    assert editor.mission_modified
+    if failure != 'cancel':
+        assert 'Unable to save mission' in editor.GetStatusBar().GetStatusText()
+
+
+@pytest.mark.parametrize('ftp', [True, False])
+def test_old_read_result_cannot_complete_newer_read(gui, editor, ftp):
+    from MAVProxy.modules.mavproxy_misseditor import me_event
+    editor.checkbox_mavftp.SetValue(ftp)
+    editor.read_wp_pushed(mock.Mock())
+    first_id = editor.active_read_id
+    editor.grid_mission.SetCellValue(0, 7, '444')
+    editor.set_modified_state(True)
+    editor.read_wp_pushed(mock.Mock())
+    second_id = editor.active_read_id
+    assert second_id != first_id
+    kind = me_event.MEGE_FTP_MISSION if ftp else me_event.MEGE_READ_MISSION
+    editor.process_gui_event(me_event.MissionEditorEvent(kind, wploader=mission(), read_id=first_id))
+    assert editor.active_read_id == second_id
+    assert editor.grid_mission.GetCellValue(0, 7) == '444'
+    assert editor.mission_modified
+    if ftp:
+        editor.process_gui_event(me_event.MissionEditorEvent(
+            me_event.MEGE_FTP_TRANSFER, success=False, message='Old read failed', read_id=first_id))
+        assert not editor.button_read_wps.IsEnabled()
+        assert editor.active_read_id == second_id
+    editor.process_gui_event(me_event.MissionEditorEvent(kind, wploader=mission(), read_id=second_id))
+    assert editor.active_read_id is None
+    assert editor.grid_mission.GetCellValue(0, 7) == '120.00'
+    assert not editor.mission_modified
+    assert editor.button_read_wps.IsEnabled()
+    # A duplicate completion must not revert a subsequent local edit either.
+    editor.grid_mission.SetCellValue(0, 7, '555')
+    editor.set_modified_state(True)
+    editor.process_gui_event(me_event.MissionEditorEvent(kind, wploader=mission(), read_id=second_id))
+    assert editor.grid_mission.GetCellValue(0, 7) == '555'
+
+
+@pytest.mark.parametrize('frame', [2, 11])
+def test_save_preserves_unnamed_frames_and_defaults_blank_parameters(gui, editor, tmp_path, frame):
+    from MAVProxy.modules.mavproxy_misseditor import me_event
+    source = mission()
+    source.wp(1).frame = frame
+    editor.load_wploader(source, modified=True)
+    assert editor.grid_mission.GetCellValue(0, 8) == str(frame)
+    for col in range(1, 5):
+        editor.grid_mission.SetCellValue(0, col, ' ' if col == 1 else '')
+    editor.set_modified_state(True)
+    assert last_map_mission(editor).wp(1).frame == frame
+    path = tmp_path / 'unnamed-frame.waypoints'
+    with mock.patch.object(gui.wx, 'FileDialog') as dialog:
+        dialog.return_value.ShowModal.return_value = gui.wx.ID_OK
+        dialog.return_value.GetPath.return_value = str(path)
+        editor.save_wp_file_pushed(mock.Mock())
+    saved = mavwp.MAVWPLoader()
+    saved.load(str(path))
+    assert saved.wp(1).frame == frame
+    assert [getattr(saved.wp(1), 'param%u' % col) for col in range(1, 5)] == [0] * 4
+    assert editor.mission_modified
+    # A subsequent upload must preserve the same frame as the saved file.
+    editor.checkbox_mavftp.SetValue(False)
+    editor.write_wp_pushed(mock.Mock())
+    written = [event for event in list(editor.event_queue.queue)
+               if event.type == me_event.MEE_WRITE_WP_NUM and event.get_arg('num') == 1]
+    assert written[-1].get_arg('frame') == frame
