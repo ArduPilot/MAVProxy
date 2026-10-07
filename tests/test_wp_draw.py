@@ -65,6 +65,40 @@ class WPDrawTests(unittest.TestCase):
         self.draw(['80', 'AboveHome'])
         self.assert_waypoints(80, mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT)
 
+    def test_automatic_frame_tracks_terrain_changes(self):
+        self.wp.settings.terrainalt = 'Auto'
+        self.wp.get_mav_param = mock.Mock(return_value=0)
+        self.draw([])
+        self.assert_waypoints(100, mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT)
+        self.wp.get_mav_param.return_value = 1
+        self.draw([])
+        self.assert_waypoints(100, mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT)
+        self.wp.settings.terrainalt = 'False'
+        self.draw(['75'])
+        self.assert_waypoints(75, mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT)
+        self.wp.settings.terrainalt = 'True'
+        self.draw([])
+        self.assert_waypoints(75, mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT)
+        self.assertIsNone(self.wp.draw_frame)
+
+    def test_explicit_frame_is_remembered_until_default_selected(self):
+        self.draw(['80', 'AMSL'])
+        self.wp.settings.terrainalt = 'True'
+        self.draw(['90'])
+        self.assert_waypoints(90, mavutil.mavlink.MAV_FRAME_GLOBAL)
+        self.draw(['95', 'Default'])
+        self.assert_waypoints(95, mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT)
+        self.wp.settings.terrainalt = 'False'
+        self.draw([])
+        self.assert_waypoints(95, mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT)
+
+    def test_active_draw_keeps_frame_resolved_at_start(self):
+        with mock.patch('builtins.print'):
+            self.wp.cmd_draw([])
+        self.wp.settings.terrainalt = 'True'
+        self.draw_lines.call_args.args[0](self.points)
+        self.assert_waypoints(100, mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT)
+
     def test_invalid_arguments_do_not_start_drawing(self):
         for args in [['bad'], ['75', 'bad'], ['75', 'AGL', 'extra']]:
             with self.subTest(args=args), mock.patch('builtins.print'):
@@ -87,13 +121,13 @@ class WPDrawTests(unittest.TestCase):
             setattr(wx, name, 1)
         wx.Dialog.return_value.ShowModal.return_value = wx.ID_OK
         wx.TextCtrl.return_value.GetValue.return_value = '275'
-        wx.Choice.return_value.GetSelection.return_value = 2
+        wx.Choice.return_value.GetSelection.return_value = 3
 
         with mock.patch.object(wx_loader, 'wx', wx), \
                 mock.patch.dict(mp_menu.last_dropdown_selection, {}, clear=True), \
                 mock.patch.dict(mp_menu.last_value_selection, {}, clear=True):
             handler = draw_handler()
-            self.assertEqual(handler.dropdown_options, ['AboveHome', 'AGL', 'AMSL'])
+            self.assertEqual(handler.dropdown_options, ['Default', 'AboveHome', 'AGL', 'AMSL'])
             self.draw(handler.call().split())
             self.assert_waypoints(275, mavutil.mavlink.MAV_FRAME_GLOBAL)
 
@@ -101,9 +135,40 @@ class WPDrawTests(unittest.TestCase):
             wx.Dialog.return_value.ShowModal.return_value = 0
             self.assertIsNone(draw_handler().call())
             self.assertEqual(wx.TextCtrl.call_args.kwargs['value'], '275')
-            wx.Choice.return_value.SetSelection.assert_called_with(2)
+            wx.Choice.return_value.SetSelection.assert_called_with(3)
             self.assertEqual(mp_menu.last_value_selection[handler.title], '275')
-            self.assertEqual(mp_menu.last_dropdown_selection[handler.title], 2)
+            self.assertEqual(mp_menu.last_dropdown_selection[handler.title], 3)
+
+    @unittest.skipUnless(mavproxy_wp.mp_util.has_wxpython, 'requires wxPython')
+    def test_dialog_default_resolves_after_parameters_arrive(self):
+        from MAVProxy.modules.lib import wx_loader
+
+        self.wp.settings.terrainalt = 'Auto'
+        self.wp.get_mav_param = mock.Mock(return_value=0)
+        handler = next(item.handler for item in self.wp.gui_menu_items()
+                       if item.name == 'Draw')
+        self.wp.get_mav_param.return_value = 1
+
+        wx = mock.MagicMock()
+        for name in ('VERTICAL', 'HORIZONTAL', 'ALL', 'ALIGN_CENTER_VERTICAL',
+                     'EXPAND', 'OK', 'CANCEL', 'ALIGN_CENTER', 'ID_OK'):
+            setattr(wx, name, 1)
+        wx.Dialog.return_value.ShowModal.return_value = wx.ID_OK
+        wx.TextCtrl.return_value.GetValue.return_value = '100'
+        wx.Choice.return_value.GetSelection.side_effect = (
+            lambda: wx.Choice.return_value.SetSelection.call_args.args[0])
+
+        with mock.patch.object(wx_loader, 'wx', wx), \
+                mock.patch.dict(mp_menu.last_dropdown_selection, {}, clear=True), \
+                mock.patch.dict(mp_menu.last_value_selection, {}, clear=True):
+            self.draw(handler.call().split())
+            self.assert_waypoints(100, mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT)
+            self.wp.settings.terrainalt = 'False'
+            self.draw(handler.call().split())
+            self.assert_waypoints(100, mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT)
+            self.wp.settings.terrainalt = 'True'
+            self.draw(handler.call().split())
+            self.assert_waypoints(100, mavutil.mavlink.MAV_FRAME_GLOBAL_TERRAIN_ALT)
 
 
 if __name__ == '__main__':
