@@ -192,6 +192,38 @@ class TestSettingsSync(object):
         # view's, which it read after the command
         assert settings.showlabels is True
 
+    def test_mavexplorer_gives_a_view_a_setting_changed_anywhere(
+            self, map3d_frame, mavexplorer, monkeypatch):
+        '''the settings dialog writes the setting and says nothing, so what
+        the views are drawn by is taken each time round rather than only
+        when a set command gives it'''
+        from MAVProxy.modules.lib.mp_settings import MPSettings, MPSetting
+        settings = MPSettings([
+            MPSetting('showdirection', bool, True),
+            MPSetting('showlabels', bool, False),
+            MPSetting('labelsize', int, 14),
+            MPSetting('missionpath', str, 'flown',
+                      choice=['flown', 'geometry', 'plain'])])
+        monkeypatch.setattr(mavexplorer, 'mestate',
+                            SimpleNamespace(settings=settings), raising=False)
+        (viewer, frame) = connect(map3d_frame)
+        monkeypatch.setattr(mavexplorer, 'map3d_views', [viewer])
+        monkeypatch.setattr(mavexplorer, 'map3d_pushed', None,
+                            raising=False)
+        mavexplorer.poll_map3d_views()
+        deliver(viewer, frame)
+        assert frame.mission_style == 'flown'
+        # the dialog's own doing: the setting changed, with nothing said
+        settings.missionpath = 'plain'
+        settings.labelsize = 20
+        mavexplorer.poll_map3d_views()
+        deliver(viewer, frame)
+        assert frame.mission_style == 'plain'
+        assert frame.mission_label_size == 20
+        # and nothing more is sent while nothing changes
+        mavexplorer.poll_map3d_views()
+        assert viewer.object_queue.empty()
+
 
 def display():
     return bool(os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY'))

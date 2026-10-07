@@ -2741,6 +2741,50 @@ class TestDrawnTrack(object):
             cmds, mission, None, PARAMS, mavlink.MAV_TYPE_FIXED_WING,
             path, started, rally, origin) is not None
 
+    def test_mavexplorer_flies_a_mission_once_a_rally_table_is_cleared(self):
+        """a table the log holds only part of leaves the mission unflown,
+        but a table cleared away afterwards is the whole of what the vehicle
+        holds: none of it, and the mission is flown home again"""
+        mx = self.explorer()
+
+        def legacy(seq, count, north, east):
+            (lat, lon, _) = offset(north, east)
+            return self.mavlink(mavlink.MAVLink_rally_point_message(
+                255, 1, seq, count, int(lat * 1e7), int(lon * 1e7), 120,
+                0, 0, 0), 1)
+
+        def flown(log):
+            (path, mission, cmds, started, rally, origin, _) = \
+                mx.mission_from_log(log)
+            mission = mx.resolve_mission_amsl(mission, HOME[2], PARAMS,
+                                              mavlink.MAV_TYPE_FIXED_WING)
+            return mx.plane_mission_track(
+                cmds, mission, None, PARAMS, mavlink.MAV_TYPE_FIXED_WING,
+                path, started, rally, origin)
+        # one point of a table of two: not a table to work a return out from
+        assert flown(self.telemetry_mission(legacy(0, 2, -2000, 0))) is None
+        # and then the logger writing out a table with nothing in it
+        assert flown(self.telemetry_mission(
+            legacy(0, 2, -2000, 0),
+            self.message('MSG', Message='New rally'))) is not None
+
+    def test_mavexplorer_does_not_fly_a_rally_download_which_brought_none(
+            self):
+        """a download which says how many points to expect and ends before
+        any of them arrive leaves nothing known of the table: the mission is
+        not flown home as though the vehicle held no points"""
+        mx = self.explorer()
+        log = self.telemetry_mission(
+            self.mission_count(255, 2, mavlink.MAV_MISSION_TYPE_RALLY, 1))
+        (path, mission, cmds, started, rally, origin, _) = \
+            mx.mission_from_log(log)
+        assert rally == []
+        mission = mx.resolve_mission_amsl(mission, HOME[2], PARAMS,
+                                          mavlink.MAV_TYPE_FIXED_WING)
+        assert mx.plane_mission_track(
+            cmds, mission, None, PARAMS, mavlink.MAV_TYPE_FIXED_WING,
+            path, started, rally, origin) is None
+
     def test_mavexplorer_drops_rally_points_cleared_away(self):
         """MISSION_CLEAR_ALL for the rally table, and for everything, which
         takes the mission with it"""
