@@ -342,9 +342,13 @@ class Map3DModule(mp_module.MPModule):
         if frame in (0, 5):          # already AMSL
             return alt
         if frame in (10, 11):
-            # still above terrain: send_mission() turns these into AMSL once
-            # it has the terrain height, and until then nobody knows
-            return None
+            # above terrain which has not been fetched yet: send_mission()
+            # turns these into AMSL once it has the terrain height, and
+            # until then home's height stands in for the ground's, which is
+            # nearer the mark than the height the aircraft happens to be at
+            if self.home_amsl is None:
+                return None
+            return self.home_amsl + alt
         if self.home_amsl is None:
             # relative to a home we have not been told about yet
             return None
@@ -529,7 +533,9 @@ class Map3DModule(mp_module.MPModule):
         def keyed_alt(amsl, fixed):
             if amsl is None or fixed is None:
                 return None
-            return round(amsl if fixed else amsl - home[2], 2)
+            # which of the two it is matters as much as the number: 100m
+            # above home and 100m AMSL are not the same item
+            return (fixed, round(amsl if fixed else amsl - home[2], 2))
         relative = tuple(
             (command,
              'home' if (lat, lon) == home[:2] else (lat, lon),
