@@ -583,8 +583,9 @@ class Map3DModule(mp_module.MPModule):
         its own rather than one which moves with home'''
         from MAVProxy.modules.lib import plane_track
         try:
-            loader = self.module('rally').rallyloader
-            points = [loader.rally_point(i) for i in range(loader.rally_count())]
+            rally = self.module('rally')
+            points = [rally.rally_point(i)
+                      for i in range(rally.rally_count())]
         except Exception:
             return []
         out = []
@@ -763,8 +764,8 @@ class Map3DModule(mp_module.MPModule):
         if self.map is None:
             return
         try:
-            loader = self.module('rally').rallyloader
-            raw = [loader.rally_point(i) for i in range(loader.rally_count())]
+            rally = self.module('rally')
+            raw = [rally.rally_point(i) for i in range(rally.rally_count())]
         except Exception:
             return
         resolved = self.rally_points((0.0, 0.0, self.home_amsl))
@@ -860,7 +861,7 @@ class Map3DModule(mp_module.MPModule):
         except Exception:
             pass
         try:
-            rally_change = self.module('rally').rallyloader.last_change
+            rally_change = self.module('rally').last_change()
             if rally_change != self.rally_change_time:
                 self.rally_change_time = rally_change
                 self.send_rally()

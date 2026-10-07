@@ -1846,8 +1846,7 @@ class TestDrawnTrack(object):
                                  lng=int(HOME[1] * 1e7), alt=100,
                                  flags=frame_valid | (2 << 3))]
         module.mpstate.module = lambda name: SimpleNamespace(
-            rallyloader=SimpleNamespace(rally_count=lambda: 1,
-                                        rally_point=lambda i: rally[0]))
+            rally_count=lambda: 1, rally_point=lambda i: rally[0])
         # ArduPilot logs the EKF origin and home together, and MAVProxy
         # keeps only the last of each type, so the origin is often unknown:
         # home stands in for it, and moves the point as home moves
@@ -1867,9 +1866,7 @@ class TestDrawnTrack(object):
         module.mpstate.module = lambda name: SimpleNamespace(
             wploader=module.mpstate.module('wp').wploader
             if name == 'wp' else None,
-            rallyloader=SimpleNamespace(
-                rally_count=lambda: len(rally),
-                rally_point=lambda i: rally[i]))
+            rally_count=lambda: len(rally), rally_point=lambda i: rally[i])
         module.origin_amsl = 500.0
         module.terrain_alt = lambda lat, lon: 300.0
         points = module.rally_points((HOME[0], HOME[1], HOME[2]))
@@ -1891,8 +1888,7 @@ class TestDrawnTrack(object):
                                  flags=frame_valid | (frame << 3))
                  for frame in (0, 1, 2, 3)]
         module.mpstate.module = lambda name: SimpleNamespace(
-            rallyloader=SimpleNamespace(rally_count=lambda: len(rally),
-                                        rally_point=lambda i: rally[i]))
+            rally_count=lambda: len(rally), rally_point=lambda i: rally[i])
         drawn = ElementManager(vtk.vtkRenderer(), HOME[0], HOME[1], 1.0)
         drawn.set_home(HOME[2])
         module.map = SimpleNamespace(
@@ -2211,7 +2207,10 @@ class TestDrawnTrack(object):
         rally = SimpleNamespace(rally_points=[])
         rally.rally_count = lambda: len(rally.rally_points)
         rally.rally_point = lambda i: rally.rally_points[i]
-        modules = SimpleNamespace(wploader=loader, rallyloader=rally)
+        modules = SimpleNamespace(wploader=loader,
+                                  rally_count=rally.rally_count,
+                                  rally_point=rally.rally_point,
+                                  last_change=lambda: 0)
         module.mpstate.module = lambda name: (
             modules if name in ('wp', 'rally') else None)
         module.send_mission()
