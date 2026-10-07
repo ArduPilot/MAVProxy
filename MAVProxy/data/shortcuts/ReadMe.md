@@ -17,6 +17,21 @@ The script is not run automatically by `pip install`, since pip cannot
 reliably write to these XDG directories (especially when installing into a
 venv), so run it yourself once after installing MAVProxy.
 
+The desktop files launch the installed command names, so `mavproxy.py`,
+`MAVExplorer.py` and `mavpicviewer.py` must be available on the graphical
+desktop session's `PATH`. Activating a virtual environment in a terminal
+does not add its `bin` directory to the desktop session. A user-level install
+(for example, `pip install --user MAVProxy` or `pipx install MAVProxy`) is
+usually the simplest option; otherwise make sure the installation's `bin`
+directory is on the desktop session's `PATH`.
+
+The MAVPicViewer shortcut also requires the optional dependencies in the
+`recommended` extra. Install them with:
+
+```
+python3 -m pip install 'MAVProxy[recommended]'
+```
+
 To install manually instead:
 
 1. Copy the .desktop files to the .local/share/applications directory in your home directory. You may need to use CRTL-H to see the .local directory in your file manager.
