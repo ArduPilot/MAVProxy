@@ -19,10 +19,10 @@ class MissionFTPResultTests(unittest.TestCase):
     def setUp(self):
         self.editor = types.SimpleNamespace(
             button_read_wps=mock.Mock(), button_write_wps=mock.Mock(),
-            mission_revision=2, ftp_revision=2, load_wploader=mock.Mock(),
+            mission_revision=2, ftp_revision=2, read_revision=2, active_read_id=1, load_wploader=mock.Mock(),
             set_modified_state=mock.Mock(), SetStatusText=mock.Mock())
         self.loader = mavwp.MAVWPLoader()
-        self.event = me_event.MissionEditorEvent(me_event.MEGE_FTP_MISSION, wploader=self.loader)
+        self.event = me_event.MissionEditorEvent(me_event.MEGE_FTP_MISSION, wploader=self.loader, read_id=1)
 
     def test_download_replaces_grid_when_no_local_edits_were_made(self):
         frame.MissionEditorFrame.process_gui_event(self.editor, self.event)

@@ -14,11 +14,11 @@ MEE_GET_WP_RAD = 3
 MEE_GET_LOIT_RAD = 4
 MEE_GET_WP_DEFAULT_ALT = 5
 MEE_WRITE_WP_NUM = 6
-MEE_LOAD_WP_FILE = 7
-MEE_SAVE_WP_FILE = 8
 MEE_SET_WP_RAD = 9
 MEE_SET_LOIT_RAD = 10
 MEE_SET_WP_DEFAULT_ALT = 11
+MEE_SURVEY_PREVIEW = 12
+MEE_MAP_MISSION = 13
 #enum of MissionEditorGUIEvent types
 MEGE_CLEAR_MISS_TABLE = 0
 MEGE_ADD_MISS_TABLE_ROWS = 1
@@ -29,6 +29,8 @@ MEGE_SET_WP_DEFAULT_ALT = 5
 MEGE_SET_LAST_MAP_CLICK_POS = 6
 MEGE_FTP_TRANSFER = 7
 MEGE_FTP_MISSION = 8
+MEGE_READ_MISSION = 9
+MEGE_LOAD_MISSION = 10
 
 class MissionEditorEvent:
     def __init__(self, type, **kwargs):
@@ -39,8 +41,10 @@ class MissionEditorEvent:
                              MEGE_ADD_MISS_TABLE_ROWS, MEGE_SET_MISS_ITEM, MEE_TIME_TO_QUIT,
                              MEE_GET_WP_RAD, MEE_GET_LOIT_RAD, MEGE_SET_WP_RAD, MEGE_SET_LOIT_RAD,
                              MEE_GET_WP_DEFAULT_ALT, MEGE_SET_WP_DEFAULT_ALT, MEE_WRITE_WP_NUM,
-                             MEE_LOAD_WP_FILE, MEE_SAVE_WP_FILE, MEE_SET_WP_RAD, MEE_SET_LOIT_RAD,
-                             MEE_SET_WP_DEFAULT_ALT, MEGE_FTP_TRANSFER, MEGE_FTP_MISSION]:
+                             MEE_SET_WP_RAD, MEE_SET_LOIT_RAD,
+                             MEE_SET_WP_DEFAULT_ALT, MEGE_FTP_TRANSFER, MEGE_FTP_MISSION,
+                             MEE_SURVEY_PREVIEW, MEE_MAP_MISSION,
+                             MEGE_READ_MISSION, MEGE_LOAD_MISSION]:
             raise TypeError("Unrecongized MissionEditorEvent type:" + str(self.type))
 
     def get_type(self):

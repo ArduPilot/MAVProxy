@@ -13,6 +13,7 @@ import datetime
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_settings
 from MAVProxy.modules.lib import mp_module
+from MAVProxy.modules.mavproxy_misseditor import get_mission_for_map
 from MAVProxy.modules.lib.mp_menu import *
 from pymavlink import mavutil
 from PIL import ImageColor
@@ -37,6 +38,7 @@ class MapModule(mp_module.MPModule):
         # lat/lon per system ID
         self.lat_lon_heading = {}
         self.wp_change_time = 0
+        self.wp_display_loader = None
         self.fence_change_time = 0
         self.rally_change_time = 0
         self.terrain_contour_ids = []
@@ -455,15 +457,19 @@ Usage: map circle <radius> <colour>
         self.map.add_object(circle)
         self.circle_counter += 1
 
-    def colour_for_wp(self, wp_num):
+    def colour_for_wp(self, wp_num, wploader=None):
         '''return a tuple describing the colour a waypoint should appear on the map'''
-        wp = self.module('wp').wploader.wp(wp_num)
+        if wploader is None:
+            wploader = get_mission_for_map(self.mpstate)
+        wp = wploader.wp(wp_num)
         command = wp.command
         return self._colour_for_wp_command.get(command, (0, 255, 0))
 
-    def label_for_waypoint(self, wp_num):
+    def label_for_waypoint(self, wp_num, wploader=None):
         '''return the label the waypoint which should appear on the map'''
-        wp = self.module('wp').wploader.wp(wp_num)
+        if wploader is None:
+            wploader = get_mission_for_map(self.mpstate)
+        wp = wploader.wp(wp_num)
         command = wp.command
         if command not in self._label_suffix_for_wp_command:
             return str(wp_num)
@@ -472,8 +478,11 @@ Usage: map circle <radius> <colour>
     def display_waypoints(self):
         '''display the waypoints'''
         from MAVProxy.modules.mavproxy_map import mp_slipmap
-        self.mission_list = self.module('wp').wploader.view_list()
-        polygons = self.module('wp').wploader.polygon_list()
+        wploader = get_mission_for_map(self.mpstate)
+        if wploader is None:
+            return
+        self.mission_list = wploader.view_list()
+        polygons = wploader.polygon_list()
         self.map.add_object(mp_slipmap.SlipClearLayer('Mission'))
         items = [
             MPMenuItem('WP Set', returnkey='popupMissionSet'),
@@ -484,7 +493,10 @@ Usage: map circle <radius> <colour>
         for i in range(len(polygons)):
             p = polygons[i]
             if len(p) > 1:
-                popup = MPMenuSubMenu('Popup', items)
+                # These actions address vehicle mission sequences. Draft
+                # sequences may differ, so edit the draft in MissionEditor.
+                popup = (MPMenuSubMenu('Popup', items)
+                         if wploader is self.module('wp').wploader else None)
                 self.map.add_object(mp_slipmap.SlipPolygon(
                     'mission %u' % i,
                     p,
@@ -493,7 +505,7 @@ Usage: map circle <radius> <colour>
                     colour=ImageColor.getrgb(self.map_settings.mission_color),
                     arrow=self.map_settings.showdirection, popup_menu=popup,
                     arcs=mp_slipmap.mission_arcs(
-                        self.module('wp').wploader, self.mission_list[i]),
+                        wploader, self.mission_list[i]),
                 ))
         labeled_wps = {}
         self.map.add_object(mp_slipmap.SlipClearLayer('LoiterCircles'))
@@ -505,13 +517,13 @@ Usage: map circle <radius> <colour>
             for j in range(len(next_list)):
                 # label already printed for this wp?
                 if (next_list[j] not in labeled_wps):
-                    label = self.label_for_waypoint(next_list[j])
-                    colour = self.colour_for_wp(next_list[j])
+                    label = self.label_for_waypoint(next_list[j], wploader)
+                    colour = self.colour_for_wp(next_list[j], wploader)
                     self.map.add_object(mp_slipmap.SlipLabel(
                         'miss_cmd %u/%u' % (i, j), polygons[i][j], label, 'Mission', colour=colour, size=font_size))
 
                     if self.map_settings.loitercircle:
-                        wp = self.module('wp').wploader.wp(next_list[j])
+                        wp = wploader.wp(next_list[j])
                         loiter_rad = mp_slipmap.mission_circle_radius(
                             wp, self.default_circle_radius(),
                             self.vehicle_type)
@@ -970,6 +982,8 @@ Usage: map circle <radius> <colour>
 
     def idle_task(self):
         self.update_roi_menu()
+        # Local editor drafts also change when there is no telemetry traffic.
+        self.check_redisplay_waypoints()
         now = time.time()
         if self.last_unload_check_time + self.unload_check_interval < now:
             self.last_unload_check_time = now
@@ -1346,8 +1360,11 @@ Usage: map circle <radius> <colour>
         if wp_module is None:
             '''wp nodule not loaded'''
             return
-        last_wp_change = wp_module.wploader.last_change
-        if self.wp_change_time != last_wp_change and abs(time.time() - last_wp_change) > 1:
+        wploader = get_mission_for_map(self.mpstate)
+        last_wp_change = wploader.last_change
+        if (self.wp_display_loader is not wploader or
+                (self.wp_change_time != last_wp_change and abs(time.time() - last_wp_change) > 1)):
+            self.wp_display_loader = wploader
             self.wp_change_time = last_wp_change
             self.display_waypoints()
 
