@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import Mock, patch
 import numpy as np
 from MAVProxy.modules.lib import mp_util
-from MAVProxy.modules.mavproxy_map.mp_slipmap_util import SlipPolygon
+from MAVProxy.modules.mavproxy_map import mp_slipmap_util
 from MAVProxy.modules.mavproxy_camera.survey import SurveyCoverage, footprint
 
 
@@ -65,7 +65,8 @@ class SurveyRenderingTests(unittest.TestCase):
         self.coverage.idle()
         display.add_object.assert_called_once()
         polygon=display.add_object.call_args.args[0]
-        self.assertIsInstance(polygon,SlipPolygon)
+        # Arc compatibility tests reload the module; use its current class.
+        self.assertIsInstance(polygon,mp_slipmap_util.SlipPolygon)
         self.assertEqual(polygon.fill_alpha,.18)
         self.assertTrue(polygon._showlines)
         self.coverage.idle()
