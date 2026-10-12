@@ -11,16 +11,12 @@ This module simply serves as a starting point for your own MAVProxy module.
 
 3. trim (or comment) out any functionality you do not need
 '''
+AP_FLAKE8_CLEAN
 
-import os
-import os.path
-import sys
 from pymavlink import mavutil
-import errno
 import time
 
 from MAVProxy.modules.lib import mp_module
-from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import mp_settings
 
 
