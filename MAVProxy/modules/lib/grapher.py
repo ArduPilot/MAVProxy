@@ -48,6 +48,9 @@ flightmode_colours = [
 
 edge_colour = (0.1, 0.1, 0.1)
 
+# a plain MSG.Field or MSG[instance].Field, whose unit can be looked up
+field_unit_re = re.compile(r'^([A-Z_][A-Z0-9_]*)(\[[^\]]*\])?\.([A-Za-z_][A-Za-z0-9_]*)$')
+
 graph_num = 1
 
 tday_base = None
@@ -128,6 +131,8 @@ class MavGraph(object):
             self.text_types = frozenset([unicode, str])
         self.max_message_rate = 0
         self.axis_mode = 'auto'
+        self.unit_axes = True
+        self.units = []
 
     def set_axis_mode(self, mode):
         '''set y-axis layout mode: 'auto' (dual for 1-2 axes, multi for 3+),
@@ -136,6 +141,62 @@ class MavGraph(object):
         if mode not in ('auto', 'dual', 'multi'):
             raise ValueError("axis_mode must be 'auto', 'dual' or 'multi'")
         self.axis_mode = mode
+
+    def set_unit_axes(self, enable):
+        '''if enabled, label y axes with units and, when no field has an
+        explicit :N axis, give each unit its own y axis'''
+        self.unit_axes = enable
+
+    def field_unit(self, i, msg):
+        '''return the unit of field i if it is a plain MSG.Field, else "".
+        Returns None if msg is not the field's message, so a later message
+        can supply the unit'''
+        m = field_unit_re.match(self.fields[i])
+        if m is None:
+            return ""
+        if m.group(1) != msg.get_type():
+            return None
+        field = m.group(3)
+        fmt = getattr(msg, 'fmt', None)
+        if fmt is not None:
+            # DataFlash message; units come from the log's FMTU metadata
+            try:
+                unit = fmt.get_unit(field)
+            except (AttributeError, KeyError):
+                return ""
+            if unit == "UNKNOWN":
+                # ArduPilot's placeholder for a unit it has not specified
+                return ""
+            return unit
+        # MAVLink message; units come from the message definition
+        return getattr(msg, 'fieldunits_by_name', {}).get(field, "")
+
+    def field_axes(self):
+        '''work out which y axis each field is plotted on'''
+        if not self.unit_axes or max(self.axes, default=1) > 1:
+            # axes chosen by hand with :N suffixes
+            return self.axes[:]
+        # give each unit its own axis; fields without a unit share the first
+        ret = []
+        axis_units = []
+        for unit in self.units:
+            if not unit:
+                ret.append(1)
+                continue
+            if unit not in axis_units:
+                axis_units.append(unit)
+            ret.append(axis_units.index(unit) + 1)
+        return ret
+
+    def axis_label_parts(self, labels, units):
+        '''add units to the field labels for one axis, returning the labels
+        and a suffix for the whole axis'''
+        if not self.unit_axes:
+            return labels, ""
+        if len(set(units)) == 1 and units[0]:
+            # one unit for the whole axis
+            return labels, " (%s)" % units[0]
+        return [("%s (%s)" % (l, u)) if u else l for (l, u) in zip(labels, units)], ""
 
     def set_max_message_rate(self, rate_hz):
         '''set maximum rate we will graph any message'''
@@ -194,7 +255,7 @@ class MavGraph(object):
         '''set multiple graph option'''
         self.multi = multi
 
-    def _set_multicolor_ylabel(self, ax_n, labels, lines):
+    def _set_multicolor_ylabel(self, ax_n, labels, lines, suffix=""):
         '''attach a y-axis label whose comma-separated parts are each coloured
         to match the line they refer to'''
         from matplotlib.offsetbox import (AnchoredOffsetbox, TextArea, VPacker)
@@ -205,6 +266,9 @@ class MavGraph(object):
                     color='black', rotation=90, ha='center', va='bottom')))
             children.append(TextArea(lbl, textprops=dict(
                 color=line.get_color(), rotation=90, ha='center', va='bottom')))
+        if suffix:
+            children.append(TextArea(suffix, textprops=dict(
+                color='black', rotation=90, ha='center', va='bottom')))
         # VPacker stacks first child on top; reverse so visual order matches
         # the default y-label direction (text reads bottom-to-top)
         vp = VPacker(children=list(reversed(children)),
@@ -320,9 +384,10 @@ class MavGraph(object):
         self.ax1 = self.fig.gca()
         self.ax_by_num = {1: self.ax1}
         self.ax2 = None
+        axes = self.field_axes()
         # resolve 'auto' to 'dual' (1-2 axes) or 'multi' (3+ axes) up front
         if self.axis_mode == 'auto':
-            max_axis = max(self.axes) if self.axes else 1
+            max_axis = max(axes) if axes else 1
             axis_mode = 'multi' if max_axis >= 3 else 'dual'
         else:
             axis_mode = self.axis_mode
@@ -348,6 +413,7 @@ class MavGraph(object):
         empty = True
         labels_by_axis = {1: []}
         lines_by_axis = {1: []}
+        units_by_axis = {1: []}
         label_strip_re = re.compile(r'^(.*):[2-9]$')
 
         for i in range(len(fields)):
@@ -360,7 +426,7 @@ class MavGraph(object):
                 color = 'red'
                 (tz, tzdst) = time.tzname
 
-            axis_num = self.axes[i]
+            axis_num = axes[i]
             if axis_mode == 'dual' and axis_num > 2:
                 # legacy 2-axis layout: anything above axis 1 goes on the right
                 axis_num = 2
@@ -369,6 +435,7 @@ class MavGraph(object):
                 self.ax_by_num[axis_num] = new_ax
                 labels_by_axis[axis_num] = []
                 lines_by_axis[axis_num] = []
+                units_by_axis[axis_num] = []
                 if self.grid:
                     new_ax.grid(None)
                     self.ax1.grid(True)
@@ -390,6 +457,7 @@ class MavGraph(object):
             labels_by_axis[axis_num].append(label)
             if self.custom_labels[i] is not None:
                 labels_by_axis[axis_num][-1] = self.custom_labels[i]
+            units_by_axis[axis_num].append(self.units[i] or "")
             if axis_num == 2 and self.ax2 is None:
                 # back-compat alias
                 self.ax2 = ax
@@ -509,10 +577,11 @@ class MavGraph(object):
                 lines_n = lines_by_axis.get(n, [])
                 if not labels_n:
                     continue
+                labels_n, suffix = self.axis_label_parts(labels_n, units_by_axis[n])
                 if len(lines_n) >= 2 and len(lines_n) == len(labels_n):
-                    self._set_multicolor_ylabel(ax_n, labels_n, lines_n)
+                    self._set_multicolor_ylabel(ax_n, labels_n, lines_n, suffix)
                 else:
-                    ax_n.set_ylabel(", ".join(labels_n))
+                    ax_n.set_ylabel(", ".join(labels_n) + suffix)
                 if len(lines_n) == 1:
                     line_color = lines_n[0].get_color()
                     ax_n.tick_params(axis='y', colors=line_color)
@@ -544,6 +613,13 @@ class MavGraph(object):
                     continue
                 self.ax_by_num[n].legend(
                     labels_n, loc=legend_positions.get(n, self.legend2))
+                units_n = []
+                for u in units_by_axis[n]:
+                    if u not in units_n:
+                        units_n.append(u)
+                # only label the axis if every field on it has a unit
+                if self.unit_axes and units_n and "" not in units_n:
+                    self.ax_by_num[n].set_ylabel(", ".join(units_n))
 
     def add_data(self, t, msg, vars):
         '''add some data'''
@@ -604,6 +680,10 @@ class MavGraph(object):
                 xv = mavutil.evaluate_expression(self.xaxis, vars)
                 if xv is None:
                     continue
+            if self.units[i] is None:
+                # only fields with data get a unit, so an instance that
+                # is not in the log does not get an empty axis
+                self.units[i] = self.field_unit(i, msg)
             self.y[i].append(v)
             self.x[i].append(xv)
 
@@ -721,6 +801,7 @@ class MavGraph(object):
         self.modes = []
         self.axes = []
         self.first_only = []
+        self.units = []
         re_caps = re.compile('[A-Z_][A-Z0-9_]+')
         re_instance = re.compile(r'([A-Z_][A-Z0-9_]+)\[([0-9A-Z_]+)\]')
         for f in self.fields:
@@ -738,6 +819,7 @@ class MavGraph(object):
             self.x.append([])
             self.axes.append(1)
             self.first_only.append(False)
+            self.units.append(None)
 
         timeshift = self.timeshift
 
@@ -834,6 +916,8 @@ if __name__ == "__main__":
                              "and multi for 3+, 'dual' forces the legacy 2-axis "
                              "layout, 'multi' stacks each :N axis on the left "
                              "with vertical labels")
+    parser.add_argument("--no-unit-axes", dest="unit_axes", action='store_false',
+                        help="don't label y axes with units or give each unit its own y axis")
     parser.add_argument("logs_fields", metavar="<LOG or FIELD>", nargs="+")
     args = parser.parse_args()
 
@@ -858,5 +942,6 @@ if __name__ == "__main__":
     mg.set_grid(args.grid)
     mg.set_show_flightmode(args.show_flightmode)
     mg.set_axis_mode(args.axis_mode)
+    mg.set_unit_axes(args.unit_axes)
     mg.process([],[],0)
     mg.show(len(mg.mav_list), output=args.output)
