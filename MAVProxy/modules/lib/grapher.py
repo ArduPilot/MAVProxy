@@ -276,6 +276,9 @@ class MavGraph(object):
         
     def rescale_yaxis(self, axis):
         '''rescale Y axes to fit'''
+        if len(axis.lines) == 0:
+            # e.g. axis 1 when every field is on another axis
+            return
         ylim = [None,None]
 
         for line in axis.lines:
