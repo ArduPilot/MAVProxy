@@ -20,10 +20,12 @@ venv), so run it yourself once after installing MAVProxy.
 The desktop files launch the installed command names, so `mavproxy.py`,
 `MAVExplorer.py` and `mavpicviewer.py` must be available on the graphical
 desktop session's `PATH`. Activating a virtual environment in a terminal
-does not add its `bin` directory to the desktop session. A user-level install
-(for example, `pip install --user MAVProxy` or `pipx install MAVProxy`) is
-usually the simplest option; otherwise make sure the installation's `bin`
-directory is on the desktop session's `PATH`.
+does not add its `bin` directory to the desktop session. Run the commands in this ReadMe with the Python interpreter that has
+MAVProxy installed. If MAVProxy is installed in a virtual environment,
+activate it first, and ensure that environment's `bin` directory is on the
+graphical desktop session's `PATH`. On recent Ubuntu/Debian releases,
+system or `--user` pip installs may be refused as
+`externally-managed-environment`; a virtual environment avoids this.
 
 The MAVPicViewer shortcut also requires the optional dependencies in the
 `recommended` extra. Install them with:
@@ -31,6 +33,18 @@ The MAVPicViewer shortcut also requires the optional dependencies in the
 ```
 python3 -m pip install 'MAVProxy[recommended]'
 ```
+
+For example, to install into a dedicated virtual environment, use its
+interpreter for both installation and the desktop-icon helper:
+
+```
+python3 -m venv ~/.venvs/mavproxy
+~/.venvs/mavproxy/bin/python -m pip install 'MAVProxy[recommended]'
+~/.venvs/mavproxy/bin/python -m MAVProxy.tools.install_desktop_icons
+```
+
+Ensure `~/.venvs/mavproxy/bin` is also on the graphical desktop session's
+`PATH` for the .desktop launchers to find the installed commands.
 
 To install manually instead:
 
