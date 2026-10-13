@@ -4,6 +4,14 @@ import os
 
 import pytest
 
+# MAVProxy runs MAVLink 2 unless started with --mav10 (mavproxy.py sets
+# MAVLINK20).  pymavlink picks its dialect once, when mavutil is first
+# imported, so this has to be set before any test module imports pymavlink:
+# otherwise whichever test file is collected first decides, and the camera
+# tests fail on MAVLink 2 only messages when a file which imports mavutil
+# without setting it (test_map_roi.py, for one) is run before them.
+os.environ.setdefault('MAVLINK20', '1')
+
 
 @pytest.fixture(autouse=True)
 def restore_mavlink20():
