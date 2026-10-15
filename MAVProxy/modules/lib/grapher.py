@@ -309,6 +309,11 @@ class MavGraph(object):
 
     def plotit(self, x, y, fields, colors=[], title=None, interactive=True):
         '''plot a set of graphs using date for x axis'''
+        if self.ax_by_num and not any(len(xi) > 0 for xi in x):
+            # show() plots each log in turn, but all the data is plotted
+            # with the first; keep the axes it made
+            print("No data to graph")
+            return
         if interactive:
             plt.ion()
         self.fig = plt.figure(num=1, figsize=(12,6))
