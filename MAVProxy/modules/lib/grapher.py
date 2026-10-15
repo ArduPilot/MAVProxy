@@ -56,6 +56,18 @@ graph_num = 1
 tday_base = None
 tday_basetime = None
 
+def figure_renderer(fig):
+    '''return a renderer for measuring the artists of fig'''
+    get_renderer = getattr(fig.canvas, 'get_renderer', None)
+    if get_renderer is not None:
+        return get_renderer()
+    # vector backends (svg, pdf, ps) have no get_renderer
+    get_renderer = getattr(fig, '_get_renderer', None)
+    if get_renderer is not None:
+        return get_renderer()
+    from matplotlib.backend_bases import _get_renderer
+    return _get_renderer(fig)
+
 def timestamp_to_days(timestamp, timeshift=0):
     '''convert log timestamp to days, public so that mavflightview can access'''
     global tday_base, tday_basetime
@@ -133,6 +145,14 @@ class MavGraph(object):
         self.axis_mode = 'auto'
         self.unit_axes = True
         self.units = []
+        self.label_boxes = {}
+        self.restack_cid = None
+        self.draw_cid = None
+        self.restack_axes = []
+        self.restacking = False
+        self.restack_pending = False
+        self.left_layout = None
+        self.redraw_timer = None
 
     def set_axis_mode(self, mode):
         '''set y-axis layout mode: 'auto' (dual for 1-2 axes, multi for 3+),
@@ -283,6 +303,93 @@ class MavGraph(object):
                                 bbox_transform=ax_n.transAxes, borderpad=0)
         ax_n.add_artist(box)
         ax_n.set_ylabel('')
+        return box
+
+    def _stack_left_axes(self, label_boxes):
+        '''in 'multi' mode place each extra y axis to the left of the one
+        inside it, just clear of that axis's tick labels and label, and
+        reserve room for them all. label_boxes holds the composite labels
+        made by _set_multicolor_ylabel, keyed by axis number. Return
+        True if anything moved'''
+        if self.restacking:
+            # measuring the labels can autoscale an axis, changing its y range
+            return False
+        self.restacking = True
+        try:
+            layout = self._place_left_axes(label_boxes)
+        finally:
+            self.restacking = False
+        changed = layout != self.left_layout
+        self.left_layout = layout
+        return changed
+
+    def _ylim_changed(self):
+        '''a y range has changed, which changes how much room the tick labels
+        need. Panning changes every axis's range at every mouse step, so
+        restack once, after the next draw, rather than on every change'''
+        if not self.restacking:
+            self.restack_pending = True
+
+    def _restack_after_draw(self):
+        '''restack the y axes if a y range has changed, drawing again if
+        that moved anything'''
+        if not self.restack_pending:
+            return
+        self.restack_pending = False
+        if self._stack_left_axes(self.label_boxes):
+            # backends ignore a request to draw made during a draw, so
+            # make it once this draw has finished
+            canvas = self.fig.canvas
+            self.redraw_timer = canvas.new_timer(interval=0)
+            self.redraw_timer.single_shot = True
+            self.redraw_timer.add_callback(canvas.draw_idle)
+            self.redraw_timer.start()
+
+    def _place_left_axes(self, label_boxes):
+        '''do the work of _stack_left_axes, returning the layout chosen'''
+        self.label_boxes = label_boxes
+        nums = sorted(self.ax_by_num.keys())
+        if len(nums) < 2 and not label_boxes:
+            return None
+        for n in nums[1:]:
+            self.ax_by_num[n].spines['left'].set_position(('axes', 0))
+            self.ax_by_num[n].yaxis.get_offset_text().set_x(0)
+        # a vector backend's renderer can change the figure's dpi
+        dpi = self.fig.dpi
+        renderer = figure_renderer(self.fig)
+        x0 = self.ax1.bbox.x0
+        gap = 6 * self.fig.dpi / 72.0
+        # how far each axis's tick labels, and then its label, reach left
+        # of its line
+        tick_widths = {}
+        widths = {}
+        for n in nums:
+            ax_n = self.ax_by_num[n]
+            tick_widths[n] = x0 - ax_n.yaxis.get_tightbbox(renderer).x0
+            widths[n] = tick_widths[n]
+            if n in label_boxes:
+                widths[n] += gap + label_boxes[n].get_window_extent(renderer).width
+        offsets = {nums[0]: 0}
+        for prev, n in zip(nums, nums[1:]):
+            offsets[n] = offsets[prev] + widths[prev] + gap
+        left = (offsets[nums[-1]] + widths[nums[-1]] + gap) / self.fig.bbox.width
+        self.fig.subplots_adjust(left=min(0.6, left))
+        ax_width = self.ax1.bbox.width
+        layout = [min(0.6, left)]
+        for n in nums:
+            ax_n = self.ax_by_num[n]
+            if n != nums[0]:
+                ax_n.spines['left'].set_position(('axes', -offsets[n] / ax_width))
+                # put the axis's scale (e.g. 1e6) over the axis, not the plot
+                ax_n.yaxis.get_offset_text().set_x(-offsets[n] / ax_width)
+                layout.append(offsets[n])
+            if n in label_boxes:
+                x = -(offsets[n] + tick_widths[n] + gap) / ax_width
+                label_boxes[n].set_bbox_to_anchor((x, 0.5), transform=ax_n.transAxes)
+                layout.append(x)
+        if self.fig.dpi != dpi:
+            self.fig.dpi = dpi
+        return layout
 
     def make_format(self, current_axis):
         '''build a format_coord that reports y for every active axis'''
@@ -519,17 +626,6 @@ class MavGraph(object):
 
             empty = False
 
-        # in 'multi' mode stack each extra axis further LEFT and reserve room
-        if axis_mode == 'multi':
-            extra_nums = sorted(n for n in self.ax_by_num.keys() if n >= 2)
-            offset_step = 0.10
-            for idx, n in enumerate(extra_nums):
-                self.ax_by_num[n].spines['left'].set_position(
-                    ("axes", -(idx + 1) * offset_step))
-            if extra_nums:
-                self.fig.subplots_adjust(
-                    left=min(0.5, 0.08 + len(extra_nums) * offset_step))
-
         # install hover readout on every twinx axis when there are multiple axes
         if len(self.ax_by_num) > 1:
             for n, ax_n in self.ax_by_num.items():
@@ -572,6 +668,7 @@ class MavGraph(object):
         # in its line's colour. Single-field axes additionally get the spine
         # and ticks coloured to match.
         if axis_mode == 'multi':
+            label_boxes = {}
             for n, ax_n in self.ax_by_num.items():
                 labels_n = labels_by_axis.get(n, [])
                 lines_n = lines_by_axis.get(n, [])
@@ -579,7 +676,7 @@ class MavGraph(object):
                     continue
                 labels_n, suffix = self.axis_label_parts(labels_n, units_by_axis[n])
                 if len(lines_n) >= 2 and len(lines_n) == len(labels_n):
-                    self._set_multicolor_ylabel(ax_n, labels_n, lines_n, suffix)
+                    label_boxes[n] = self._set_multicolor_ylabel(ax_n, labels_n, lines_n, suffix)
                 else:
                     ax_n.set_ylabel(", ".join(labels_n) + suffix)
                 if len(lines_n) == 1:
@@ -587,6 +684,20 @@ class MavGraph(object):
                     ax_n.tick_params(axis='y', colors=line_color)
                     ax_n.spines['left'].set_color(line_color)
                     ax_n.yaxis.label.set_color(line_color)
+            # stack the extra axes on the left, each clear of the one inside,
+            # and again whenever the window is resized or a y range changes,
+            # as both change how much room the labels need
+            self._stack_left_axes(label_boxes)
+            if self.restack_cid is None:
+                self.restack_cid = self.fig.canvas.mpl_connect(
+                    'resize_event', lambda event: self._stack_left_axes(self.label_boxes))
+                self.draw_cid = self.fig.canvas.mpl_connect(
+                    'draw_event', lambda event: self._restack_after_draw())
+            for ax_n in self.ax_by_num.values():
+                if ax_n not in self.restack_axes:
+                    self.restack_axes.append(ax_n)
+                    ax_n.callbacks.connect(
+                        'ylim_changed', lambda ax: self._ylim_changed())
 
         any_data_labels = any(labels_by_axis.get(n) for n in self.ax_by_num)
 
