@@ -12,10 +12,36 @@ AP_FLAKE8_CLEAN
 '''
 
 import json
+import lzma
 import re
+import struct
 import time
 
 from MAVProxy.modules.lib import mp_module
+
+
+# xz is the only compression the MAVLink component metadata interface allows
+XZ_MAGIC = b'\xfd7zXZ\x00'
+
+# struct formats for the basic event argument types
+ARGUMENT_FORMATS = {
+    "uint8_t": "<B",
+    "int8_t": "<b",
+    "uint16_t": "<H",
+    "int16_t": "<h",
+    "uint32_t": "<I",
+    "int32_t": "<i",
+    "uint64_t": "<Q",
+    "int64_t": "<q",
+    "float": "<f",
+}
+
+
+def load_metadata(contents):
+    '''decode a metadata file, which may be xz-compressed'''
+    if contents.startswith(XZ_MAGIC):
+        contents = lzma.decompress(contents)
+    return json.loads(contents)
 
 
 class event(mp_module.MPModule):
@@ -64,9 +90,8 @@ class event(mp_module.MPModule):
             # the fetch failed
             print("failed fetch of general_metadata.json: %s")
             return
-        string = fh.read()
         try:
-            self.general_metadata = json.loads(string)
+            self.general_metadata = load_metadata(fh.read())
         except Exception as e:
             print("malformed generate_metadata.json: %s" % str(e))
 
@@ -97,9 +122,8 @@ class event(mp_module.MPModule):
             # the fetch failed
             print("failed fetch of events_metadata.json: %s")
             return
-        string = fh.read()
         try:
-            self.events_metadata = json.loads(string)
+            self.events_metadata = load_metadata(fh.read())
         except Exception as e:
             print("malformed events_metadata.json: %s" % str(e))
 
@@ -155,47 +179,55 @@ class event(mp_module.MPModule):
         '''called rapidly by mavproxy'''
         self.get_events_metadata()
 
+    def find_event(self, event_id):
+        '''return (component metadata, event metadata) for event_id, or
+        None.  The top 8 bits of the id select the component in the
+        metadata, the bottom 24 bits the event within it'''
+        component = self.events_metadata["components"].get(str(event_id >> 24))
+        if component is None:
+            return None
+        sub_id = str(event_id & 0xFFFFFF)
+        for group in component.get("event_groups", {}).values():
+            event = group.get("events", {}).get(sub_id)
+            if event is not None:
+                return (component, event)
+        return None
+
+    def argument_values(self, component, event, arguments):
+        '''return display strings for the arguments of event'''
+        ret = []
+        offset = 0
+        enums = component.get("enums", {})
+        for arg in event.get("arguments", []):
+            enum = enums.get(arg["type"])
+            fmt = ARGUMENT_FORMATS[enum["type"] if enum is not None else arg["type"]]
+            (value,) = struct.unpack_from(fmt, bytes(arguments), offset)
+            offset += struct.calcsize(fmt)
+            if enum is None:
+                ret.append(str(value))
+                continue
+            entry = enum["entries"].get(str(value))
+            ret.append(entry["description"] if entry is not None else "(unknown: %s)" % value)
+        return ret
+
     def mavlink_packet(self, m):
         '''handle mavlink packets'''
         if m.get_type() == 'EVENT':
             print("Event: %s" % str(m))
             if self.events_metadata is None:
                 return
-            # print("Using event_metadata: %s" % str(self.events_metadata))
-            component_metadata = None
-            src_component = m.get_srcComponent()
-            for comp in self.events_metadata["components"]:
-                if comp["component_id"] == src_component:
-                    component_metadata = comp
-                    break
-            if component_metadata is None:
-                print("No component metadata for (%u)" % src_component)
+            found = self.find_event(m.id)
+            if found is None:
+                print("No metadata for event 0x%08x" % m.id)
                 return
-
-            ardupilot_event_enum = None
-            for x in component_metadata["enums"]:
-                if x["name"] == "ardupilot_event":
-                    ardupilot_event_enum = x
-                    break
-
-            if ardupilot_event_enum is None:
-                print("No ardupilot_event_enum")
-                return
-
-            print("ardupilot_event_enum: %s" % str(ardupilot_event_enum))
-
-            enum_entry = None
-            for entry in ardupilot_event_enum["entries"]:
-                if entry["value"] == m.id:
-                    enum_entry = entry
-                    break
-
-            if enum_entry is None:
-                print("No enum entry for %s" % str(m.id))
-                return
-
-            print("  Name: %s" % enum_entry["name"])
-            print("  Description: %s" % enum_entry["description"])
+            (component, event) = found
+            values = self.argument_values(component, event, m.arguments)
+            # "{N}" in the message is replaced with argument N (1-based)
+            message = re.sub(r'{(\d+)[^}]*}',
+                             lambda x: values[int(x.group(1))-1],
+                             event["message"])
+            print("  Name: %s" % event["name"])
+            print("  Message: %s" % message)
 
 
 def init(mpstate):
