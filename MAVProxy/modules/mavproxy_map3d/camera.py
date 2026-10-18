@@ -3,7 +3,8 @@ Cesium-like camera and interactor for the 3D map.
 
 The camera keeps the horizon level at all times (no roll/flip): only yaw (about
 world up) and pitch (look-down angle, clamped). Default mouse drag pans; Ctrl+drag
-or a right drag rotates (left-right = yaw, forward-back = pitch); wheel zooms.
+or a right drag rotates (left-right = yaw, forward-back = pitch); wheel or +/-
+keys zoom.
 '''
 
 import math
@@ -163,18 +164,16 @@ class TerrainStyle(vtk.vtkInteractorStyleUser):
             self.tc.pan(dx, dy)
         self._render()
 
-    def _wf(self, o, e):
+    def zoom_step(self, zoom_in):
         if not self.interaction_enabled:
             return
-        self.tc.zoom(1.0 / 1.2)
+        self.tc.zoom(1.0 / 1.2 if zoom_in else 1.2)
         if self.on_change:
             self.on_change()
         self._render()
 
+    def _wf(self, o, e):
+        self.zoom_step(True)
+
     def _wb(self, o, e):
-        if not self.interaction_enabled:
-            return
-        self.tc.zoom(1.2)
-        if self.on_change:
-            self.on_change()
-        self._render()
+        self.zoom_step(False)
