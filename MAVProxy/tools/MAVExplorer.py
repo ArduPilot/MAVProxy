@@ -901,6 +901,8 @@ def mission_items_from_cmds(items, started_at=None, flown_from=None):
     mission = []
     for seq in sorted(items):
         item = items[seq]
+        if not mp_util.mission_cmd_has_location(item[4]):
+            continue
         if item[0] == 0 and item[1] == 0:
             if item[4] not in mp_util.TAKEOFF_COMMANDS:
                 continue
