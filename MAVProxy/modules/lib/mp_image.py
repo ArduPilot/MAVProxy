@@ -174,6 +174,23 @@ class MPImageOSD_Line(MPImageOSD_Element):
         return cv2.line(data, start_point, end_point, self.color, self.thickness)
         
 
+class MPImageOSD_Rect(MPImageOSD_Element):
+    '''an OSD rectangle between corners p1 and p2, in the same 0..1
+    coordinates as MPImageOSD_Line'''
+    def __init__(self, label, p1, p2, color, thickness=1):
+        super().__init__(label)
+        self.p1 = p1
+        self.p2 = p2
+        self.color = color
+        self.thickness = thickness
+
+    def draw(self, data):
+        height,width,_ = data.shape
+        start_point = (int(self.p1[0]*width), int(self.p1[1]*height))
+        end_point = (int(self.p2[0]*width), int(self.p2[1]*height))
+        return cv2.rectangle(data, start_point, end_point, self.color, self.thickness)
+
+
 class MPImageOSD_HorizonLine(MPImageOSD_Element):
     '''an OSD horizon line from roll/pitch eulers in degrees and horizontal FOV'''
     def __init__(self, label, roll_deg, pitch_deg, hfov, color, thickness=1):
@@ -954,10 +971,15 @@ class MPImagePanel(wx.Panel):
                 any_button_down = event.ButtonIsDown(wx.MOUSE_BTN_ANY)
             else:
                 any_button_down = event.leftIsDown or event.rightIsDown
-            if not any_button_down and event.GetWheelRotation() == 0 and not self.state.mouse_movement_events:
+            if (not any_button_down and event.GetWheelRotation() == 0 and
+                    not event.ButtonUp() and not self.state.mouse_movement_events):
                 # don't flood the queue with mouse movement
                 return
         evt = mp_util.object_container(event)
+        if isinstance(event, wx.MouseEvent):
+            # methods aren't copied, so a press or release would be lost
+            evt.leftPressed = event.LeftDown()
+            evt.leftReleased = event.LeftUp()
         pt = self.image_coordinates(wx.Point(evt.X,evt.Y))
         evt.X = pt.x
         evt.Y = pt.y
