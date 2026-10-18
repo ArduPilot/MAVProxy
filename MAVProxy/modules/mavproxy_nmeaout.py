@@ -59,7 +59,7 @@ class NMEAOutModule(mp_module.MPModule):
                 except serial.SerialException as se:
                     print("Failed to open output port %s:%s" % (self.port, se))
             else:
-                self.serial = open(self.port, mode='w')
+                self.serial = open(self.port, mode='wb')
             
 
     def format_date(self, utc_sec):
@@ -69,19 +69,25 @@ class NMEAOutModule(mp_module.MPModule):
 
     def format_time(self, utc_sec):
         import time
-        tm_t = time.gmtime(utc_sec)
-        subsecs = utc_sec - int(utc_sec);
-        return "%02d%02d%05.3f" % (tm_t.tm_hour, tm_t.tm_min, tm_t.tm_sec + subsecs)
+        # round to whole milliseconds first so 59.9996 seconds carries
+        # into the next minute instead of printing as 60.000
+        msec = int(round(utc_sec * 1000))
+        tm_t = time.gmtime(msec // 1000)
+        return "%02d%02d%02d.%03d" % (tm_t.tm_hour, tm_t.tm_min, tm_t.tm_sec, msec % 1000)
+
+    def format_degrees(self, value, deg_digits):
+        '''format abs(value) as NMEA degrees and decimal minutes'''
+        # work in units of 1e-5 minutes so 59.999999 minutes carries
+        # into the next degree instead of printing as 60.00000
+        units = int(round(abs(value) * 60 * 100000))
+        deg, units = divmod(units, 60 * 100000)
+        return "%0*d%02d.%05d" % (deg_digits, deg, units // 100000, units % 100000)
 
     def format_lat(self, lat):
-        deg = abs(lat)
-        minutes = (deg - int(deg))*60
-        return "%02d%08.5f,%c" % (int(deg), minutes, 'S' if lat < 0 else 'N')
+        return "%s,%c" % (self.format_degrees(lat, 2), 'S' if lat < 0 else 'N')
 
     def format_lon(self, lon):
-        deg = abs(lon)
-        minutes = (deg - int(deg))*60
-        return "%03d%08.5f,%c" % (int(deg), minutes, 'W' if lon < 0 else 'E')
+        return "%s,%c" % (self.format_degrees(lon, 3), 'W' if lon < 0 else 'E')
 
 	# tst = "$GPRMC,225446,A,4916.45,N,12311.12,W,000.5,054.7,191194,020.3,E*68"
 	# print ("*%02X" % nmea_checksum(tst))
@@ -139,8 +145,9 @@ class NMEAOutModule(mp_module.MPModule):
             #print(rmc+'\r')
             #print(self.serial)
             if self.serial is not None:
-                self.serial.write(gga + '\r\n')
-                self.serial.write(rmc + '\r\n')
+                # pyserial and the binary file both take bytes
+                self.serial.write((gga + '\r\n').encode('ascii'))
+                self.serial.write((rmc + '\r\n').encode('ascii'))
                 self.serial.flush()
      
 
