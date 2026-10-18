@@ -93,7 +93,11 @@ class CameraROI:
             raise ValueError("ROI terrain lookup failed: %s" % error) from error
         if alt is None or not math.isfinite(alt):
             raise ValueError("ROI terrain height unavailable; load terrain and retry")
+        self.point_at(cameras, lat, lon, alt)
 
+    def point_at(self, cameras, lat, lon, alt):
+        """point each camera's mount at lat, lon, alt AMSL"""
+        module = self.module
         # Resolve every endpoint before sending any ROI All commands. In
         # particular, an unknown second mount must not redirect to mount 1.
         plans = []

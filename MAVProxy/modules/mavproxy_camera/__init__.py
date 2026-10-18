@@ -22,6 +22,14 @@ from pymavlink import mavutil
 if mp_util.has_wxpython:
     from MAVProxy.modules.mavproxy_map import mp_slipmap
 
+# what a left click on a video view does: see CameraModule.camera_click
+CLICK_MODES = ("flag", "roi", "track", "marker")
+TRACKING_COMMANDS = (
+    mavutil.mavlink.MAV_CMD_CAMERA_TRACK_POINT,
+    mavutil.mavlink.MAV_CMD_CAMERA_TRACK_RECTANGLE,
+    mavutil.mavlink.MAV_CMD_CAMERA_STOP_TRACKING,
+)
+
 
 def _text(value):
     if isinstance(value, str):
@@ -147,6 +155,11 @@ class CameraModule(mp_module.MPModule):
             ("mount_pitch", float, 0.0),
             ("mount_yaw", float, 0.0),
             ("mount_alt", float, 0.0),
+            mp_settings.MPSetting("click_mode", str, CLICK_MODES[0],
+                                  choice=CLICK_MODES),
+            # MAV_CMD_CAMERA_TRACK_POINT radius, as a fraction of image width
+            mp_settings.MPSetting("track_radius", float, 0.05,
+                                  range=(0.0, 1.0)),
         ])
         self.add_command(
             "camera", self.cmd_camera, "MAVLink camera control",
@@ -733,12 +746,18 @@ class CameraModule(mp_module.MPModule):
             mavutil.mavlink.MAV_CMD_VIDEO_STOP_CAPTURE: 0,
             mavutil.mavlink.MAV_CMD_SET_CAMERA_ZOOM: 2,
             mavutil.mavlink.MAV_CMD_SET_CAMERA_FOCUS: 2,
+            mavutil.mavlink.MAV_CMD_CAMERA_TRACK_POINT: 3,
+            mavutil.mavlink.MAV_CMD_CAMERA_TRACK_RECTANGLE: 4,
+            mavutil.mavlink.MAV_CMD_CAMERA_STOP_TRACKING: 0,
         }
         if command in selectors:
             slot = self._camera_manager_slot(camera)
             if slot is not None:
                 component = self.camera_settings.manager_component
                 values[selectors[command]] = slot
+            elif command in TRACKING_COMMANDS:
+                # tracking always goes through AP_Camera, 0 for its primary
+                component = self.camera_settings.manager_component
         self._send_command(camera.system_id, component, command, values)
 
     def cmd_photo(self, args):
@@ -1074,6 +1093,105 @@ class CameraModule(mp_module.MPModule):
                     self.camera_settings.manager_component)
                 self._show_camera_fov(camera, position)
 
+    def _camera_position(self, position):
+        """Camera lat, lon, AMSL alt and the ground to project onto, from
+        the vehicle's GLOBAL_POSITION_INT, or None."""
+        try:
+            latitude = position.lat * 1.0e-7
+            longitude = position.lon * 1.0e-7
+            altitude = position.alt * 1.0e-3 + self.camera_settings.mount_alt
+            ground_altitude = ((position.alt - position.relative_alt) *
+                               1.0e-3)
+        except AttributeError:
+            return None
+        terrain = self.module("terrain")
+        elevation_model = getattr(terrain, "ElevationModel", None)
+        if elevation_model is None:
+            elevation_model = _FlatElevationModel(ground_altitude)
+        return latitude, longitude, altitude, elevation_model
+
+    def project_pixel(self, camera, stream, x, y, width, height):
+        """Ground (lat, lon, AMSL alt) seen at pixel x,y of a width x height
+        frame from stream, or None."""
+        hfov = float(getattr(stream, "hfov", 0))
+        if width <= 0 or height <= 0 or not 0.0 < hfov < 180.0:
+            return None
+        with self._camera_context(camera):
+            position = self._vehicle_message(
+                "GLOBAL_POSITION_INT", camera.system_id,
+                self.camera_settings.manager_component)
+            located = self._camera_position(position)
+            attitude = self._fov_attitude()
+            if located is None or attitude is None:
+                return None
+            latitude, longitude, altitude, elevation_model = located
+            try:
+                params = camera_projection.CameraParams(
+                    xresolution=width, yresolution=height, FOV=hfov)
+                projection = camera_projection.CameraProjection(
+                    params, elevation_model=elevation_model)
+                return projection.get_latlonalt_for_pixel(
+                    x, y, latitude, longitude, altitude, *attitude,
+                    max_range=self.camera_settings.fov_max_range)
+            except Exception:
+                # terrain tiles may be unavailable
+                return None
+
+    def camera_click(self, camera, stream, x, y, width, height):
+        """Act on a left click at pixel x,y of a video frame in click_mode,
+        other than track, which the view handles itself."""
+        with self._camera_context(camera):
+            mode = self.camera_settings.click_mode
+        location = self.project_pixel(camera, stream, x, y, width, height)
+        if location is None:
+            print("Camera: can't project that pixel onto the ground")
+            return
+        lat, lon, alt = location
+        self.mpstate.click_location = (lat, lon)
+        if mode == "marker":
+            map_module = self.module("map")
+            if map_module is None:
+                print("Camera: load the map module to place markers")
+                return
+            map_module.cmd_map_marker(["blueflag"], latlon=(lat, lon))
+            return
+        self._show_click_flag(lat, lon)
+        if mode == "roi":
+            try:
+                self.roi.point_at([camera], lat, lon, alt)
+            except ValueError as error:
+                print("Camera ROI error: %s" % error)
+
+    def _show_click_flag(self, lat, lon):
+        map_display = getattr(self.mpstate, "map", None)
+        if map_display is None or not mp_util.has_wxpython:
+            return
+        map_display.add_object(mp_slipmap.SlipIcon(
+            "CameraClick", (lat, lon), map_display.icon("flag.png"),
+            layer="CameraClick", rotation=0, follow=False))
+
+    def camera_track(self, camera, p1, p2=None):
+        """Ask the camera to track the point p1, or the rectangle with
+        corners p1 and p2; points are 0..1 across and down the image."""
+        def clamp(value):
+            return min(1.0, max(0.0, value))
+        with self._camera_context(camera):
+            if p2 is None:
+                self.camera_command(
+                    mavutil.mavlink.MAV_CMD_CAMERA_TRACK_POINT,
+                    (clamp(p1[0]), clamp(p1[1]),
+                     self.camera_settings.track_radius))
+                return
+            left, right = sorted((clamp(p1[0]), clamp(p2[0])))
+            top, bottom = sorted((clamp(p1[1]), clamp(p2[1])))
+            self.camera_command(
+                mavutil.mavlink.MAV_CMD_CAMERA_TRACK_RECTANGLE,
+                (left, top, right, bottom))
+
+    def stop_tracking(self, camera):
+        with self._camera_context(camera):
+            self.camera_command(mavutil.mavlink.MAV_CMD_CAMERA_STOP_TRACKING)
+
     def _show_camera_fov(self, camera, position):
         """Project this camera's streams using its command context/settings."""
         if not mp_util.has_wxpython:
@@ -1093,19 +1211,10 @@ class CameraModule(mp_module.MPModule):
         if attitude is None or not camera.streams:
             self._clear_fov(camera=camera)
             return
-        try:
-            latitude = position.lat * 1.0e-7
-            longitude = position.lon * 1.0e-7
-            altitude = position.alt * 1.0e-3 + self.camera_settings.mount_alt
-            ground_altitude = ((position.alt - position.relative_alt) *
-                               1.0e-3)
-        except AttributeError:
+        located = self._camera_position(position)
+        if located is None:
             return
-
-        terrain = self.module("terrain")
-        elevation_model = getattr(terrain, "ElevationModel", None)
-        if elevation_model is None:
-            elevation_model = _FlatElevationModel(ground_altitude)
+        latitude, longitude, altitude, elevation_model = located
 
         active = set()
         layer, colour = self._projection_style(camera)

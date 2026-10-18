@@ -189,6 +189,32 @@ Camera components using the same mount endpoint share one tracking target:
 setting another ROI replaces the previous target, and clearing or manually
 controlling the mount through either camera stops that tracking.
 
+## Clicking on video
+
+A left click on a video window projects the clicked pixel onto the ground, using
+the same pose, stream FOV and terrain as the map footprints. What happens next
+depends on the click mode, chosen in the image's right-click **Click mode** menu
+or with `camera set click_mode MODE`. The window title shows the current mode.
+
+- **Flag** (`flag`, the default) places a green flag on the map at the clicked
+  ground location. The next click moves the same flag.
+- **Point gimbal (ROI)** (`roi`) also moves the flag, and points this camera's
+  gimbal at the location as with **Set ROI** on the map, at the projected AMSL
+  altitude.
+- **Camera track** (`track`) asks the camera to track the image point with
+  `MAV_CMD_CAMERA_TRACK_POINT`, radius `track_radius` (a fraction of image width,
+  0.05 by default). Dragging out a rectangle sends
+  `MAV_CMD_CAMERA_TRACK_RECTANGLE` instead. **Stop tracking** in the right-click
+  menu sends `MAV_CMD_CAMERA_STOP_TRACKING`. These commands always go to the
+  flight controller, with the camera's slot as their selector when it is known
+  and 0 (the primary camera) otherwise.
+- **Marker** (`marker`) places a blue flag that stays, and logs it like the map's
+  **Marker → Flag** menu (a `marker_*.json` file). This needs the map module.
+
+Each click also sets the shared click location used by other commands. A click
+that cannot be projected, for example above the horizon or without position or
+gimbal attitude, does nothing.
+
 ## Live graphs
 
 Choose **Camera → Graphs** in the console or map menu. Graphs use MAVProxy's
@@ -312,7 +338,8 @@ photo start/stop, recording start/stop, zoom and focus are
 addressed to the FC when its cached `CAMn_TYPE=6` and `CAMn_COMPID` parameters
 identify exactly one backend for the selected camera. `CAMn_COMPID=0` uses the
 usual component `100 + n - 1`. The command carries the one-based camera slot
-in its selector: param1 for capture/recording, param3 for zoom/focus.
+in its selector: param1 for capture/recording and stop tracking, param3 for
+zoom/focus, param4 for track point and param5 for track rectangle.
 Mappings use only the selected vehicle's FC parameters; discovery order is
 irrelevant. Missing or ambiguous mappings keep the camera component address
 so FC routing delivers the command to that camera without guessing a slot.
