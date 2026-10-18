@@ -579,6 +579,16 @@ class TestLogMissionItems(object):
         out = self.module().mission_items_from_cmds({1: takeoff})
         assert out == []
 
+    def test_an_item_whose_xy_are_not_a_position_is_left_out(self):
+        from pymavlink import mavutil
+        home = (HERE[0], HERE[1], 584.0, 0,
+                mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 0, (0, 0, 0, 0))
+        # NAV_SCRIPT_TIME carries script arguments in x/y
+        script = (13.0, 17.0, 0.0, 0, mavutil.mavlink.MAV_CMD_NAV_SCRIPT_TIME,
+                  1, (72, 0, 300, 1))
+        out = self.module().mission_items_from_cmds({0: home, 1: script})
+        assert [i[5] for i in out] == [0]
+
     def test_a_mission_uploaded_before_home_was_known(self):
         from pymavlink import mavutil
         # the autopilot keeps its own home in item 0, so a mission uploaded
