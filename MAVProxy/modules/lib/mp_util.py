@@ -225,6 +225,17 @@ def mission_item_label(seq, command):
     return "%s(%s)" % (seq, suffix)
 
 
+def mission_cmd_has_location(command):
+    """whether a MAV_CMD's x/y are a latitude/longitude, from hasLocation in
+    the XML. Others, such as NAV_SCRIPT_TIME, use them for other values"""
+    from pymavlink import mavutil
+    cmd_enum = mavutil.mavlink.enums['MAV_CMD'].get(command)
+    if cmd_enum is None:
+        return False
+    # older pymavlink does not have the attribute
+    return getattr(cmd_enum, 'has_location', True)
+
+
 # vehicles which hold position at a loiter point rather than flying a circle
 # around it.  MAVProxy's own vehicle type names are accepted as well as the
 # MAV_TYPEs, since that is what a live module has to hand
