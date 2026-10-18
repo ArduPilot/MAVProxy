@@ -173,6 +173,23 @@ class Map3DFrame(wx.Frame):
         self.Bind(wx.EVT_TIMER, self.on_timer, self.timer)
         self.timer.Start(100)
         self.Bind(wx.EVT_CLOSE, self.on_close)
+        # frame-wide so zoom works without the mouse giving the canvas focus
+        self.Bind(wx.EVT_CHAR_HOOK, self.on_char_hook)
+
+    def on_char_hook(self, event):
+        key = event.GetKeyCode()
+        if (self.tc is None or event.AltDown() or
+                isinstance(self.FindFocus(), wx.TextEntry)):
+            event.Skip()
+            return
+        # key down codes are unshifted, so '+' arrives as '=' on many layouts
+        if key in (ord('+'), ord('='), wx.WXK_ADD, wx.WXK_NUMPAD_ADD):
+            self.style.zoom_step(True)
+        elif key in (ord('-'), ord('_'), wx.WXK_SUBTRACT,
+                     wx.WXK_NUMPAD_SUBTRACT):
+            self.style.zoom_step(False)
+        else:
+            event.Skip()
 
     # ----------------------------------------------------------------- scene
     def init_scene(self, lat0, lon0, amsl_ref):
