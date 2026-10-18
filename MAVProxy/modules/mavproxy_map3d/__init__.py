@@ -388,6 +388,8 @@ class Map3DModule(mp_module.MPModule):
         for w in wploader.wpoints:
             frame = getattr(w, 'frame', 0)
             (lat, lon) = (w.x, w.y)
+            if not mp_util.mission_cmd_has_location(w.command):
+                (lat, lon) = (0, 0)
             if w.seq != 0 and (lat == 0 and lon == 0 and
                                w.command not in mp_util.TAKEOFF_COMMANDS):
                 from MAVProxy.modules.lib import plane_track
