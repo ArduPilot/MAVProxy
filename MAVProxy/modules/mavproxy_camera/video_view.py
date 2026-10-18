@@ -2,8 +2,19 @@
 
 import cv2
 
-from MAVProxy.modules.lib.mp_image import MPImage
-from MAVProxy.modules.lib.mp_menu import MPMenuItem
+from MAVProxy.modules.lib.mp_image import MPImage, MPImageOSD_Rect, MPImageOSD_None
+from MAVProxy.modules.lib.mp_menu import MPMenuItem, MPMenuSubMenu
+from MAVProxy.modules.mavproxy_camera import CLICK_MODES
+
+CLICK_MODE_NAMES = {
+    "flag": "Flag",
+    "roi": "Point gimbal (ROI)",
+    "track": "Camera track",
+    "marker": "Marker",
+}
+
+# a drag shorter than this fraction of the image is a click
+DRAG_THRESHOLD = 0.01
 
 
 def _opencv_has_gstreamer():
@@ -19,15 +30,24 @@ class VideoView:
         self.camera = camera
         self.stream = stream
         self.uri = uri
-        title = "%s - %s" % (camera.label(), stream.name)
-        self.image = MPImage(title=title, width=stream.resolution_h,
+        self.title = "%s - %s" % (camera.label(), stream.name)
+        self.shown_mode = None
+        # where a track mode drag began, 0..1 across and down the image
+        self.drag_start = None
+        self.image = MPImage(title=self.title, width=stream.resolution_h,
                              height=stream.resolution_v, auto_size=False,
-                             auto_fit=True, can_zoom=False, fps=60)
+                             auto_fit=True, can_zoom=False, fps=60,
+                             mouse_events=True)
         menu = self.image.get_popup_menu()
         menu.add(MPMenuItem("Take photo", returnkey="Camera:Photo"))
         menu.add(MPMenuItem("Toggle recording", returnkey="Camera:Record"))
         menu.add(MPMenuItem("Autofocus", returnkey="Camera:Autofocus"))
+        menu.add(MPMenuSubMenu("Click mode", items=[
+            MPMenuItem(CLICK_MODE_NAMES[mode], returnkey="ClickMode:" + mode)
+            for mode in CLICK_MODES]))
+        menu.add(MPMenuItem("Stop tracking", returnkey="Camera:StopTracking"))
         self.image.set_popup_menu(menu)
+        self._update_title()
         codec = "h265" if stream.encoding == 2 else "h264"
         if _opencv_has_gstreamer():
             # Match the proven mavproxy_SIYI CameraView path while selecting
@@ -52,20 +72,69 @@ class VideoView:
             self.image.terminate()
             self.image = None
 
+    def _click_mode(self):
+        with self.module._camera_context(self.camera):
+            return self.module.camera_settings.click_mode
+
+    def _update_title(self):
+        mode = self._click_mode()
+        if mode != self.shown_mode:
+            self.shown_mode = mode
+            self.image.set_title("%s (click: %s)" % (self.title, CLICK_MODE_NAMES[mode]))
+
+    def _command(self, command):
+        self.module.cmd_camera([
+            "for", "%u:%u" % (self.camera.system_id, self.camera.component_id)
+        ] + command)
+
+    def _menu_event(self, event):
+        if event.returnkey == "Camera:Photo":
+            self._command(["photo"])
+        elif event.returnkey == "Camera:Record":
+            self._command(["record", "toggle"])
+        elif event.returnkey == "Camera:Autofocus":
+            self._command(["focus", "auto"])
+        elif event.returnkey == "Camera:StopTracking":
+            self.module.stop_tracking(self.camera)
+        elif event.returnkey.startswith("ClickMode:"):
+            self.module.camera_settings.set("click_mode", event.returnkey[10:])
+
+    def _mouse_event(self, event):
+        shape = getattr(event, "shape", None)
+        if shape is None:
+            # no frame yet
+            return
+        height, width = shape[0], shape[1]
+        point = (event.X / float(width), event.Y / float(height))
+        if self._click_mode() != "track":
+            self.drag_start = None
+            if getattr(event, "leftPressed", False):
+                self.module.camera_click(self.camera, self.stream,
+                                         event.X, event.Y, width, height)
+            return
+        if getattr(event, "leftPressed", False):
+            self.drag_start = point
+        if self.drag_start is None:
+            return
+        dragged = max(abs(point[0] - self.drag_start[0]),
+                      abs(point[1] - self.drag_start[1])) > DRAG_THRESHOLD
+        if getattr(event, "leftReleased", False):
+            self.image.add_OSD(MPImageOSD_None("track_rect"))
+            if dragged:
+                self.module.camera_track(self.camera, self.drag_start, point)
+            else:
+                self.module.camera_track(self.camera, self.drag_start)
+            self.drag_start = None
+        elif getattr(event, "leftIsDown", False) and dragged:
+            self.image.add_OSD(MPImageOSD_Rect("track_rect", self.drag_start,
+                                               point, (255, 255, 0), 2))
+
     def check_events(self):
         if not self.alive():
             return
         for event in self.image.events():
-            if not isinstance(event, MPMenuItem):
-                continue
-            if event.returnkey == "Camera:Photo":
-                command = ["photo"]
-            elif event.returnkey == "Camera:Record":
-                command = ["record", "toggle"]
-            elif event.returnkey == "Camera:Autofocus":
-                command = ["focus", "auto"]
-            else:
-                continue
-            self.module.cmd_camera([
-                "for", "%u:%u" % (self.camera.system_id, self.camera.component_id)
-            ] + command)
+            if isinstance(event, MPMenuItem):
+                self._menu_event(event)
+            elif getattr(event, "ClassName", "") == "wxMouseEvent":
+                self._mouse_event(event)
+        self._update_title()
