@@ -31,7 +31,7 @@ class RallyModule(mission_item_protocol.MissionItemProtocolModule):
         return "rally"
 
     def MISSION_CURRENT_opaque_id_attribute(self):
-        return "rally_point"
+        return "rally_points_id"
 
     def cmd_rally_add(self, args):
         '''add a rally point at the last map click position'''
