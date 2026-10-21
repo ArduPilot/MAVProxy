@@ -3571,24 +3571,18 @@ class TestMissionStyles(object):
 
     def test_the_live_map_setting(self):
         from types import SimpleNamespace
-        from MAVProxy.modules.lib import mp_settings
-        from MAVProxy.modules.mavproxy_map3d.map3d import MISSION_STYLES
+        from MAVProxy.modules import mavproxy_map3d
         module = TestDrawnTrack().live_module('plane')
         styles = []
         sends = []
-        # settings of the kind the module makes, to see the choice enforced
-        module.map3d_settings = mp_settings.MPSettings([
-            ('fpvfov', float, 90.0), ('terrainbrightness', float, 1.25),
-            ('terrainshading', bool, True), ('terrainwireframe', bool, False),
-            ('showdirection', bool, True), ('showlabels', bool, False),
-            ('labelsize', int, 14),
-            mp_settings.MPSetting('missionpath', str, MISSION_STYLES[0],
-                                  choice=MISSION_STYLES)])
+        # Use the module's settings to exercise the mission style choice.
+        module.map3d_settings = mavproxy_map3d.make_settings()
         module.map = SimpleNamespace(
             is_alive=lambda: True, set_fpv_fov=lambda fov: None,
             set_mission_arrows=lambda enable: None,
             set_mission_labels=lambda enable: None,
             set_mission_label_size=lambda size: None,
+            set_trail_ribbon=lambda enable, width: None,
             set_render_settings=lambda *args: None,
             set_mission_style=styles.append,
             set_mission=lambda items, track=None: sends.append(track))
@@ -3769,6 +3763,7 @@ class TestMissionStyles(object):
             set_mission_arrows=lambda enable: None,
             set_mission_labels=lambda enable: None,
             set_mission_label_size=lambda size: None,
+            set_trail_ribbon=lambda enable, width: None,
             set_mission_style=styles.append,
             set_render_settings=lambda *args: None,
             set_mission=lambda items, track=None: module.sent.append(track))
