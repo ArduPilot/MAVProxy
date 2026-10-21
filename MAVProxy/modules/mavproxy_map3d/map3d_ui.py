@@ -17,7 +17,7 @@ from MAVProxy.modules.mavproxy_map3d.terrain import (
     TerrainManager, R, TILE_DOWNLOAD_THREADS, wrap_longitude)
 from MAVProxy.modules.mavproxy_map3d.elements import ElementManager
 from MAVProxy.modules.mavproxy_map3d.map3d import (
-    MISSION_LABEL_SIZE, MISSION_STYLES, RIBBON_WIDTH)
+    MISSION_LABEL_SIZE, MISSION_STYLES, TRAIL_LENGTH, RIBBON_WIDTH)
 
 import vtk
 
@@ -106,6 +106,7 @@ class Map3DFrame(wx.Frame):
         self.mission_labelled = False
         self.mission_label_size = MISSION_LABEL_SIZE
         self.mission_style = MISSION_STYLES[0]
+        self.trail_length = TRAIL_LENGTH
         self.trail_ribbon = False
         self.ribbon_width = RIBBON_WIDTH
         self.terrain_brightness = min(
@@ -189,6 +190,7 @@ class Map3DFrame(wx.Frame):
         self.elements.set_mission_label_size(self.mission_label_size)
         self.elements.set_mission_labels(self.mission_labelled)
         self.elements.set_mission_style(self.mission_style)
+        self.elements.set_trail_length(self.trail_length)
         self.elements.set_trail_ribbon(self.trail_ribbon, self.ribbon_width)
         if self.vehicle_type is not None:
             self.elements.set_vehicle_type(self.vehicle_type)
@@ -433,6 +435,12 @@ class Map3DFrame(wx.Frame):
             return
         if kind == 'mission_style':
             self.set_mission_style(msg[1])
+            return
+        if kind == 'trail_length':
+            self.trail_length = msg[1]
+            if self.elements is not None:
+                self.elements.set_trail_length(self.trail_length)
+                self.render()
             return
         if kind == 'trail_ribbon':
             self.trail_ribbon, self.ribbon_width = msg[1:]

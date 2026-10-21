@@ -81,7 +81,7 @@ def map3d_frame(monkeypatch):
         from types import SimpleNamespace
         from MAVProxy.modules.mavproxy_map3d import map3d_ui
         from MAVProxy.modules.mavproxy_map3d.map3d import (
-            MISSION_LABEL_SIZE, MISSION_STYLES, RIBBON_WIDTH)
+            MISSION_LABEL_SIZE, MISSION_STYLES, TRAIL_LENGTH, RIBBON_WIDTH)
         # a scene is built with the real element manager and camera, over
         # terrain and imagery which are never fetched
         monkeypatch.setattr(map3d_ui, 'TerrainManager', Terrain)
@@ -119,6 +119,7 @@ def map3d_frame(monkeypatch):
         frame.mission_labelled = False
         frame.mission_label_size = MISSION_LABEL_SIZE
         frame.mission_style = MISSION_STYLES[0]
+        frame.trail_length = TRAIL_LENGTH
         frame.trail_ribbon = False
         frame.ribbon_width = RIBBON_WIDTH
         frame.labels_check = Widget(frame.mission_labelled)

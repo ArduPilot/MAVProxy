@@ -176,7 +176,26 @@ class TestSettingsSync(object):
         attitude = (0.3, 0.2, 1.0)
         viewer.set_vehicle(*HOME, *attitude)
         deliver(viewer, frame)
-        assert frame.elements.trail[-1][1] == attitude
+        assert frame.elements.trail[-1][2] == attitude
+
+    @pytest.mark.parametrize('before_scene', [False, True])
+    def test_trail_length_reaches_the_scene(self, map3d_frame, map3d_module,
+                                          before_scene):
+        (viewer, frame) = connect(map3d_frame)
+        module = map3d_module(viewer)
+        assert module.map3d_settings.traillength == 240.0
+        assert frame.trail_length == 240.0
+        assert frame.elements.trail_length == 240.0
+        if before_scene:
+            frame.elements = None
+            frame.terrain = None
+        module.cmd_map3d(['set', 'traillength', '30'])
+        deliver(viewer, frame)
+        if before_scene:
+            viewer.set_origin(*HOME)
+            deliver(viewer, frame)
+        assert frame.trail_length == 30.0
+        assert frame.elements.trail_length == 30.0
 
     def test_render_settings_wait_for_a_scene(self, map3d_frame,
                                               map3d_module):
@@ -326,3 +345,41 @@ class TestToolbar(object):
             assert self.events(frame) == []
         finally:
             frame.Destroy()
+
+
+class TestTrail(object):
+    '''the vehicle's trail is kept for traillength seconds, 0 for all of it'''
+
+    def elements(self):
+        pytest.importorskip("vtk")
+        import vtk
+        from MAVProxy.modules.mavproxy_map3d.elements import ElementManager
+        em = ElementManager(vtk.vtkRenderer(), HOME[0], HOME[1], 1.0)
+        em.set_home(HOME[2])
+        return em
+
+    def fly(self, em, seconds):
+        for t in range(seconds):
+            em.add_trail_point(HOME[0] + t * 1.0e-5, HOME[1], HOME[2] + 100,
+                               now=1000.0 + t)
+
+    def test_old_points_are_dropped(self):
+        em = self.elements()
+        em.set_trail_length(240, now=1000.0)
+        self.fly(em, 300)
+        times = [t for (t, _, _) in em.trail]
+        assert times[0] >= 1299.0 - 240
+        assert times[-1] == 1299.0
+        assert len(em.actors['trail']) == 1
+
+    def test_zero_keeps_all_of_it(self):
+        em = self.elements()
+        em.set_trail_length(0, now=1000.0)
+        self.fly(em, 300)
+        assert len(em.trail) == 300
+        # shortening it drops what is now too old, and all of it can go
+        em.set_trail_length(10, now=1299.0)
+        assert len(em.trail) == 11
+        em.set_trail_length(10, now=2000.0)
+        assert em.trail == []
+        assert em.actors['trail'] == []
