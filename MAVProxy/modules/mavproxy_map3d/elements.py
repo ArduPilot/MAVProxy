@@ -11,7 +11,8 @@ import vtk
 
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.mavproxy_map3d.map3d import (
-    MissionItem, MISSION_LABEL_SIZE, MISSION_LABEL_SIZES, MISSION_STYLES)
+    MissionItem, MISSION_LABEL_SIZE, MISSION_LABEL_SIZES, MISSION_STYLES,
+    RIBBON_WIDTH)
 from MAVProxy.modules.mavproxy_map3d.terrain import enu, R, wrap_longitude
 
 # MAV_FRAME altitude conventions
@@ -27,6 +28,99 @@ MISSION_CIRCLE_SEGMENTS = 64
 # and how many pixels each should take up on the screen
 MISSION_ARROW_COUNT = 60
 MISSION_ARROW_PIXELS = 22.0
+
+# FlightCoach/Flight Plotter, Artur Uzieblo: js/geometries/RibbonMesh.js.
+# Top and underside palettes in 15 degree pilot-roll bands, then the right
+# (green) and left (red) edges. Ribbon thickness is wingspan / 15.
+RIBBON_COLOURS = (
+    0xffbb33, 0xffdd33, 0xffff33, 0xddff33, 0xbbff33, 0x99ff33, 0x77ff33,
+    0xaa00ff, 0xd400ff, 0xff00d4, 0xff00aa, 0xff0080, 0xff0055, 0xff002b,
+    0x00bb00, 0xff0000)
+
+
+def _ribbon_colours(attitude):
+    '''FlightCoach's pilot roll, using its default (north) field rotation.
+
+    This is the YZX quaternion for (-roll, -yaw - pi/2, -pitch), followed
+    by FlightCoach's roll extraction. Folding atan2 into 0..90 degrees
+    gives the same absolute atan(numerator/denominator), including at a
+    zero denominator, and its rollMap caps the last band at index 5.
+    '''
+    roll, pitch, yaw = attitude
+    x, y, z = -roll / 2, (-yaw - math.pi / 2) / 2, -pitch / 2
+    c1, c2, c3 = math.cos(x), math.cos(y), math.cos(z)
+    s1, s2, s3 = math.sin(x), math.sin(y), math.sin(z)
+    qx = s1 * c2 * c3 + c1 * s2 * s3
+    qy = c1 * s2 * c3 + s1 * c2 * s3
+    qz = c1 * c2 * s3 - s1 * s2 * c3
+    qw = c1 * c2 * c3 - s1 * s2 * s3
+    numerator = 2 * (qy * qz + qw * qx)
+    denominator = qw * qw - qx * qx - qy * qy + qz * qz
+    bank = math.atan2(abs(numerator), abs(denominator))
+    band = min(5, int(bank * 12 / math.pi))
+    colours = (RIBBON_COLOURS[band], RIBBON_COLOURS[14],
+               RIBBON_COLOURS[band + 7], RIBBON_COLOURS[15])
+    return [tuple((colour >> shift) & 255 for shift in (16, 8, 0))
+            for colour in colours]
+
+
+def _ribbon_section(position, attitude, width, zexag):
+    '''left-down, right-down, right-up, left-up wing corners in map ENU'''
+    roll, pitch, yaw = attitude
+    sr, cr = math.sin(roll), math.cos(roll)
+    sp, cp = math.sin(pitch), math.cos(pitch)
+    sy, cy = math.sin(yaw), math.cos(yaw)
+    # Body right and down axes, rotated ZYX in NED, then mapped to ENU.
+    # Exaggerate their vertical offsets just as for the trail positions.
+    right = (sy * sp * sr + cy * cr, cy * sp * sr - sy * cr,
+             -cp * sr * zexag)
+    down = (sy * sp * cr - cy * sr, cy * sp * cr + sy * sr,
+            -cp * cr * zexag)
+    half = width / 2
+    thickness = half / 15
+    return [tuple(position[j] + wing * right[j] + side * down[j]
+                  for j in range(3))
+            for wing, side in ((-half, thickness), (half, thickness),
+                               (half, -thickness), (-half, -thickness))]
+
+
+def _ribbon(trail, width, zexag):
+    '''join the attitude-oriented wing boxes with coloured top/bottom/edges'''
+    points = vtk.vtkPoints()
+    faces = vtk.vtkCellArray()
+    colours = vtk.vtkUnsignedCharArray()
+    colours.SetName('Ribbon colours')
+    colours.SetNumberOfComponents(3)
+    for i, (position, attitude) in enumerate(trail):
+        for point in _ribbon_section(position, attitude, width, zexag):
+            points.InsertNextPoint(*point)
+        if i == 0:
+            continue
+        previous = 4 * (i - 1)
+        current = 4 * i
+        # Wind each face outwards, matching FlightCoach's separate surfaces.
+        quads = ((previous + 3, previous + 2, current + 2, current + 3),
+                 (previous + 1, current + 1, current + 2, previous + 2),
+                 (previous, current, current + 1, previous + 1),
+                 (previous + 3, current + 3, current, previous))
+        for quad, colour in zip(quads, _ribbon_colours(attitude)):
+            for triangle in ((quad[0], quad[1], quad[2]),
+                             (quad[0], quad[2], quad[3])):
+                faces.InsertNextCell(3, triangle)
+                colours.InsertNextTuple3(*colour)
+    poly = vtk.vtkPolyData()
+    poly.SetPoints(points)
+    poly.SetPolys(faces)
+    poly.GetCellData().SetScalars(colours)
+    mapper = vtk.vtkPolyDataMapper()
+    mapper.SetInputData(poly)
+    mapper.SetScalarModeToUseCellData()
+    mapper.SetColorModeToDirectScalars()
+    actor = vtk.vtkActor()
+    actor.SetMapper(mapper)
+    actor.GetProperty().SetLighting(False)
+    actor.GetProperty().BackfaceCullingOn()
+    return actor
 
 
 def ring_points(centre, radius, bearings):
@@ -420,7 +514,9 @@ class ElementManager:
         self.actors = {}            # key -> list of actors
         self.path = []              # (ENU point, optional timestamp)
         self.path_time_range = None
-        self.trail = []             # accumulated live positions (enu)
+        self.trail = []             # (enu, (roll, pitch, yaw) radians)
+        self.trail_ribbon = False
+        self.ribbon_width = RIBBON_WIDTH
         self.vehicle = None
         self.vehicle_pose = None
         self.vehicle_visible = True
@@ -530,12 +626,29 @@ class ElementManager:
                   for segment in segments if len(segment) >= 2]
         self._replace('path', actors)
 
-    def add_trail_point(self, lat, lon, amsl):
-        self.trail.append(self._enu(lat, lon, amsl))
+    def add_trail_point(self, lat, lon, amsl, attitude=(0.0, 0.0, 0.0)):
+        self.trail.append((self._enu(lat, lon, amsl), attitude))
         if len(self.trail) > 5000:
             self.trail = self.trail[-5000:]
+        self._draw_trail()
+
+    def set_trail_ribbon(self, enable, width=RIBBON_WIDTH):
+        '''switch the retained trail between a line and an attitude ribbon'''
+        enable, width = bool(enable), max(0.1, float(width))
+        if (enable, width) == (self.trail_ribbon, self.ribbon_width):
+            return
+        self.trail_ribbon, self.ribbon_width = enable, width
+        self._draw_trail()
+
+    def _draw_trail(self):
+        actors = []
         if len(self.trail) >= 2:
-            self._replace('trail', [_polyline(self.trail, (1.0, 1.0, 0.0), 2.0)])
+            if self.trail_ribbon:
+                actors = [_ribbon(self.trail, self.ribbon_width, self.zexag)]
+            else:
+                points = [p for (p, _) in self.trail]
+                actors = [_polyline(points, (1.0, 1.0, 0.0), 2.0)]
+        self._replace('trail', actors)
 
     def set_mission(self, items, track=None):
         '''items: list of MissionItem (plain tuples are accepted too).  track

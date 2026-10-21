@@ -21,7 +21,8 @@ from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.mavproxy_misseditor import get_mission_for_map
 from MAVProxy.modules.mavproxy_map3d.map3d import (
     Map3D, MissionItem, MISSION_LABEL_SIZE, MISSION_LABEL_SIZES,
-    MISSION_STYLES, missing_packages, missing_packages_message)
+    MISSION_STYLES, RIBBON_WIDTH, missing_packages,
+    missing_packages_message)
 
 # fence colours as the 2D map's PolyFence layer uses them (OpenCV BGR)
 FENCE_INCLUSION_BGR = (0, 255, 0)
@@ -69,6 +70,9 @@ def make_settings():
         # flown, geometry or plain: see Map3D.set_mission_style()
         mp_settings.MPSetting('missionpath', str, MISSION_STYLES[0],
                               choice=MISSION_STYLES),
+        ('trailribbon', bool, False),
+        mp_settings.MPSetting('ribbonwidth', float, RIBBON_WIDTH,
+                              label='Ribbon width (m)', range=(0.1, 1000.0)),
     ])
 
 
@@ -150,6 +154,8 @@ class Map3DModule(mp_module.MPModule):
                 self.map.set_mission_labels(self.map3d_settings.showlabels)
                 self.map.set_mission_label_size(self.map3d_settings.labelsize)
                 self.map.set_mission_style(self.map3d_settings.missionpath)
+                self.map.set_trail_ribbon(self.map3d_settings.trailribbon,
+                                          self.map3d_settings.ribbonwidth)
                 # the path flown is only worked out while it is drawn
                 self.send_mission()
                 self.send_render_settings()
@@ -178,6 +184,8 @@ class Map3DModule(mp_module.MPModule):
         self.map.set_mission_labels(self.map3d_settings.showlabels)
         self.map.set_mission_label_size(self.map3d_settings.labelsize)
         self.map.set_mission_style(self.map3d_settings.missionpath)
+        self.map.set_trail_ribbon(self.map3d_settings.trailribbon,
+                                  self.map3d_settings.ribbonwidth)
         self.send_mission()
         self.send_fence()
         self.send_rally()
