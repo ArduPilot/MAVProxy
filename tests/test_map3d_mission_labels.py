@@ -59,6 +59,7 @@ def recording_map(pushed):
         set_mission_labels=lambda enable: pushed.append(('labels', enable)),
         set_mission_label_size=lambda size: pushed.append(('size', size)),
         set_trail_ribbon=lambda enable, width: None,
+        set_trail_length=lambda seconds: None,
         set_mission_style=lambda style: None,
         set_render_settings=lambda *args: None)
 

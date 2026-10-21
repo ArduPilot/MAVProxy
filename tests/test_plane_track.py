@@ -3583,6 +3583,7 @@ class TestMissionStyles(object):
             set_mission_labels=lambda enable: None,
             set_mission_label_size=lambda size: None,
             set_trail_ribbon=lambda enable, width: None,
+            set_trail_length=lambda seconds: None,
             set_render_settings=lambda *args: None,
             set_mission_style=styles.append,
             set_mission=lambda items, track=None: sends.append(track))
@@ -3764,6 +3765,7 @@ class TestMissionStyles(object):
             set_mission_labels=lambda enable: None,
             set_mission_label_size=lambda size: None,
             set_trail_ribbon=lambda enable, width: None,
+            set_trail_length=lambda seconds: None,
             set_mission_style=styles.append,
             set_render_settings=lambda *args: None,
             set_mission=lambda items, track=None: module.sent.append(track))

@@ -109,23 +109,43 @@ def test_switching_and_resizing_preserve_the_retained_attitude():
 
 
 @pytest.mark.parametrize('ribbon', [False, True])
-def test_trail_limit_keeps_attitudes_with_their_positions(ribbon):
+def test_zero_trail_length_keeps_more_than_5000_points(ribbon):
+    em = elements()
+    em.set_trail_length(0)
+    em.set_trail_ribbon(ribbon, 20)
+    em.trail = [(i * 0.01, (float(i), 0, HOME[2]), (math.pi / 2, 0, 0))
+                for i in range(5000)]
+    em.add_trail_point(*HOME, attitude=(math.pi, 0, 0), now=1000)
+    assert len(em.trail) == 5001
+    assert em.trail[0][1] == (0, 0, HOME[2])
+    assert em.trail[0][2] == (math.pi / 2, 0, 0)
+    assert em.trail[-1][2] == (math.pi, 0, 0)
+    assert mesh(em).GetNumberOfPoints() == 5001 * (4 if ribbon else 1)
+
+
+@pytest.mark.parametrize('ribbon', [False, True])
+def test_trail_trimming_keeps_attitudes_with_their_positions(ribbon):
     em = elements()
     em.set_trail_ribbon(ribbon, 20)
-    # Fill the retained history, then add one live sample across the limit.
-    em.trail = [((float(i), 0, HOME[2]), (math.pi / 2, 0, 0))
-                for i in range(5000)]
-    em.add_trail_point(*HOME, attitude=(math.pi, 0, 0))
-    assert len(em.trail) == 5000
-    assert em.trail[0][0] == (1, 0, HOME[2])
-    assert em.trail[0][1] == (math.pi / 2, 0, 0)
-    assert em.trail[-1][1] == (math.pi, 0, 0)
+    for i, roll in enumerate((0, 22, 90, 180)):
+        em.add_trail_point(HOME[0] + i * 1.0e-4, HOME[1], HOME[2],
+                           attitude=(math.radians(roll), 0, 0), now=1000 + i)
+    em.set_trail_length(1, now=1003)
+    assert [sample[0] for sample in em.trail] == [1002, 1003]
+    assert em.trail[0][2] == (math.pi / 2, 0, 0)
+    assert em.trail[-1][2] == (math.pi, 0, 0)
     if ribbon:
-        assert mesh(em).GetNumberOfPoints() == 20000
-        assert mesh(em).GetNumberOfPolys() == 8 * 4999
-        # The first station is banked 90 degrees; the last is inverted.
+        assert mesh(em).GetNumberOfPoints() == 8
+        assert mesh(em).GetNumberOfPolys() == 8
+        # First retained station is banked 90 degrees; the last is inverted.
         assert mesh(em).GetPoint(1)[2] == pytest.approx(HOME[2] - 10)
-        assert mesh(em).GetPoint(4 * 4999 + 1)[0] == pytest.approx(-10)
+        assert mesh(em).GetPoint(5)[0] == pytest.approx(-10)
     else:
-        assert mesh(em).GetNumberOfPoints() == 5000
+        assert mesh(em).GetNumberOfPoints() == 2
         assert mesh(em).GetNumberOfLines() == 1
+    em.set_trail_length(1, now=1004)
+    assert len(em.trail) == 1
+    assert em.actors['trail'] == []
+    em.set_trail_length(1, now=1005)
+    assert em.trail == []
+    assert em.actors['trail'] == []

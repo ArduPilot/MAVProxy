@@ -6,13 +6,14 @@ zexag).
 '''
 
 import math
+import time
 
 import vtk
 
 from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.mavproxy_map3d.map3d import (
     MissionItem, MISSION_LABEL_SIZE, MISSION_LABEL_SIZES, MISSION_STYLES,
-    RIBBON_WIDTH)
+    TRAIL_LENGTH, RIBBON_WIDTH)
 from MAVProxy.modules.mavproxy_map3d.terrain import enu, R, wrap_longitude
 
 # MAV_FRAME altitude conventions
@@ -91,7 +92,7 @@ def _ribbon(trail, width, zexag):
     colours = vtk.vtkUnsignedCharArray()
     colours.SetName('Ribbon colours')
     colours.SetNumberOfComponents(3)
-    for i, (position, attitude) in enumerate(trail):
+    for i, (_, position, attitude) in enumerate(trail):
         for point in _ribbon_section(position, attitude, width, zexag):
             points.InsertNextPoint(*point)
         if i == 0:
@@ -514,7 +515,8 @@ class ElementManager:
         self.actors = {}            # key -> list of actors
         self.path = []              # (ENU point, optional timestamp)
         self.path_time_range = None
-        self.trail = []             # (enu, (roll, pitch, yaw) radians)
+        self.trail = []             # (time, enu, (roll, pitch, yaw) radians)
+        self.trail_length = TRAIL_LENGTH
         self.trail_ribbon = False
         self.ribbon_width = RIBBON_WIDTH
         self.vehicle = None
@@ -626,27 +628,40 @@ class ElementManager:
                   for segment in segments if len(segment) >= 2]
         self._replace('path', actors)
 
-    def add_trail_point(self, lat, lon, amsl, attitude=(0.0, 0.0, 0.0)):
-        self.trail.append((self._enu(lat, lon, amsl), attitude))
-        if len(self.trail) > 5000:
-            self.trail = self.trail[-5000:]
-        self._draw_trail()
+    def add_trail_point(self, lat, lon, amsl, attitude=(0.0, 0.0, 0.0),
+                        now=None):
+        if now is None:
+            now = time.time()
+        self.trail.append((now, self._enu(lat, lon, amsl), attitude))
+        self._draw_trail(now)
 
-    def set_trail_ribbon(self, enable, width=RIBBON_WIDTH):
+    def set_trail_length(self, seconds, now=None):
+        '''how many seconds of trail to keep, 0 for all of it'''
+        self.trail_length = max(float(seconds), 0.0)
+        self._draw_trail(time.time() if now is None else now)
+
+    def set_trail_ribbon(self, enable, width=RIBBON_WIDTH, now=None):
         '''switch the retained trail between a line and an attitude ribbon'''
         enable, width = bool(enable), max(0.1, float(width))
         if (enable, width) == (self.trail_ribbon, self.ribbon_width):
             return
         self.trail_ribbon, self.ribbon_width = enable, width
-        self._draw_trail()
+        self._draw_trail(time.time() if now is None else now)
 
-    def _draw_trail(self):
+    def _draw_trail(self, now):
+        if self.trail_length > 0:
+            oldest = now - self.trail_length
+            first = 0
+            while first < len(self.trail) and self.trail[first][0] < oldest:
+                first += 1
+            if first:
+                del self.trail[:first]
         actors = []
         if len(self.trail) >= 2:
             if self.trail_ribbon:
                 actors = [_ribbon(self.trail, self.ribbon_width, self.zexag)]
             else:
-                points = [p for (p, _) in self.trail]
+                points = [p for (_, p, _) in self.trail]
                 actors = [_polyline(points, (1.0, 1.0, 0.0), 2.0)]
         self._replace('trail', actors)
 
