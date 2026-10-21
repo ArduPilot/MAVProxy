@@ -61,6 +61,8 @@ class ConsoleModule(mp_module.MPModule):
         self.safety_on = False
         self.unload_check_interval = 5 # seconds
         self.last_unload_check_time = time.time()
+        self.last_nav_controller_progress = None  # time.time() of last NAV_CONTROLLER_PROGRESS shown
+        self.nav_progress_boot_ms = {}  # (sysid, compid) -> last SYSTEM_TIME.time_boot_ms of vehicles asked for NAV_CONTROLLER_PROGRESS
         self.add_command('console', self.cmd_console, "console module", ['add','list','remove','title'])
         mpstate.console = wxconsole.MessageConsole(title='Console')
 
@@ -91,6 +93,7 @@ class ConsoleModule(mp_module.MPModule):
         mpstate.console.set_status('WP', 'WP --', row=3)
         mpstate.console.set_status('WPDist', 'Distance ---', row=3)
         mpstate.console.set_status('WPBearing', 'Bearing ---', row=3)
+        mpstate.console.set_status('WPProgress', 'Progress --', row=3)
         mpstate.console.set_status('AltError', 'AltError --', row=3)
         mpstate.console.set_status('AspdError', 'AspdError --', row=3)
         mpstate.console.set_status('FlightTime', 'FlightTime --', row=3)
@@ -765,6 +768,67 @@ class ConsoleModule(mp_module.MPModule):
             self.console.set_status('AltError', 'AltError %s' % alt_error)
             self.console.set_status('AspdError', 'AspdError %s%s' % (self.speed_string(msg.aspd_error*0.01), aspd_error_sign))
 
+    def nav_controller_progress_string(self, msg):
+        '''describe a NAV_CONTROLLER_PROGRESS message's progress through the current
+        task of a mission item or, with MAV_MISSION_TYPE_ALL, towards the target of
+        a mode such as GUIDED or RTL'''
+        if msg.mission_type not in (mavutil.mavlink.MAV_MISSION_TYPE_MISSION,
+                                    mavutil.mavlink.MAV_MISSION_TYPE_RALLY,
+                                    mavutil.mavlink.MAV_MISSION_TYPE_ALL):
+            return None
+        remaining = []
+        if not math.isnan(msg.distance_remaining):
+            remaining.append(self.dist_string(msg.distance_remaining))
+        if not math.isnan(msg.time_remaining):
+            seconds = int(round(msg.time_remaining))
+            remaining.append('%u:%02u' % (seconds/60, seconds%60))
+        if not math.isnan(msg.count_remaining):
+            remaining.append('count %.1f' % msg.count_remaining)
+        if msg.percentage_complete != 255:
+            remaining.append('(%u%%)' % msg.percentage_complete)
+        if len(remaining) == 0:
+            return None
+        return ' '.join(remaining)
+
+    def request_nav_controller_progress(self, msg):
+        '''NAV_CONTROLLER_PROGRESS is only sent on request: ask a vehicle for
+        it when it is first seen, and again if it reboots'''
+        if not hasattr(mavutil.mavlink, 'MAVLINK_MSG_ID_NAV_CONTROLLER_PROGRESS'):
+            # message not in this dialect
+            return
+        key = (msg.get_srcSystem(), msg.get_srcComponent())
+        if msg.get_type() == 'HEARTBEAT':
+            if msg.autopilot == mavutil.mavlink.MAV_AUTOPILOT_INVALID or key in self.nav_progress_boot_ms:
+                return
+            self.nav_progress_boot_ms[key] = 0
+        else:
+            # SYSTEM_TIME: a boot time which goes backwards means the vehicle rebooted, forgetting the request
+            if key not in self.nav_progress_boot_ms:
+                return
+            rebooted = msg.time_boot_ms < self.nav_progress_boot_ms[key]
+            self.nav_progress_boot_ms[key] = msg.time_boot_ms
+            if not rebooted:
+                return
+        self.master.mav.command_long_send(
+            key[0],
+            key[1],
+            mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL,
+            0,  # confirmation
+            mavutil.mavlink.MAVLINK_MSG_ID_NAV_CONTROLLER_PROGRESS,  # msg id
+            500000,  # interval - 2Hz
+            0,  # p3
+            0,  # p4
+            0,  # p5
+            0,  # p6
+            0)  # p7
+
+    def handle_nav_controller_progress(self, msg):
+            progress = self.nav_controller_progress_string(msg)
+            if progress is None:
+                progress = '--'
+            self.console.set_status('WPProgress', 'Progress %s' % progress)
+            self.last_nav_controller_progress = time.time()
+
     def handle_param_value(self, msg):
             rec, tot = self.module('param').param_status()
             self.console.set_status('Params', 'Param %u/%u' % (rec,tot))
@@ -944,6 +1008,12 @@ class ConsoleModule(mp_module.MPModule):
         elif type == 'NAV_CONTROLLER_OUTPUT':
             self.handle_nav_controller_output(msg)
 
+        elif type == 'NAV_CONTROLLER_PROGRESS':
+            self.handle_nav_controller_progress(msg)
+
+        if type in ('HEARTBEAT', 'SYSTEM_TIME'):
+            self.request_nav_controller_progress(msg)
+
         elif type == 'PARAM_VALUE':
             self.handle_param_value(msg)
 
@@ -1014,6 +1084,12 @@ class ConsoleModule(mp_module.MPModule):
 
     def idle_task(self):
         now = time.time()
+        # ArduPilot only sends NAV_CONTROLLER_PROGRESS while flying a
+        # mission, so don't leave the last item's progress showing
+        if (self.last_nav_controller_progress is not None and
+            now - self.last_nav_controller_progress > 3):
+            self.last_nav_controller_progress = None
+            self.console.set_status('WPProgress', 'Progress --')
         if self.last_unload_check_time + self.unload_check_interval < now:
             self.last_unload_check_time = now
             if not self.console.is_alive():
