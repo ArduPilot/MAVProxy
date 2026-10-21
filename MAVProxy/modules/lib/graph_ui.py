@@ -40,6 +40,7 @@ class Graph_UI(object):
         self.mg.set_show_flightmode(self.mestate.settings.show_flightmode)
         self.mg.set_legend(self.mestate.settings.legend)
         self.mg.set_axis_mode(self.mestate.settings.axis_mode)
+        self.mg.set_unit_axes(self.mestate.settings.unit_axes)
         self.mg.add_mav(copy.copy(self.mestate.mlog))
         for f in graphdef.expression.split():
             self.mg.add_field(f)
