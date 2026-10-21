@@ -150,6 +150,34 @@ class TestSettingsSync(object):
         assert rendered(frame) == (0.75, True, True, 45.0)
         assert frame.terrain.render_settings == (0.75, True, True)
 
+    @pytest.mark.parametrize('before_scene', [False, True])
+    def test_ribbon_settings_reach_the_scene(self, map3d_frame, map3d_module,
+                                           before_scene):
+        (viewer, frame) = connect(map3d_frame)
+        if before_scene:
+            frame.elements = None
+            frame.terrain = None
+        module = map3d_module(viewer)
+        assert module.map3d_settings.trailribbon is False
+        assert module.map3d_settings.ribbonwidth == 3.0
+        module.cmd_map3d(['set', 'trailribbon', 'true'])
+        module.cmd_map3d(['set', 'ribbonwidth', '25'])
+        deliver(viewer, frame)
+        if before_scene:
+            viewer.set_origin(*HOME)
+            deliver(viewer, frame)
+        assert frame.trail_ribbon is True
+        assert frame.ribbon_width == 25.0
+        assert frame.elements.trail_ribbon is True
+        assert frame.elements.ribbon_width == 25.0
+
+    def test_vehicle_attitude_reaches_the_trail(self, map3d_frame):
+        (viewer, frame) = connect(map3d_frame)
+        attitude = (0.3, 0.2, 1.0)
+        viewer.set_vehicle(*HOME, *attitude)
+        deliver(viewer, frame)
+        assert frame.elements.trail[-1][1] == attitude
+
     def test_render_settings_wait_for_a_scene(self, map3d_frame,
                                               map3d_module):
         (viewer, frame) = connect(map3d_frame)

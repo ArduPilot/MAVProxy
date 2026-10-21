@@ -17,7 +17,7 @@ from MAVProxy.modules.mavproxy_map3d.terrain import (
     TerrainManager, R, TILE_DOWNLOAD_THREADS, wrap_longitude)
 from MAVProxy.modules.mavproxy_map3d.elements import ElementManager
 from MAVProxy.modules.mavproxy_map3d.map3d import (
-    MISSION_LABEL_SIZE, MISSION_STYLES)
+    MISSION_LABEL_SIZE, MISSION_STYLES, RIBBON_WIDTH)
 
 import vtk
 
@@ -106,6 +106,8 @@ class Map3DFrame(wx.Frame):
         self.mission_labelled = False
         self.mission_label_size = MISSION_LABEL_SIZE
         self.mission_style = MISSION_STYLES[0]
+        self.trail_ribbon = False
+        self.ribbon_width = RIBBON_WIDTH
         self.terrain_brightness = min(
             2.0, max(0.25, float(state.terrain_brightness)))
         self.terrain_shading = bool(state.terrain_shading)
@@ -187,6 +189,7 @@ class Map3DFrame(wx.Frame):
         self.elements.set_mission_label_size(self.mission_label_size)
         self.elements.set_mission_labels(self.mission_labelled)
         self.elements.set_mission_style(self.mission_style)
+        self.elements.set_trail_ribbon(self.trail_ribbon, self.ribbon_width)
         if self.vehicle_type is not None:
             self.elements.set_vehicle_type(self.vehicle_type)
         self.elements.set_terrain_height(self.terrain.height_at)
@@ -431,6 +434,13 @@ class Map3DFrame(wx.Frame):
         if kind == 'mission_style':
             self.set_mission_style(msg[1])
             return
+        if kind == 'trail_ribbon':
+            self.trail_ribbon, self.ribbon_width = msg[1:]
+            if self.elements is not None:
+                self.elements.set_trail_ribbon(self.trail_ribbon,
+                                              self.ribbon_width)
+                self.render()
+            return
         if kind == 'kml':
             self.kml_features = list(msg[1])
             if self.elements is not None:
@@ -448,7 +458,8 @@ class Map3DFrame(wx.Frame):
         elif kind == 'vehicle':
             (_, lat, lon, amsl, roll, pitch, yaw) = msg
             enu = self.elements.set_vehicle(lat, lon, amsl, roll, pitch, yaw)
-            self.elements.add_trail_point(lat, lon, amsl)
+            self.elements.add_trail_point(lat, lon, amsl,
+                                          attitude=(roll, pitch, yaw))
             self.last_vehicle = (lat, lon, amsl)
             self.last_vehicle_pose = (lat, lon, amsl, roll, pitch, yaw)
             if self.fpv_enabled:
