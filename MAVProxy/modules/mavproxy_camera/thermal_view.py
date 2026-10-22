@@ -91,10 +91,33 @@ class ThermalView:
         (directory / (stem + '.json')).write_text(json.dumps(metadata, indent=2) + '\n')
         print('Raw thermal frame saved: %s' % (directory / stem))
 
+    def _count(self, x, y):
+        pixels, m = self.shown
+        sx, sy = (639-x, 511-y) if m['rotation_deg'] == 180 else (x, y)
+        return int(pixels[sy, sx])
+
+    def _temperature_conversion(self):
+        m = self.shown[1]
+        if m.get('temperature_scale_k') is not None:
+            return m['temperature_scale_k'], m['temperature_offset_k']
+        information = getattr(self.camera, 'information', None)
+        model = getattr(information, 'model_name', '')
+        if not isinstance(model, str):
+            model = bytes(model).decode('utf-8', errors='replace')
+        # ZT30 uses the MT11 Kelvin*64 conversion by operator assumption.
+        # Keep the source metadata unchanged when saving native frames.
+        if model.rstrip('\x00') == 'ZT30' and m.get('temperature_calibration') == 'unverified_sensor_counts':
+            return 1.0 / 64, 0
+        return None
+
     def _temperature(self, x, y):
         pixels, m = self.shown
         sx, sy = (639-x, 511-y) if m['rotation_deg'] == 180 else (x, y)
-        return int(pixels[sy, sx])*m['temperature_scale_k'] + m['temperature_offset_k'] - 273.15
+        conversion = self._temperature_conversion()
+        if conversion is None:
+            return None
+        scale, offset = conversion
+        return int(pixels[sy, sx])*scale + offset - 273.15
 
     def _update_readout(self):
         if self.shown is None:
@@ -107,12 +130,25 @@ class ThermalView:
         if title != self.last_title:
             self.image.set_title(title)
             self.last_title = title
-        text = 'Min: %.2f C    Max: %.2f C\n' % (m['minimum_c'], m['maximum_c'])
+        conversion = self._temperature_conversion()
+        counts_only = conversion is None
+        if counts_only:
+            pixels = self.shown[0]
+            text = 'Min: %u counts    Max: %u counts\nTemperature conversion unverified\n' % (int(pixels.min()), int(pixels.max()))
+        else:
+            scale, offset = conversion
+            pixels = self.shown[0]
+            text = 'Min: %.2f C    Max: %.2f C\n' % (
+                int(pixels.min())*scale + offset - 273.15,
+                int(pixels.max())*scale + offset - 273.15)
         if self.cursor is None:
-            text += 'Hover over the image for pixel temperature'
+            text += 'Hover over the image for pixel ' + ('sensor counts' if counts_only else 'temperature')
         else:
             x, y = self.cursor
-            text += 'Pixel (%u, %u): %.2f C' % (x, y, self._temperature(x, y))
+            if counts_only:
+                text += 'Pixel (%u, %u): %u counts' % (x, y, self._count(x, y))
+            else:
+                text += 'Pixel (%u, %u): %.2f C' % (x, y, self._temperature(x, y))
         colour = (0, 0, 255) if self.palette == 'Greyscale' else None
         readout = text, colour
         if readout != self.last_readout:

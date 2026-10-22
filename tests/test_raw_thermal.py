@@ -43,6 +43,61 @@ class ThermalTests(unittest.TestCase):
         for data in [b'', b'\0'*8+b'{}', (2).to_bytes(8,'big')+json.dumps(m).encode(), b'x'*65545]:
             with self.assertRaises(ValueError): parse_metadata(data)
 
+    def test_uncalibrated_counts_and_unknown_fov(self):
+        m=metadata()
+        m.update(temperature_calibration='unverified_sensor_counts', temperature_scale_k=None,
+                 temperature_offset_k=None, minimum_c=None, maximum_c=None, hfov_deg=None,
+                 minimum_raw=18576, maximum_raw=18720)
+        encode=lambda value: (0x41504347).to_bytes(8,'big')+json.dumps(value).encode()
+        self.assertEqual(parse_metadata(encode(m)),m)
+        self.assertIsNone(projection_pose(m))
+        for key,value in [('temperature_scale_k',1/64),('minimum_c',15),
+                          ('minimum_raw',True),('maximum_raw',65536),('maximum_raw',18000)]:
+            bad=copy.deepcopy(m);bad[key]=value
+            with self.subTest(key=key),self.assertRaises(ValueError):parse_metadata(encode(bad))
+        calibrated=metadata();calibrated['hfov_deg']=None
+        self.assertEqual(parse_metadata(encode(calibrated)),calibrated)
+        self.assertIsNone(projection_pose(calibrated))
+        view=ThermalView.__new__(ThermalView)
+        view.camera=SimpleNamespace(label=lambda:'test');view.image=mock.Mock()
+        view.palette='Greyscale'
+        view.shown=(np.full((512,640),18700,dtype=np.uint16),m)
+        view.paused=False;view.last_title=None;view.last_readout=None;view.cursor=(10,20)
+        self.assertIsNone(view._temperature(10,20))
+        self.assertEqual(view._count(10,20),18700)
+        view._update_readout()
+        self.assertIn('18700 counts',view.image.add_OSD.call_args.args[0].text)
+        self.assertNotIn(' C',view.image.add_OSD.call_args.args[0].text)
+
+    def test_zt30_assumes_mt11_temperature_conversion(self):
+        m = metadata()
+        m.update(temperature_calibration='unverified_sensor_counts', temperature_scale_k=None,
+                 temperature_offset_k=None, minimum_c=None, maximum_c=None,
+                 minimum_raw=18916, maximum_raw=19052)
+        pixels = np.full((512,640), 18916, dtype=np.uint16)
+        pixels[0,0] = 19052
+        original = pixels.copy()
+        view = ThermalView.__new__(ThermalView)
+        view.camera = SimpleNamespace(label=lambda:'test', information=SimpleNamespace(model_name=b'ZT30\x00'))
+        view.image = mock.Mock()
+        view.palette = 'Greyscale'
+        view.shown = pixels, m
+        view.paused = False; view.last_title = None; view.last_readout = None; view.cursor = (0,0)
+        self.assertAlmostEqual(view._temperature(0,0), 22.4125)
+        view._update_readout()
+        osd = view.image.add_OSD.call_args.args[0]
+        self.assertIn('Min: 22.41 C    Max: 24.54 C', osd.text)
+        self.assertNotIn('counts', osd.text)
+        display = np.zeros((512,640,3), dtype=np.uint8)
+        osd.draw(display)
+        self.assertFalse(display[:430].any())
+        self.assertTrue(display[430:,:400].any())
+        self.assertTrue(np.all(display[-4:,:100] == 255))  # opaque backing
+        np.testing.assert_array_equal(pixels, original)
+        self.assertIsNone(m['temperature_scale_k'])
+        view.camera.information.model_name = 'other'
+        self.assertIsNone(view._temperature(0,0))
+
     def test_projection_is_frozen_and_refuses_stale_sources(self):
         m=metadata(); original=copy.deepcopy(m)
         lat,lon,alt,roll,pitch,yaw=projection_pose(m)
