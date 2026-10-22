@@ -38,8 +38,9 @@ class MPImageTitle:
 
 class MPImageStatusText:
     """Readable text below the image, independent of image scaling."""
-    def __init__(self, text):
+    def __init__(self, text, colour=None):
         self.text = text
+        self.colour = colour
 
 class MPImageBrightness:
     '''image brightness to use'''
@@ -191,6 +192,45 @@ class MPImageOSD_Rect(MPImageOSD_Element):
         return cv2.rectangle(data, start_point, end_point, self.color, self.thickness)
 
 
+class MPImageOSD_Text(MPImageOSD_Element):
+    """Multiline text drawn at screen resolution over an opaque background."""
+    def __init__(self, label, text, colour=None):
+        super().__init__(label)
+        self.text = text
+        self.colour = colour
+
+    def draw(self, data):
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        scale, thickness, margin = 0.5, 1, 8
+        # Wrap in screen pixels instead of shrinking the font in small windows.
+        max_width = max(1, data.shape[1] - 2 * margin)
+        lines = []
+        for paragraph in self.text.splitlines():
+            line = ''
+            for word in paragraph.split():
+                candidate = (line + ' ' + word).strip()
+                if line and cv2.getTextSize(candidate, font, scale, thickness)[0][0] > max_width:
+                    lines.append(line)
+                    line = word
+                else:
+                    line = candidate
+            lines.append(line)
+        (_, height), baseline = cv2.getTextSize('Ag', font, scale, thickness)
+        spacing = height + baseline + 6
+        y = data.shape[0] - margin - baseline - spacing * (len(lines) - 1)
+        colour = self.colour if self.colour is not None else (255, 255, 255)
+        background = (255, 255, 255) if self.colour is not None else (0, 0, 0)
+        width = max((cv2.getTextSize(line, font, scale, thickness)[0][0]
+                     for line in lines), default=0)
+        cv2.rectangle(data, (0, max(0, y - height - margin)),
+                      (min(data.shape[1] - 1, width + 2 * margin), data.shape[0] - 1),
+                      background, -1)
+        for line in lines:
+            cv2.putText(data, line, (margin, y), font, scale, colour, thickness, cv2.LINE_AA)
+            y += spacing
+        return data
+
+
 class MPImageOSD_HorizonLine(MPImageOSD_Element):
     '''an OSD horizon line from roll/pitch eulers in degrees and horizontal FOV'''
     def __init__(self, label, roll_deg, pitch_deg, hfov, color, thickness=1):
@@ -302,9 +342,9 @@ class MPImage():
         '''set the frame title'''
         self.in_queue.put(MPImageTitle(title))
 
-    def set_status_text(self, text):
+    def set_status_text(self, text, colour=None):
         """Show a readable text panel below the image."""
-        self.in_queue.put(MPImageStatusText(text))
+        self.in_queue.put(MPImageStatusText(text, colour))
 
     def set_brightness(self, brightness):
         '''set the image brightness'''
@@ -421,12 +461,14 @@ class MPImageFrame(wx.Frame):
         self.layout_timer.Start(1000)
         self.Bind(wx.EVT_SIZE, state.panel.on_size)
 
-    def set_status_text(self, text):
+    def set_status_text(self, text, colour=None):
         if self.status_text is None:
             self.status_text = wx.StaticText(self, style=wx.ST_NO_AUTORESIZE)
             self.status_text.SetFont(wx.Font(12, wx.FONTFAMILY_TELETYPE,
                                             wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
             self.sizer.Add(self.status_text, 0, wx.EXPAND | wx.ALL, 6)
+        self.status_text.SetForegroundColour(
+            wx.NullColour if colour is None else wx.Colour(*colour))
         self.status_text.SetLabel(text)
         height = self.status_text.GetCharHeight() * max(1, len(text.splitlines()))
         if self.status_text.GetMinSize().height != height:
@@ -557,6 +599,16 @@ class MPImagePanel(wx.Panel):
                     self.done_PIL_warning = True
                 # ignore lack of PIL library
                 pass
+        if self.osd_elements is not None:
+            text_elements = [obj for obj in self.osd_elements.values()
+                             if isinstance(obj, MPImageOSD_Text)]
+            if text_elements:
+                # Start from the clean scaled frame on every repaint. Text
+                # remains legible at any zoom and previous readouts are erased.
+                data = np.frombuffer(scaled_image.GetData(), dtype=np.uint8).reshape(ih, iw, 3).copy()
+                for obj in text_elements:
+                    data = obj.draw(data)
+                scaled_image.SetData(data)
         self.imagePanel.set_image(scaled_image)
         self.need_redraw = False
 
@@ -573,7 +625,8 @@ class MPImagePanel(wx.Panel):
     def draw_osd(self, data):
         '''draw OSD elements on the image'''
         for obj in self.osd_elements.values():
-            data = obj.draw(data)
+            if not isinstance(obj, MPImageOSD_Text):
+                data = obj.draw(data)
         return data
 
     def set_image_data(self, data, width, height):
@@ -601,6 +654,9 @@ class MPImagePanel(wx.Panel):
                 data = cv2.LUT(data, self.colormap)
 
         if self.osd_elements is not None:
+            # Queued still images arrive as bytes; OSD drawing needs a writable
+            # pixel array. Keep raw_img free of overlays for mouse readouts.
+            data = np.frombuffer(data, dtype=np.uint8).reshape(height, width, 3).copy()
             data = self.draw_osd(data)
 
         #cv2.imwrite("x.jpg", data)
@@ -623,8 +679,10 @@ class MPImagePanel(wx.Panel):
             self.osd_elements = OrderedDict()
         if isinstance(obj, MPImageOSD_None):
             self.osd_elements.pop(obj.label,None)
+            self.need_redraw = True
             return
         self.osd_elements[obj.label] = obj
+        self.need_redraw = True
 
     def on_redraw_timer(self, event):
         '''the redraw timer ensures we show new map tiles as they
@@ -643,7 +701,7 @@ class MPImagePanel(wx.Panel):
             if isinstance(obj, MPImageTitle):
                 state.frame.SetTitle(obj.title)
             if isinstance(obj, MPImageStatusText):
-                state.frame.set_status_text(obj.text)
+                state.frame.set_status_text(obj.text, obj.colour)
             if isinstance(obj, MPImageRecenter):
                 self.on_recenter(obj.location)
             if isinstance(obj, MPImageMenu):

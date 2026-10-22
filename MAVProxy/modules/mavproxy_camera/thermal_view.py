@@ -6,7 +6,7 @@ import time
 
 import cv2
 import numpy as np
-from MAVProxy.modules.lib.mp_image import MPImage
+from MAVProxy.modules.lib.mp_image import MPImage, MPImageOSD_Text
 from MAVProxy.modules.lib.mp_menu import MPMenuItem, MPMenuSubMenu
 from MAVProxy.modules.lib import camera_projection
 from MAVProxy.modules.mavproxy_camera.thermal_stream import ThermalReader, projection_pose
@@ -113,9 +113,12 @@ class ThermalView:
         else:
             x, y = self.cursor
             text += 'Pixel (%u, %u): %.2f C' % (x, y, self._temperature(x, y))
-        if text != self.last_readout:
-            self.image.set_status_text(text)
-            self.last_readout = text
+        colour = (0, 0, 255) if self.palette == 'Greyscale' else None
+        readout = text, colour
+        if readout != self.last_readout:
+            self.image.add_OSD(MPImageOSD_Text('thermal-readout', text, colour=colour))
+            self.last_readout = readout
+            self.last_key = None  # redraw the OSD when hovering over a paused frame
 
     def _pixel(self, x, y):
         if self.shown is None:
@@ -160,9 +163,11 @@ class ThermalView:
                     if palette in self.PALETTES:
                         self.palette = palette
             elif getattr(event, 'ClassName', '') == 'wxMouseEvent':
-                temperature = self._pixel(event.x, event.y)
+                # MPImage maps X/Y through zoom and pan; lowercase x/y still
+                # contain the original window coordinates copied from wx.
+                temperature = self._pixel(event.X, event.Y)
                 if getattr(event, 'leftIsDown', False):
-                    self._project(event.x, event.y, temperature)
+                    self._project(event.X, event.Y, temperature)
         with self.lock:
             latest, error = self.latest, self.error
         if error:
@@ -176,7 +181,7 @@ class ThermalView:
         if key == self.last_key:
             self._update_readout()
             return
-        self.last_key, self.shown = key, latest
+        self.shown = latest
         lo, hi = int(pixels.min()), int(pixels.max())
         display = ((pixels.astype(np.float32)-lo)*(255.0/max(1, hi-lo))).astype(np.uint8)
         colormap = self.PALETTES[self.palette]
@@ -184,5 +189,6 @@ class ThermalView:
                    else cv2.applyColorMap(display, colormap))
         if m['rotation_deg'] == 180:
             display = display[::-1, ::-1].copy()
-        self.image.set_image(display, bgr=True)
         self._update_readout()
+        self.image.set_image(display, bgr=True)
+        self.last_key = key
