@@ -4,6 +4,7 @@ import io
 from pathlib import Path
 import struct
 import socket
+import tempfile
 import time
 import types
 import unittest
@@ -497,6 +498,88 @@ class TestConcurrentFTP(unittest.TestCase):
             payload=b'Fold\t1\t0\x00', seq=1))
         self.assertEqual(len(self.mpstate._master.mav.sent), sent)
         self.assertEqual(worker.dir_offset, 0)
+
+    def test_wildcard_uploads_files_to_directory_through_queue(self):
+        self.ftp.ftp_settings.max_sessions = 1
+        with tempfile.TemporaryDirectory() as directory:
+            local = Path(directory)
+            (local / 'b.apmod').write_bytes(b'second')
+            (local / 'a.apmod').write_bytes(b'first')
+            (local / 'ignored.txt').write_bytes(b'ignored')
+            (local / 'directory.apmod').mkdir()
+            self.ftp.cmd_ftp(['put', str(local / '*.apmod'), 'APM/MODULES'])
+            self.assertEqual(len(self.ftp.workers), 1)
+            self.assertEqual(len(self.ftp.pending), 1)
+
+            for name, content in [('a.apmod', b'first'), ('b.apmod', b'second')]:
+                worker = next(iter(self.ftp.workers.values()))
+                create = self.mpstate._master.mav.sent[-1]
+                self.assertEqual(request_opcode(create), mavproxy_ftp.OP_CreateFile)
+                self.assertEqual(create[12:12 + create[4]],
+                                 ('APM/MODULES/' + name).encode('ascii'))
+                self.ftp.mavlink_packet(reply(worker.session, mavproxy_ftp.OP_CreateFile))
+                write = self.mpstate._master.mav.sent[-1]
+                self.assertEqual(request_opcode(write), mavproxy_ftp.OP_WriteFile)
+                self.assertEqual(write[12:12 + write[4]], content)
+                self.ftp.mavlink_packet(reply(worker.session, mavproxy_ftp.OP_WriteFile, seq=2))
+                self.assertTrue(worker.write_closing)
+                self.ftp.mavlink_packet(reply(
+                    worker.session, mavproxy_ftp.OP_TerminateSession,
+                    seq=(worker.last_op.seq + 1) % 256))
+                self.assertTrue(worker.done)
+                self.assertNotIn(worker.session, self.ftp.workers)
+
+            self.assertFalse(self.ftp.workers)
+            self.assertFalse(self.ftp.pending)
+
+    def test_single_wildcard_match_still_uses_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            local = Path(directory)
+            (local / 'module.apmod').write_bytes(b'module')
+            for destination, remote in [(['APM/MODULES'], 'APM/MODULES/module.apmod'),
+                                        (['APM/MODULES/'], 'APM/MODULES/module.apmod'),
+                                        (['/'], '/module.apmod'),
+                                        ([], 'module.apmod')]:
+                with self.subTest(destination=destination):
+                    self.ftp.cmd_put([str(local / '*.apmod')] + destination)
+                    worker = next(iter(self.ftp.workers.values()))
+                    self.assertEqual(worker.filename, remote)
+                    self.ftp.cmd_cancel()
+
+    def test_wildcard_without_matching_files_starts_no_upload(self):
+        with tempfile.TemporaryDirectory() as directory:
+            local = Path(directory)
+            (local / 'directory.apmod').mkdir()
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                self.ftp.cmd_put([str(local / '*.apmod'), 'APM/MODULES'])
+            self.assertIn('no files matching', output.getvalue())
+            self.assertFalse(self.mpstate._master.mav.sent)
+            self.assertFalse(self.ftp.workers)
+            self.assertFalse(self.ftp.pending)
+
+    def test_wildcard_duplicate_basenames_rejected_before_upload(self):
+        with tempfile.TemporaryDirectory() as directory:
+            local = Path(directory)
+            for subdir in ['first', 'second']:
+                (local / subdir).mkdir()
+                (local / subdir / 'module.apmod').write_bytes(b'module')
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                self.ftp.cmd_put([str(local / '*' / '*.apmod'), 'APM/MODULES'])
+            self.assertIn('duplicate names', output.getvalue())
+            self.assertFalse(self.mpstate._master.mav.sent)
+            self.assertFalse(self.ftp.workers)
+            self.assertFalse(self.ftp.pending)
+
+    def test_upload_with_file_handle_does_not_expand_wildcard(self):
+        completed = []
+        self.ftp.cmd_put(['*.apmod', '/remote'], fh=io.BytesIO(b'module'),
+                         callback=completed.append)
+        worker = next(iter(self.ftp.workers.values()))
+        self.assertEqual(worker.filename, '/remote')
+        self.ftp.cmd_cancel()
+        self.assertEqual(completed, [None])
 
     def test_upload_uses_baseline_create_and_per_block_acks(self):
         self.ftp.ftp_settings.write_size = 2
