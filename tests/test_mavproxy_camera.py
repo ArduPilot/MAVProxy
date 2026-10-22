@@ -235,6 +235,74 @@ class CameraModuleTest(unittest.TestCase):
             self.assertTrue(any(c[:2] == (1, component) and c[4] ==
                                 mavutil.mavlink.MAVLINK_MSG_ID_CAMERA_SETTINGS for c in requests))
 
+    def test_all_camera_controls_skip_proxy_and_preserve_selection(self):
+        self.module.mavlink_packet(camera_information(component_id=1))
+        self.module.mavlink_packet(camera_information())
+        self.module.mavlink_packet(camera_information(component_id=101))
+        self.module.mavlink_packet(camera_information(system_id=42))
+        self.module.cmd_camera(["select", "1:101"])
+        self.module.camera_settings.camera_component = 101
+        settings = self.module.camera_settings
+        keys = [(1, 100), (1, 101), (42, 100)]
+        for command in (["photo"], ["stopphotos"], ["record", "toggle"],
+                        ["focus", "auto"], ["zoom", "30"], ["mode", "video"],
+                        ["source", "rgb"], ["stream", "start"]):
+            with self.subTest(command=command):
+                self.state._master.mav.commands.clear()
+                self.module.cmd_camera(["all"] + command)
+                self.assertEqual([c[:2] for c in self.commands()], keys)
+                self.assertEqual(self.module.selected_camera, (1, 101))
+                self.assertIsNone(self.module.command_camera)
+                self.assertIs(self.module.camera_settings, settings)
+        self.assertIsNone(self.module.cameras[(1, 1)].recording)
+        self.assertTrue(all(self.module.cameras[key].recording for key in keys))
+        self.module.cmd_camera(["all", "set", "rtsp_host", "192.168.1.2"])
+        for key in keys:
+            self.assertEqual(self.module.cameras[key].control_overrides["rtsp_host"],
+                             "192.168.1.2")
+        self.assertEqual(settings.rtsp_host, "")
+
+    def test_all_mount_uses_each_camera_mapping_and_continues_after_error(self):
+        for system, component, gimbal in ((1, 100, 1), (1, 101, 2), (42, 100, 1)):
+            self.module.mavlink_packet(camera_information(
+                system_id=system, component_id=component, gimbal_device_id=gimbal))
+        second = self.module.cameras[(1, 101)]
+        second.control_overrides.update(manager_component=2, manager_gimbal_id=3)
+        settings = self.module.camera_settings
+        self.state._master.mav.commands.clear()
+        self.module.cmd_camera(["all", "mount", "angle", "0", "-90"])
+        commands = self.commands(mavutil.mavlink.MAV_CMD_DO_GIMBAL_MANAGER_PITCHYAW)
+        self.assertEqual([c[:2] for c in commands], [(1, 1), (1, 2), (42, 1)])
+        self.assertEqual([c[4:6] for c in commands], [(0, -90)] * 3)
+        self.assertEqual([c[10] for c in commands], [1, 3, 1])
+        # A failure for the first camera must not prevent later cameras running.
+        self.state._master.mav.commands.clear()
+        with mock.patch.object(self.module, "_mount_command", side_effect=[
+                ValueError("first camera unavailable"), None, None]) as mount:
+            with contextlib.redirect_stdout(io.StringIO()) as output:
+                self.module.cmd_camera(["all", "mount", "angle", "0", "-90"])
+            self.assertIn("first camera unavailable", output.getvalue())
+            self.assertEqual(mount.call_count, 3)
+        self.assertIsNone(self.module.command_camera)
+        self.assertIs(self.module.camera_settings, settings)
+        self.assertEqual(self.module.selected_camera, (1, 100))
+
+    def test_all_requires_cameras_and_rejects_nested_targeting(self):
+        with contextlib.redirect_stdout(io.StringIO()) as output:
+            self.module.cmd_camera(["all", "photo"])
+        self.assertIn("no MAVLink cameras discovered", output.getvalue())
+        self.module.mavlink_packet(camera_information())
+        for args in (["all"], ["all", "all", "photo"],
+                     ["all", "for", "1:100", "photo"],
+                     ["all", "select", "42:101"],
+                     ["for", "1:100", "all", "photo"]):
+            with self.subTest(args=args):
+                with contextlib.redirect_stdout(io.StringIO()) as output:
+                    self.module.cmd_camera(args)
+                self.assertIn("usage:", output.getvalue())
+                self.assertEqual(self.module.selected_camera, (1, 100))
+                self.assertEqual(list(self.module.cameras), [(1, 100)])
+
     def setup_camera_roi(self):
         self.roi_now = 100.0
         clock = mock.patch("MAVProxy.modules.mavproxy_camera.roi.time",

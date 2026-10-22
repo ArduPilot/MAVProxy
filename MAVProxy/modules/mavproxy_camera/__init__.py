@@ -161,9 +161,14 @@ class CameraModule(mp_module.MPModule):
             mp_settings.MPSetting("track_radius", float, 0.05,
                                   range=(0.0, 1.0)),
         ])
+        camera_commands = (
+            "<status|discover|info|custom|definition|params|param|streams|view|"
+            "projection|graph|roi|coverage|photo|stopphotos|record|zoom|focus|"
+            "mode|source|stream|mount|set>")
         self.add_command(
             "camera", self.cmd_camera, "MAVLink camera control",
-            ["<status|discover|select|for|info|custom|definition|params|param|streams|view|projection|graph|roi|coverage|photo|stopphotos|record|zoom|focus|mode|source|stream|mount|set>",
+            ["<select|for|all|" + camera_commands[1:],
+             "all " + camera_commands,
              "roi <all|clear>",
              "projection <toggle>",
              "for (CAMERAADDRESS)",
@@ -327,6 +332,7 @@ class CameraModule(mp_module.MPModule):
   camera discover                     request fresh discovery information
   camera select [SYSID:]COMPID         select a camera
   camera for SYSID:COMPID COMMAND      control one camera without changing selection
+  camera all COMMAND [ARGS]           run a command for every discovered camera
   camera info                          show selected camera information
   camera custom                       open live Custom Settings dialog
   camera definition [FILE|URL]         reload or override camera definition
@@ -572,7 +578,7 @@ class CameraModule(mp_module.MPModule):
             self.command_camera, self.camera_settings = previous_camera, previous_settings
 
     def cmd_for(self, args):
-        if len(args) < 2 or args[1].lower() in ("for", "select"):
+        if len(args) < 2 or args[1].lower() in ("for", "select", "all"):
             raise ValueError("usage: camera for SYSID:COMPID COMMAND [ARGS]")
         parts = args[0].split(":")
         if len(parts) != 2:
@@ -584,6 +590,16 @@ class CameraModule(mp_module.MPModule):
         with self._camera_context(camera):
             self.cmd_camera(args[1:])
 
+    def cmd_all(self, args):
+        if not args or args[0].lower() in ("for", "select", "all"):
+            raise ValueError("usage: camera all COMMAND [ARGS]")
+        keys = self._camera_menu_keys()
+        if not keys:
+            raise ValueError("no MAVLink cameras discovered; use 'camera discover'")
+        for key in keys:
+            with self._camera_context(self.cameras[key]):
+                self.cmd_camera(args)
+
     def cmd_camera(self, args):
         if not args:
             print(self.usage())
@@ -592,6 +608,8 @@ class CameraModule(mp_module.MPModule):
         try:
             if command == "for":
                 self.cmd_for(args[1:])
+            elif command == "all":
+                self.cmd_all(args[1:])
             elif command == "status":
                 if self.command_camera is not None:
                     self.show_info()
