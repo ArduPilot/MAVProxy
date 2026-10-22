@@ -122,6 +122,20 @@ The last command closes only that camera's graphs. A bare `camera graph close`
 closes all camera graphs. Addressed commands do not change the command-line
 selection. Map footprints are independent of the command-line camera selection.
 
+Use `camera all COMMAND [ARGS]` to run any camera command for every discovered
+camera without changing the selection, for example:
+
+```
+camera all mount angle 0 -90
+camera all photo
+camera all record start
+camera all set show_fov false
+```
+
+Each command uses that camera's settings and gimbal mapping. Duplicate
+autopilot camera proxies are skipped when the physical camera is discovered.
+The targeting commands `select`, `for`, and `all` cannot be nested under `all`.
+
 Use `camera for SYSID:COMPID set NAME VALUE` to override module settings for
 that camera's menus and addressed commands, such as its `rtsp_host`,
 `gimbal_component` or `manager_gimbal_id`. Other settings
