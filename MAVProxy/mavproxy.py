@@ -25,6 +25,7 @@ import time
 import traceback
 
 from importlib import reload
+from multiprocessing import active_children
 from queue import Empty
 from types import SimpleNamespace
 
@@ -1685,7 +1686,7 @@ if __name__ == '__main__':
     #  - when one handler raises, input() runs any others still pending
     #    with that exception set, which fails with SystemError
     #
-    # So the handlers for the signals themselves only record what was
+    # For a clean SIGTERM shutdown, the handler only records what was
     # asked for, and poke_handler is the one place that raises.  A
     # forwarder thread interrupts the main thread with POKE_SIGNAL:
     # once when woken through the wakeup fd, which happens whichever
@@ -1695,14 +1696,6 @@ if __name__ == '__main__':
     signal_state = SimpleNamespace(
         # when the first fatal signal (or other shutdown) was seen
         shutdown_started=None,
-        # interactive Ctrl-Cs the main loop has still to act on.  A
-        # list because append and pop are each a single operation: a
-        # handler can run between the bytecodes of "count += 1" - or of
-        # testing and clearing a flag - and so lose one
-        interrupts=[],
-        # 'startup', then 'running' while the main loop is (and so will
-        # act on that), then 'cleanup'
-        phase='startup',
         # the forwarder thread's request pipe, if it is running
         request_fd=None,
         # how many times our handlers for the signals themselves have run
@@ -1728,18 +1721,11 @@ if __name__ == '__main__':
             frame = frame.f_back
         return False
 
-    def interrupts_pending():
-        return len(signal_state.interrupts) > 0
-
     def raise_to_end_input():
-        if interrupts_pending():
-            # the main loop counts this as handled once it has caught it
-            raise KeyboardInterrupt()
         raise ShutdownRequested()
 
     def poke_handler(signum=None, frame=None):
-        if (in_input_loop(frame) and
-                (interrupts_pending() or mpstate.status.stop_event.is_set())):
+        if in_input_loop(frame) and mpstate.status.stop_event.is_set():
             raise_to_end_input()
 
     def request_pokes():
@@ -1767,10 +1753,6 @@ if __name__ == '__main__':
             signal.pthread_kill(main_ident, POKE_SIGNAL)
 
         def wanted():
-            if interrupts_pending():
-                # until the main loop has acted on it, wherever the
-                # main thread is now
-                return True
             return (mpstate.status.stop_event.is_set() and
                     in_input_loop(sys._current_frames().get(main_ident)))
 
@@ -1801,26 +1783,20 @@ if __name__ == '__main__':
                          daemon=True).start()
         signal_state.request_fd = request_w
 
-    def interrupt_handler(signum=None, frame=None):
-        '''an interactive Ctrl-C'''
+    def immediate_exit(signum, frame=None):
+        '''Ctrl-C and Ctrl-\\ must also work during stuck module cleanup.'''
         signal_state.handler_runs += 1
-        if signal_state.phase == 'cleanup':
-            # we are already shutting down; treat it as we would a
-            # repeated fatal signal
-            quit_handler(signum, frame)
-            return
-        if signal_state.phase == 'startup':
-            # just interrupt whatever is going on
-            raise KeyboardInterrupt()
-        signal_state.interrupts.append(signum)
-        if signal_state.request_fd is None:
-            # no forwarder: raise ourselves if waiting for input, and
-            # otherwise leave it to the top of the main loop, as a raise
-            # anywhere else can escape the loop and skip the cleanup
-            if in_input_loop(frame):
-                raise_to_end_input()
-            return
-        request_pokes()
+        try:
+            # Do not leave camera/map/console processes behind. Kill without
+            # joining: their own signal handlers or cleanup may be stuck too.
+            for child in active_children():
+                try:
+                    child.kill()
+                except Exception:
+                    pass
+        finally:
+            # No print, flush, module unload or atexit handler may delay this.
+            os._exit(128 + signum)
 
     def quit_handler(signum=None, frame=None):
         '''a fatal signal'''
@@ -1858,20 +1834,14 @@ if __name__ == '__main__':
         sys.__excepthook__(*args)
     sys.excepthook = excepthook
 
-    # Listen for kill signals to cleanly shutdown modules
-    fatalsignals = [signal.SIGTERM]
+    # Terminal interrupts exit immediately; SIGTERM unloads modules cleanly.
+    signal.signal(signal.SIGINT, immediate_exit)
+    signal.signal(signal.SIGTERM, quit_handler)
     try:
-        fatalsignals.append(signal.SIGQUIT)
+        signal.signal(signal.SIGQUIT, immediate_exit)
         signal.signal(signal.SIGHUP, signal.SIG_IGN)
     except Exception:
         pass
-    if opts.daemon or opts.non_interactive: # SIGINT breaks readline parsing - if we are interactive, just let things die
-        fatalsignals.append(signal.SIGINT)
-    else:
-        signal.signal(signal.SIGINT, interrupt_handler)
-
-    for sig in fatalsignals:
-        signal.signal(sig, quit_handler)
     start_forwarder()
 
     mpstate.load_module('link', quiet=True)
@@ -2005,32 +1975,6 @@ if __name__ == '__main__':
     else:
         print("Note: Not saving telemetry logs")
 
-    def handle_interrupt():
-        '''act on one Ctrl-C'''
-        try:
-            signal_state.interrupts.pop()
-        except IndexError:
-            # raised without one recorded, e.g. during startup
-            pass
-        if mpstate.settings.requireexit:
-            print("Interrupt caught.  Use 'exit' to quit MAVProxy.")
-
-            # Just lost the map and console, get them back:
-            for (m, pm) in mpstate.modules:
-                if m.name in ["map", "console"]:
-                    if hasattr(m, 'unload'):
-                        try:
-                            m.unload()
-                        except Exception:
-                            pass
-                    reload(m)
-                    m.init(mpstate)
-
-        else:
-            # leave the loop through the module cleanup below, rather
-            # than skipping it
-            mpstate.status.stop_event.set()
-
     # run main loop as a thread
     mpstate.status.thread = threading.Thread(target=main_loop, name='main_loop')
     mpstate.status.thread.daemon = True
@@ -2038,12 +1982,7 @@ if __name__ == '__main__':
 
     # use main program for input. This ensures the terminal cleans
     # up on exit
-    signal_state.phase = 'running'
     while not mpstate.status.stop_event.is_set():
-        if interrupts_pending():
-            # a Ctrl-C which arrived while we were not waiting for input
-            handle_interrupt()
-            continue
         try:
             if opts.daemon or opts.non_interactive:
                 time.sleep(0.1)
@@ -2058,18 +1997,16 @@ if __name__ == '__main__':
             # a signal handler ran while our exception was on its way
             # out of input(); see the signal handling above
             if isinstance(ex.__cause__, KeyboardInterrupt):
-                handle_interrupt()
+                immediate_exit(signal.SIGINT)
             elif not isinstance(ex.__cause__, ShutdownRequested):
                 # not one of ours.  Report it, but still unload the
                 # modules rather than dying here
                 traceback.print_exc()
                 mpstate.status.stop_event.set()
         except KeyboardInterrupt:
-            handle_interrupt()
-    signal_state.phase = 'cleanup'
-    del signal_state.interrupts[:]
+            immediate_exit(signal.SIGINT)
     if signal_state.shutdown_started is None:
-        # a shutdown by some other means - the exit command, or Ctrl-C -
+        # a shutdown by some other means - the exit command -
         # gets the same grace against a repeat signal
         signal_state.shutdown_started = time.monotonic()
 
