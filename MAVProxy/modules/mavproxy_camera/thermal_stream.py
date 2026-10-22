@@ -1,4 +1,4 @@
-"""Lossless APCG thermal Matroska reader. Pixel values remain uint16 Kelvin*64.
+"""Lossless APCG thermal Matroska reader. Pixel values remain native uint16 sensor samples.
 
 PyAV exposes Matroska BlockAdditional as packet side data; metadata is paired
 with the compressed frame before decoding, not joined to live MAVLink state.
@@ -26,12 +26,26 @@ def parse_metadata(data):
     for key in ('frame_id', 'capture_monotonic_us'):
         if type(m.get(key)) is not int or m[key] < 1:
             raise ValueError('invalid thermal frame timestamp or sequence')
-    for key in ('temperature_scale_k', 'temperature_offset_k', 'hfov_deg', 'minimum_c', 'maximum_c'):
-        value = m.get(key)
-        if type(value) not in (int, float) or not math.isfinite(value):
-            raise ValueError('invalid thermal calibration')
-    if m['temperature_scale_k'] <= 0 or not 0 < m['hfov_deg'] < 180:
-        raise ValueError('invalid thermal scale or FOV')
+    temperature_keys = ('temperature_scale_k', 'temperature_offset_k', 'minimum_c', 'maximum_c')
+    counts_only = m.get('temperature_calibration') == 'unverified_sensor_counts'
+    if counts_only:
+        if any(m.get(key) is not None for key in temperature_keys):
+            raise ValueError('inconsistent uncalibrated thermal data')
+        for key in ('minimum_raw', 'maximum_raw'):
+            if type(m.get(key)) is not int or not 0 <= m[key] <= 65535:
+                raise ValueError('invalid thermal sample range')
+        if m['minimum_raw'] > m['maximum_raw']:
+            raise ValueError('invalid thermal sample range')
+    else:
+        for key in temperature_keys:
+            value = m.get(key)
+            if type(value) not in (int, float) or not math.isfinite(value):
+                raise ValueError('invalid thermal calibration')
+        if m['temperature_scale_k'] <= 0:
+            raise ValueError('invalid thermal scale')
+    fov = m.get('hfov_deg')
+    if fov is not None and (type(fov) not in (int, float) or not math.isfinite(fov) or not 0 < fov < 180):
+        raise ValueError('invalid thermal FOV')
     if m.get('rotation_deg') not in (0, 180):
         raise ValueError('unsupported thermal rotation')
     return m
@@ -39,6 +53,9 @@ def parse_metadata(data):
 
 def projection_pose(metadata):
     """Use only this frame's telemetry; refuse missing/stale state for mapping."""
+    fov = metadata.get('hfov_deg')
+    if type(fov) not in (int, float) or not math.isfinite(fov) or not 0 < fov < 180:
+        return None
     from MAVProxy.modules.lib.video_telemetry import camera_pose
     if metadata.get('altitude_datum') != 'AMSL' or metadata.get('gimbal_frame') != 'roll_pitch_level_yaw_vehicle':
         return None
