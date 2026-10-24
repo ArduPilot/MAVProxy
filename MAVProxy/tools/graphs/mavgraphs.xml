@@ -749,5 +749,129 @@
   <expression>RATE.Y RATE.YDes ATT.Yaw:2 ATT.DesYaw:2</expression>
  </graph>
 
- 
+ <!-- ============================== EKF Diagnostics ============================== -->
+
+ <graph name="EKF3/Variance/Velocity">
+    <expression>XKF4[0].SV</expression>
+    <expression>XKF4[1].SV</expression>
+    <expression>NKF4[0].SV</expression>
+    <expression>NKF4[1].SV</expression>
+    <expression>1.0+0*XKF4[0].SV</expression>
+ </graph>
+
+ <graph name="EKF3/Variance/Position">
+    <expression>XKF4[0].SP</expression>
+    <expression>XKF4[1].SP</expression>
+    <expression>NKF4[0].SP</expression>
+    <expression>NKF4[1].SP</expression>
+    <expression>1.0+0*XKF4[0].SP</expression>
+ </graph>
+
+ <graph name="EKF3/Variance/Height">
+    <expression>XKF4[0].SH</expression>
+    <expression>XKF4[1].SH</expression>
+    <expression>NKF4[0].SH</expression>
+    <expression>NKF4[1].SH</expression>
+    <expression>1.0+0*XKF4[0].SH</expression>
+ </graph>
+
+ <graph name="EKF3/Variance/Magnetometer">
+    <expression>XKF4[0].SM</expression>
+    <expression>XKF4[1].SM</expression>
+    <expression>NKF4[0].SM</expression>
+    <expression>NKF4[1].SM</expression>
+    <expression>1.0+0*XKF4[0].SM</expression>
+ </graph>
+
+ <graph name="EKF3/Variance/Terrain">
+    <expression>XKF4[0].SVT</expression>
+    <expression>XKF4[1].SVT</expression>
+    <expression>NKF4[0].SVT</expression>
+    <expression>NKF4[1].SVT</expression>
+    <expression>1.0+0*XKF4[0].SVT</expression>
+ </graph>
+
+ <graph name="EKF3/Variance/Overview">
+    <expression>XKF4[0].SV</expression>
+    <expression>XKF4[0].SP</expression>
+    <expression>XKF4[0].SH</expression>
+    <expression>XKF4[0].SM</expression>
+    <expression>1.0+0*XKF4[0].SV</expression>
+ </graph>
+
+ <graph name="EKF3/Innovations/Velocity">
+    <expression>XKF3[0].IVN</expression>
+    <expression>XKF3[0].IVE</expression>
+    <expression>XKF3[0].IVD</expression>
+    <expression>NKF3[0].IVN</expression>
+    <expression>NKF3[0].IVE</expression>
+    <expression>NKF3[0].IVD</expression>
+ </graph>
+
+ <graph name="EKF3/Innovations/Position">
+    <expression>XKF3[0].IPN</expression>
+    <expression>XKF3[0].IPE</expression>
+    <expression>XKF3[0].IPD</expression>
+    <expression>NKF3[0].IPN</expression>
+    <expression>NKF3[0].IPE</expression>
+    <expression>NKF3[0].IPD</expression>
+ </graph>
+
+ <graph name="EKF3/Innovations/Magnetometer">
+    <expression>XKF3[0].IMX</expression>
+    <expression>XKF3[0].IMY</expression>
+    <expression>XKF3[0].IMZ</expression>
+    <expression>NKF3[0].IMX</expression>
+    <expression>NKF3[0].IMY</expression>
+    <expression>NKF3[0].IMZ</expression>
+ </graph>
+
+ <graph name="EKF3/Innovations/Yaw">
+    <expression>XKF3[0].IYAW</expression>
+    <expression>NKF3[0].IYAW</expression>
+ </graph>
+
+ <graph name="EKF3/Status/Flags">
+    <expression>XKF4[0].SS</expression>
+    <expression>XKF4[1].SS</expression>
+    <expression>NKF4[0].SS</expression>
+ </graph>
+
+ <graph name="EKF3/Status/AttitudeError">
+    <expression>degrees(XKF4[0].errRP)</expression>
+    <expression>degrees(XKF4[1].errRP)</expression>
+    <expression>degrees(NKF4[0].errRP)</expression>
+ </graph>
+
+ <graph name="Sensors/IMU/Accel-Consistency">
+    <expression>IMU[0].AccX-IMU[1].AccX</expression>
+    <expression>IMU[0].AccY-IMU[1].AccY</expression>
+    <expression>IMU[0].AccZ-IMU[1].AccZ</expression>
+ </graph>
+
+ <graph name="Sensors/IMU/Gyro-Consistency">
+    <expression>degrees(IMU[0].GyrX-IMU[1].GyrX)</expression>
+    <expression>degrees(IMU[0].GyrY-IMU[1].GyrY)</expression>
+    <expression>degrees(IMU[0].GyrZ-IMU[1].GyrZ)</expression>
+ </graph>
+
+ <graph name="Sensors/GPS/Position-Offset">
+    <expression>(GPS[0].Lat-GPS[1].Lat)*1.0e7</expression>
+    <expression>(GPS[0].Lng-GPS[1].Lng)*1.0e7</expression>
+    <expression>GPS[0].Alt-GPS[1].Alt</expression>
+ </graph>
+
+ <graph name="Sensors/GPS/Quality">
+    <expression>GPS[0].HDop</expression>
+    <expression>GPS[1].HDop</expression>
+    <expression>GPS[0].NSats</expression>
+    <expression>GPS[1].NSats</expression>
+ </graph>
+
+ <graph name="Sensors/Compass/Field-Consistency">
+    <expression>sqrt(MAG[0].MagX**2+MAG[0].MagY**2+MAG[0].MagZ**2)</expression>
+    <expression>sqrt(MAG[1].MagX**2+MAG[1].MagY**2+MAG[1].MagZ**2)</expression>
+    <expression>sqrt(MAG[2].MagX**2+MAG[2].MagY**2+MAG[2].MagZ**2)</expression>
+ </graph>
+
 </graphs>
