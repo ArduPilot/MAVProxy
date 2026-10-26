@@ -23,6 +23,14 @@ def test_time_rounding_carries_into_next_minute():
     assert make_module().format_time(1577882099.9996) == "123500.000"
 
 
+def test_rmc_date_rolls_over_with_time():
+    # 2020-01-01 23:59:59.9996 rounds to 00:00:00.000 on 2020-01-02
+    rmc = make_module().format_rmc(1577923199.9996, "A", 0.0, 0.0, 0.0, 0.0)
+    fields = rmc.split(",")
+    assert fields[1] == "000000.000"
+    assert fields[9] == "020120"
+
+
 def test_position_minutes():
     nmea = make_module()
     assert nmea.format_lat(-35.5) == "3530.00000,S"
