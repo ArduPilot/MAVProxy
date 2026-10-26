@@ -31,6 +31,15 @@ def test_rmc_date_rolls_over_with_time():
     assert fields[9] == "020120"
 
 
+def test_gga_and_rmc_times_match():
+    # round(t, 3) and round(t * 1000) disagree here; both sentences must agree
+    nmea = make_module()
+    t = 1708632199.1595
+    gga = nmea.format_gga(t, 0.0, 0.0, 1, 10, 1.0, 0.0)
+    rmc = nmea.format_rmc(t, "A", 0.0, 0.0, 0.0, 0.0)
+    assert gga.split(",")[1] == rmc.split(",")[1]
+
+
 def test_position_minutes():
     nmea = make_module()
     assert nmea.format_lat(-35.5) == "3530.00000,S"

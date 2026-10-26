@@ -107,7 +107,7 @@ class NMEAOutModule(mp_module.MPModule):
     def format_rmc(self, utc_sec, fix, lat, lon, speed, course):
         fmt = "$GPRMC,%s,%s,%s,%s,%.2f,%.2f,%s,,"
         # round once so time and date roll over midnight together
-        utc_sec = round(utc_sec, 3)
+        utc_sec = int(round(utc_sec * 1000)) / 1000.0
         msg = fmt % (self.format_time(utc_sec), fix, self.format_lat(lat), self.format_lon(lon),
                      speed, course, self.format_date(utc_sec))
         return msg + "*%02X" % self.nmea_checksum(msg)
