@@ -13,6 +13,7 @@ from MAVProxy.modules.mavproxy_misseditor import me_event
 from MAVProxy.modules.mavproxy_misseditor.survey_preview import SurveyPreview
 import queue
 import copy
+import multiprocessing
 from types import SimpleNamespace
 MissionEditorEvent = me_event.MissionEditorEvent
 
@@ -260,18 +261,26 @@ class MissionEditorMain(object):
         self.map_mission = None
 
         self.survey_preview = SurveyPreview()
-        self.event_queue = multiproc.Queue()
-        self.event_queue_lock = multiproc.Lock()
-        self.gui_event_queue = multiproc.Queue()
-        self.gui_event_queue_lock = multiproc.Lock()
 
-        self.object_queue = multiproc.Queue()
+        # MAVProxy has worker threads before this module is normally loaded.
+        # Do not fork that process for the wx child: inherited locks can leave
+        # the child stuck before it reaches child_task(). Keep this local to
+        # Mission Editor so other MAVProxy processes retain their existing
+        # multiprocessing behaviour. All IPC passed to the child must come
+        # from this same context.
+        self.mp_context = multiprocessing.get_context('spawn')
+        self.event_queue = self.mp_context.Queue()
+        self.event_queue_lock = self.mp_context.Lock()
+        self.gui_event_queue = self.mp_context.Queue()
+        self.gui_event_queue_lock = self.mp_context.Lock()
 
-        self.close_window = multiproc.Semaphore()
+        self.object_queue = self.mp_context.Queue()
+
+        self.close_window = self.mp_context.Semaphore()
         self.close_window.acquire()
 
         # Spawn/forkserver must not serialize this editor or live MAVProxy state.
-        self.child = multiproc.Process(
+        self.child = self.mp_context.Process(
             target=self.child_task,
             args=(self.event_queue, self.event_queue_lock,
                   self.gui_event_queue, self.gui_event_queue_lock,
@@ -286,7 +295,7 @@ class MissionEditorMain(object):
         self.last_unload_check_time = time.time()
         self.unload_check_interval = 0.1 # seconds
 
-        self.mavlink_message_queue = multiproc.Queue()
+        self.mavlink_message_queue = self.mp_context.Queue()
         self.mavlink_message_queue_handler = threading.Thread(target=self.mavlink_message_queue_handler)
         self.mavlink_message_queue_handler.start()
         self.needs_unloading = False
