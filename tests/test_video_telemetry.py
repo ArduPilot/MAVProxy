@@ -180,6 +180,16 @@ class ThermalMetadataTests(unittest.TestCase):
         meta = dict(schema='apcg.thermal.v1', hfov_deg=24.2, telemetry=dict(record(), hfov_deg=42.0))
         self.assertEqual(self.parse(meta)['hfov_deg'], 42.0)
 
+    def test_preserves_radiometric_scale_without_assuming_calibration(self):
+        meta = dict(schema='apcg.thermal.v1', telemetry=record(),
+                    temperature_scale_k=1/64, temperature_offset_k=2,
+                    minimum_c=-10, maximum_c=30)
+        self.assertEqual(self.parse(meta)['thermal'], {key: meta[key] for key in (
+            'temperature_scale_k', 'temperature_offset_k', 'minimum_c', 'maximum_c')})
+        meta['temperature_scale_k'] = None
+        self.assertIsNone(self.parse(meta)['thermal']['temperature_scale_k'])
+
+
     def test_rejects_unusable_metadata(self):
         for meta in (dict(schema='other', telemetry=record()),
                      dict(schema='apcg.thermal.v1', telemetry=None),
