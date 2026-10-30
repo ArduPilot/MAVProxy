@@ -1,6 +1,9 @@
 """Small OpenCV-backed viewer for MAVLink video streams."""
 
 import cv2
+from urllib.parse import urlsplit
+
+from pymavlink import mavutil
 
 from MAVProxy.modules.lib.mp_image import MPImage, MPImageOSD_Rect, MPImageOSD_None
 from MAVProxy.modules.lib.mp_menu import MPMenuItem, MPMenuSubMenu
@@ -22,6 +25,27 @@ def _opencv_has_gstreamer():
         if line.strip().startswith("GStreamer:"):
             return line.split(":", 1)[1].strip().upper().startswith("YES")
     return False
+
+
+def video_pipeline(stream, uri, latency):
+    """Decode the advertised transport, independently of its video codec."""
+    codec = "h265" if stream.encoding == 2 else "h264"
+    parsed = urlsplit(uri)
+    mpegts = (getattr(stream, 'type', None) == mavutil.mavlink.VIDEO_STREAM_TYPE_MPEG_TS or
+              parsed.path.lower().endswith(('.misb', '.ts')))
+    location = '"%s"' % uri.replace('\\', '\\\\').replace('"', '\\"')
+    if parsed.scheme.lower() in ('rtsp', 'rtsps'):
+        source = ("rtspsrc location=%s latency=%u protocols=tcp "
+                  "tcp-timeout=3000000 buffer-mode=auto" % (location, max(0, latency)))
+        source += " ! rtpmp2tdepay ! tsdemux" if mpegts else " ! rtp%sdepay" % codec
+    elif mpegts and parsed.scheme.lower() in ('http', 'https'):
+        source = "souphttpsrc location=%s ! tsdemux" % location
+    else:
+        return ("uridecodebin uri=%s ! videoconvert ! "
+                "video/x-raw,format=BGRx ! appsink" % location)
+    # Select the video pad: a MISB transport also exposes a KLV data pad.
+    return (source + " ! video/x-%s ! %sparse ! avdec_%s ! videoconvert ! "
+            "video/x-raw,format=BGRx ! appsink" % (codec, codec, codec))
 
 
 class VideoView:
@@ -48,16 +72,10 @@ class VideoView:
         menu.add(MPMenuItem("Stop tracking", returnkey="Camera:StopTracking"))
         self.image.set_popup_menu(menu)
         self._update_title()
-        codec = "h265" if stream.encoding == 2 else "h264"
         if _opencv_has_gstreamer():
             # Match the proven mavproxy_SIYI CameraView path while selecting
             # the depayloader and decoder from VIDEO_STREAM_INFORMATION.
-            pipeline = (
-                "rtspsrc location={uri} latency={latency} protocols=tcp "
-                "tcp-timeout=3000000 buffer-mode=auto ! rtp{codec}depay ! "
-                "{codec}parse ! avdec_{codec} ! videoconvert ! "
-                "video/x-raw,format=BGRx ! appsink"
-            ).format(uri=uri, latency=max(0, latency), codec=codec)
+            pipeline = video_pipeline(stream, uri, latency)
             self.image.set_gstreamer(pipeline, reconnect=True)
         else:
             # PyPI OpenCV builds generally omit CAP_GSTREAMER. Passing the URI

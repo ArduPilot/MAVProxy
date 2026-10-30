@@ -3,7 +3,9 @@
 `mavvidplay.py` opens a recorded video with an attitude OSD and a separate MAVProxy
 map. It reads the `apcg.telemetry.v1` JSON carried in H.264/H.265 unregistered SEI
 messages by AP_CameraGimbal. No live MAVLink connection is needed. SIYI vendor MP4 subtitle telemetry is also
-supported; an optional flight log supplies vehicle attitude for its map projection. MP4/MOV and Matroska recordings with presentation timestamps are supported;
+supported; an optional flight log supplies vehicle attitude for its map projection.
+MISB ST 0601 KLV telemetry in MPEG-TS recordings is detected automatically.
+MP4/MOV, MPEG-TS and Matroska recordings with presentation timestamps are supported;
 the first video track is used. Audio is not played.
 
 Install MAVProxy normally to install the command. The player also needs `ffprobe`
@@ -13,6 +15,35 @@ From a source checkout, run with `PYTHONPATH=.`:
 ```sh
 python MAVProxy/tools/mavvidplay.py flight.mp4
 ```
+
+For a MISB recording, use `mavvidplay.py flight.ts`. The player reads the KLV
+data track, validates its checksum, and matches metadata to video presentation
+timestamps. Missing or damaged metadata leaves that frame's pose unavailable.
+ST 0601 sensor-relative angles are combined with platform attitude before map
+projection. MSL sensor altitude is used for terrain projection; ellipsoid height
+is not silently substituted. A recorded horizontal FOV is used automatically.
+The KLV decoder prefers the 32-bit full-range pitch/roll fields (tags 90/91)
+when available and falls back to legacy fields for older recordings. Standard
+full-range pitch and roll both cover +/-90 degrees. AP_CameraGimbal also embeds
+its complete APCG snapshot as SEI in MISB video; the player prefers that snapshot
+to retain inverted attitudes, extra fields and APCG precision. KLV presence is
+still counted independently when both encodings are present.
+
+MPEG-TS playback needs PyAV (`pip install av`). Seeking uses indexed keyframe
+timestamps and decoder preroll so backward seeks and GOP boundaries keep the
+displayed image aligned with its telemetry. MISB recordings without B-frames start
+playing while telemetry is indexed in the background. The terminal and status bar
+show progress; seeking past the available index waits for the scan to catch up.
+When opening a recording that is still growing, the player uses its length at
+startup. Reopen it to include material recorded later.
+
+In live MAVProxy camera viewing, advertised MISB streams appear in `camera
+streams` and the Video menu. The camera advertises the format selected by
+`VIDEO_META_FMT` as its primary streams, so `camera view rgb` and `camera view
+thermal` select that format. In MISB mode, APCG compatibility previews have
+additional stream IDs. Select a specific entry with `camera view STREAM_ID`. MPEG-TS
+over RTSP (`.misb`) is depacketized and demultiplexed before video decoding;
+OpenCV builds without GStreamer use the FFmpeg backend directly.
 
 New AP_CameraGimbal recordings include `hfov_deg`: the effective horizontal field
 of view for each frame, including optical zoom and digital crop. The player uses
@@ -82,7 +113,7 @@ The panel shows the raw frame's temperature range and separately displays
 their ages or invalid flags. Missing tlog measurements show `--`. Compressed
 colour video is not treated as radiometric data.
 
-Telemetry is indexed at startup without decoding the video. Playback uses container
+Telemetry is indexed without decoding the video. Playback uses container
 presentation timestamps, including when packets are stored out of display order;
 SEI timestamps may have a different epoch after remuxing. Decoding and seeking run
 in a worker so the controls stay responsive. The map, hover location and OSD always

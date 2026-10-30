@@ -95,6 +95,7 @@ class CameraDevice:
         self.recording_verify_at = 0.0
         self.storage = {}
         self.streams = {}
+        self.stream_count = None
         self.thermal_requested = False
         self.thermal_interval = None
         self.last_thermal_request = 0.0
@@ -1557,6 +1558,24 @@ class CameraModule(mp_module.MPModule):
             camera.storage[message.storage_id] = message
         elif message_type == "VIDEO_STREAM_INFORMATION":
             camera = self._ensure_camera(system_id, component_id)
+            # A format change followed by a restart removes format variants.
+            # Preserve legacy entries from cameras with inconsistent counts.
+            if message.count and camera.stream_count is not None and message.count < camera.stream_count:
+                for stream_id in list(camera.streams):
+                    if (stream_id > message.count and
+                            (urlsplit(_text(camera.streams[stream_id].uri)).path.lower().endswith('.misb') or
+                             _text(camera.streams[stream_id].name).endswith('APCG JSON'))):
+                        del camera.streams[stream_id]
+                        view = self.views.pop((system_id, component_id, stream_id), None)
+                        if view is not None:
+                            view.close()
+            if message.count:
+                camera.stream_count = message.count
+            previous = camera.streams.get(message.stream_id)
+            if previous is not None and (_text(previous.uri), previous.type) != (_text(message.uri), message.type):
+                view = self.views.pop((system_id, component_id, message.stream_id), None)
+                if view is not None:
+                    view.close()
             camera.streams[message.stream_id] = message
             for stream_id in range(1, message.count + 1):
                 if stream_id not in camera.streams:

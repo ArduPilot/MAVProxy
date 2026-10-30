@@ -1,4 +1,4 @@
-"""Index AP_CameraGimbal SEI, SIYI subtitle and thermal-Matroska telemetry on the video's presentation clock.
+"""Index AP_CameraGimbal SEI, MISB KLV, SIYI subtitle and thermal-Matroska telemetry on the video's presentation clock.
 
 No MAVLink connection is needed. ffprobe demuxes packets without decoding video;
 MP4 packet offsets allow us to read compressed samples directly from the file.
@@ -15,9 +15,12 @@ import re
 import statistics
 import subprocess
 import tempfile
+import threading
+import time
 import xml.etree.ElementTree as ET
 
 UUID = bytes.fromhex('8d646b4e556f4a908b7c35e629510321')
+UUID_PATTERN = re.compile(re.escape(UUID))
 THERMAL_ADDITION_TYPE = 0x41504347  # APCG block-addition FourCC written by thermal_to_video.py
 START = re.compile(b'\x00\x00(?:\x00)?\x01')
 
@@ -28,7 +31,8 @@ def unhex(text):
         r'(?:^|\s)[0-9a-fA-F]{8,}: ([0-9a-fA-F ]{39})', text)))
 
 
-def packet_nals(packet, length_size):
+def packet_nals(packet, length_size, copy=True):
+    packet = memoryview(packet)
     if length_size:
         offset = 0
         while offset + length_size <= len(packet):
@@ -36,13 +40,17 @@ def packet_nals(packet, length_size):
             offset += length_size
             if size == 0 or offset + size > len(packet):
                 return
-            yield packet[offset:offset + size]
+            nal = packet[offset:offset + size]
+            yield bytes(nal) if copy else nal
             offset += size
     else:
         starts = list(START.finditer(packet))
         for i, start in enumerate(starts):
             end = starts[i + 1].start() if i + 1 < len(starts) else len(packet)
-            yield packet[start.end():end].rstrip(b'\0')
+            while end > start.end() and packet[end-1] == 0:
+                end -= 1
+            nal = packet[start.end():end]
+            yield bytes(nal) if copy else nal
 
 
 def sei_records(nal, codec):
@@ -126,19 +134,79 @@ class Sample:
     record: object
     speed: object = None
     speed_source: str = 'GPS estimate'
+    has_misb: bool = False
+
+
+class _SpeedEstimator:
+    def __init__(self):
+        from MAVProxy.modules.lib import mp_util
+        self.gps_distance = mp_util.gps_distance
+        self.previous = self.speed = None
+
+    def update(self, sample):
+        pos = position(sample.record)
+        raw = source(sample.record, 'position')
+        utc = sample.record.get('utc_us') if sample.record else None
+        if pos is None or not finite(utc):
+            self.previous, self.speed = None, None
+            return
+        timestamp = utc * 1e-6 - raw.get('age_ms', 0) * .001
+        if self.previous is not None:
+            dt = timestamp - self.previous[0]
+            # Repeated snapshots include the same GPS fix with increasing age.
+            # Millisecond age quantization can jitter the reconstructed time.
+            if dt < -.01 or dt > 10:
+                self.speed = None
+                self.previous = None
+            elif dt > .02:
+                self.speed = self.gps_distance(*self.previous[1][:2], *pos[:2]) / dt
+                self.previous = (timestamp, pos)
+        if self.previous is None:
+            self.previous = (timestamp, pos)
+        sample.speed = self.speed
+
+
+class _RecordingSnapshot:
+    """Seekable read-only prefix of a recording which may still be growing."""
+    def __init__(self, source, size):
+        self.source, self.size = source, size
+
+    def read(self, size=-1):
+        remaining = max(0, self.size-self.source.tell())
+        return self.source.read(remaining if size < 0 else min(size, remaining))
+
+    def seek(self, offset, whence=0):
+        if whence == 2:
+            offset, whence = self.size+offset, 0
+        return self.source.seek(offset, whence)
+
+    def tell(self):
+        return self.source.tell()
 
 
 class VideoIndex:
-    def __init__(self, filename):
+    def __init__(self, filename, background=False, progress=None):
         self.filename = str(pathlib.Path(filename).resolve(strict=True))
         self.thermal = False
         self.frame_pts = None
+        self.keyframe_pts = None
+        self.keyframe_dts = {}
+        self.misb_count = 0
+        self.indexing = False
+        self.index_error = None
+        self.index_progress = 100.0
+        self._index_thread = None
+        self._index_stop = threading.Event()
+        self._index_ready = threading.Event()
+        self._index_done = threading.Event()
+        self._index_done.set()
         info = json.loads(subprocess.check_output([
             'ffprobe', '-v', 'error', '-show_entries',
-            'stream=index,codec_type,codec_name,width,height,avg_frame_rate,extradata:format=format_name',
+            'stream=index,codec_type,codec_name,width,height,avg_frame_rate,has_b_frames,extradata:format=format_name,duration',
             '-show_data', '-of', 'json', self.filename]))
         streams = [s for s in info.get('streams', []) if s.get('codec_type') == 'video']
         subtitle_ids = {s['index'] for s in info.get('streams', []) if s.get('codec_name') == 'mov_text'}
+        klv_ids = {s['index'] for s in info.get('streams', []) if s.get('codec_name') == 'klv'}
         if not streams:
             raise ValueError('An H.264/H.265 or APCG thermal Matroska recording is required')
         if streams[0]['codec_name'] == 'ffv1':
@@ -162,8 +230,18 @@ class VideoIndex:
             if len(extra) <= offset:
                 raise ValueError('Truncated video codec configuration')
             length_size = (extra[offset] & 3) + 1
-        direct = 'mov' in info.get('format', {}).get('format_name', '').split(',')
-        entries = 'packet=stream_index,pts_time,duration_time,pos,size' + ('' if direct else ',data')
+        formats = info.get('format', {}).get('format_name', '').split(',')
+        direct = 'mov' in formats
+        if 'mpegts' in formats:
+            self.frame_pts = [] # MPEG-TS seeks use real presentation times.
+            self.keyframe_pts = []
+            if klv_ids:
+                # Video packet hex dumps expand multi-GB recordings into tens
+                # of GB of XML. Demux in native code, copying only KLV/SEI.
+                self._start_misb_index(stream, klv_ids, info.get('format', {}),
+                                       background and not stream.get('has_b_frames', 0), progress)
+                return
+        entries = 'packet=stream_index,pts,dts,pts_time,duration_time,pos,size,flags' + ('' if direct else ',data')
         command = ['ffprobe', '-v', 'error', '-show_packets',
                    '-show_entries', entries, '-of', 'xml']
         if not direct:
@@ -171,6 +249,8 @@ class VideoIndex:
         self.samples = []
         self.warnings = []
         subtitles = {}
+        klv_samples = []
+        from MAVProxy.modules.lib.misb import records as misb_records
         from MAVProxy.modules.lib.siyi_video import parse_subtitle, attach_subtitles
         # Drain stderr to a file so malformed input cannot deadlock the subprocess.
         with open(self.filename, 'rb') as video, tempfile.TemporaryFile() as errors:
@@ -185,7 +265,7 @@ class VideoIndex:
                         continue
                     attrs = element.attrib
                     packet_stream = int(attrs['stream_index'])
-                    if packet_stream != stream['index'] and packet_stream not in subtitle_ids:
+                    if packet_stream != stream['index'] and packet_stream not in subtitle_ids | klv_ids:
                         element.clear()
                         if packets_element is not None:
                             packets_element.clear()
@@ -195,6 +275,15 @@ class VideoIndex:
                         packet = video.read(int(attrs['size']))
                     else:
                         packet = unhex(attrs.get('data', ''))
+                    if packet_stream in klv_ids:
+                        timestamp = float(attrs.get('pts_time', 'nan'))
+                        records = list(misb_records(packet))
+                        if records and math.isfinite(timestamp):
+                            klv_samples.append((timestamp, records[-1]))
+                        element.clear()
+                        if packets_element is not None:
+                            packets_element.clear()
+                        continue
                     if packet_stream in subtitle_ids:
                         record = parse_subtitle(packet)
                         pts = float(attrs.get('pts_time', 'nan'))
@@ -214,6 +303,13 @@ class VideoIndex:
                     if not math.isfinite(timestamp) or not math.isfinite(duration):
                         raise ValueError('Invalid video timestamp')
                     self.samples.append(Sample(timestamp, duration, records[-1] if records else None))
+                    if self.frame_pts is not None:
+                        if 'pts' not in attrs:
+                            raise ValueError('MPEG-TS video packets have no presentation timestamps')
+                        self.frame_pts.append(int(attrs['pts']))
+                        if 'K' in attrs.get('flags', ''):
+                            self.keyframe_dts[int(attrs['pts'])] = int(attrs.get('dts', attrs['pts']))
+                            self.keyframe_pts.append(int(attrs['pts']))
                     element.clear()
                     if packets_element is not None:
                         packets_element.clear()
@@ -229,7 +325,25 @@ class VideoIndex:
             raise ValueError('No video frames found')
         # Packet decode order may differ from display order (B frames). Never use
         # JSON pts90k for seeking: remuxed RTP recordings may have an arbitrary epoch.
-        self.samples.sort(key=lambda sample: sample.time)
+        if self.frame_pts is not None:
+            ordered = sorted(zip(self.samples, self.frame_pts), key=lambda row: row[0].time)
+            self.samples = [row[0] for row in ordered]
+            self.frame_pts = [row[1] for row in ordered]
+            self.keyframe_pts.sort()
+        else:
+            self.samples.sort(key=lambda sample: sample.time)
+        if klv_samples:
+            klv_samples.sort(key=lambda row: row[0])
+            klv_times = [row[0] for row in klv_samples]
+            for sample in self.samples:
+                i = bisect.bisect_left(klv_times, sample.time-1e-5)
+                # One 90 kHz tick, allowing ffprobe's decimal rounding. Do not
+                # borrow an adjacent frame's pose when metadata is missing.
+                if i < len(klv_times) and abs(klv_times[i]-sample.time) <= 1.2e-5:
+                    sample.has_misb = True
+                    self.misb_count += 1
+                    if sample.record is None:
+                        sample.record = klv_samples[i][1]
         origin = self.samples[0].time
         for sample in self.samples:
             sample.time -= origin
@@ -244,9 +358,157 @@ class VideoIndex:
                 self.warnings.append('%u SIYI records rejected: subtitle timing/frame counters do not match this video' % rejected)
         self.telemetry_count = sum(s.record is not None for s in self.samples)
         if not self.telemetry_count:
-            detail = '; '.join(self.warnings) or 'No AP_CameraGimbal SEI or SIYI subtitle telemetry found'
+            detail = '; '.join(self.warnings) or 'No AP_CameraGimbal SEI, MISB KLV or SIYI subtitle telemetry found'
             raise ValueError(detail)
         self._speeds()
+
+    def _start_misb_index(self, stream_info, klv_ids, format_info, background, progress):
+        self.samples, self.times, self.warnings = [], [], []
+        self.siyi_count = self.telemetry_count = 0
+        try:
+            duration = float(format_info.get('duration', 0))
+        except (TypeError, ValueError):
+            duration = 0
+        self.duration = duration if math.isfinite(duration) and duration > 0 else 1/self.fps
+        # The recorder holds an exclusive lock while appending an access unit.
+        # Snapshot a complete prefix, even when the selected file is growing.
+        with open(self.filename, 'rb') as source_file:
+            try:
+                import fcntl
+            except ImportError:
+                fcntl = None
+            if fcntl:
+                fcntl.flock(source_file, fcntl.LOCK_SH)
+            source_file.seek(0, 2)
+            size = source_file.tell()
+        self.indexing = True
+        self.index_progress = 0
+        self._index_done.clear()
+        if background:
+            self._index_thread = threading.Thread(target=self._scan_misb,
+                args=(stream_info['index'], klv_ids, size, True, progress),
+                name='telemetry-index', daemon=True)
+            self._index_thread.start()
+            self._index_ready.wait()
+        else:
+            self._scan_misb(stream_info['index'], klv_ids, size, False, progress)
+        if self.index_error:
+            raise ValueError(self.index_error)
+
+    def _scan_misb(self, video_id, klv_ids, size, incremental, progress):
+        from MAVProxy.modules.lib.misb import records as misb_records
+        samples_by_pts, pending = {}, {}
+        origin, last_progress = None, 0.0
+        speed_at = 0
+        try:
+            estimator = _SpeedEstimator() if incremental else None
+            import av
+            # Bound reads and SEEK_END to the captured length. FFmpeg's
+            # subfile protocol mishandles seek offsets on multi-GB inputs.
+            with open(self.filename, 'rb') as source, av.open(
+                    _RecordingSnapshot(source, size), format='mpegts',
+                    buffer_size=1024*1024) as container:
+                streams = [s for s in container.streams if s.index == video_id or s.index in klv_ids]
+                for packet in container.demux(*streams):
+                    if self._index_stop.is_set():
+                        return
+                    if not packet.size or packet.pts is None:
+                        continue
+                    timestamp = float(packet.pts * packet.time_base)
+                    tick = round(timestamp*90000)
+                    if packet.stream.index == video_id:
+                        if origin is None:
+                            origin = timestamp
+                        relative = timestamp-origin
+                        if incremental and self.times and relative < self.times[-1]:
+                            raise ValueError('Non-monotonic MPEG-TS timestamps; reopen without background indexing')
+                        duration = float(packet.duration*packet.time_base) if packet.duration else 1/self.fps
+                        rec = None
+                        data = memoryview(packet)
+                        # Preserve SEI precedence in mixed recordings without
+                        # copying compressed video or formatting it as hex.
+                        if UUID_PATTERN.search(data):
+                            recs = [r for nal in packet_nals(data, 0, copy=False)
+                                    for r in sei_records(nal, self.codec)]
+                            rec = recs[-1] if recs else None
+                        klv = pending.pop(tick, None)
+                        if rec is None:
+                            rec = klv
+                        sample = Sample(relative, duration, rec, has_misb=klv is not None)
+                        self.misb_count += sample.has_misb
+                        self.frame_pts.append(int(packet.pts))
+                        if packet.is_keyframe:
+                            self.keyframe_dts[int(packet.pts)] = int(packet.dts if packet.dts is not None else packet.pts)
+                            self.keyframe_pts.append(int(packet.pts))
+                        self.samples.append(sample)
+                        samples_by_pts[tick] = sample
+                        self.telemetry_count += rec is not None
+                        self.duration = max(self.duration, relative+duration)
+                        # Publish times last: an exposed index always has a
+                        # matching sample and decoder timestamp already stored.
+                        self.times.append(relative)
+                        self._index_ready.set()
+                    else:
+                        recs = list(misb_records(bytes(packet)))
+                        if recs:
+                            sample = samples_by_pts.get(tick)
+                            if sample is not None:
+                                if not sample.has_misb:
+                                    sample.has_misb = True
+                                    self.misb_count += 1
+                                if sample.record is None:
+                                    sample.record = recs[-1]
+                                    self.telemetry_count += 1
+                            else:
+                                pending[tick] = recs[-1]
+                    if incremental:
+                        # KLV may follow its video packet. Leave a short tail
+                        # for late metadata, then treat missing poses as gaps.
+                        while speed_at < len(self.samples):
+                            sample = self.samples[speed_at]
+                            if sample.record is None and speed_at >= len(self.samples)-2*self.fps:
+                                break
+                            estimator.update(sample)
+                            speed_at += 1
+                    if packet.pos is not None and 0 <= packet.pos <= size:
+                        self.index_progress = max(self.index_progress, min(99.9, packet.pos*100/max(1, size)))
+                    now = time.monotonic()
+                    if now-last_progress >= .5:
+                        if progress:
+                            progress(self.index_progress, len(self.samples))
+                        last_progress = now
+            if not self.samples:
+                raise ValueError('No video frames found')
+            if not self.telemetry_count:
+                raise ValueError('No valid MISB KLV or AP_CameraGimbal SEI telemetry found')
+            if not incremental:
+                ordered = sorted(zip(self.samples, self.frame_pts), key=lambda row: row[0].time)
+                self.samples[:] = [row[0] for row in ordered]
+                self.frame_pts[:] = [row[1] for row in ordered]
+                start = self.samples[0].time
+                for sample in self.samples:
+                    sample.time -= start
+                self.times[:] = [s.time for s in self.samples]
+                self.keyframe_pts.sort()
+            self.duration = self.times[-1] + (self.samples[-1].duration or 1/self.fps)
+            self._speeds()
+            self.index_progress = 100.0
+            if progress:
+                progress(100.0, len(self.samples))
+        except Exception as error:
+            self.index_error = str(error)
+        finally:
+            self.indexing = False
+            self._index_ready.set()
+            self._index_done.set()
+
+    def wait_for_index(self, timeout=None):
+        return self._index_done.wait(timeout)
+
+    def close(self):
+        self._index_stop.set()
+        if self._index_thread is not None:
+            self._index_thread.join(timeout=5)
 
     def _thermal_record(self, packet):
         """Return the apcg.telemetry.v1 snapshot from a thermal frame's Matroska
@@ -326,34 +588,17 @@ class VideoIndex:
                              're-convert with thermal_to_video.py --bin FLIGHT.bin')
         self._speeds()
 
+    def has_fov(self):
+        return any(sample.record and finite(sample.record.get('hfov_deg')) and
+                   0 < sample.record['hfov_deg'] < 180 for sample in self.samples)
+
     def frame_at(self, seconds):
         return max(0, min(len(self.samples) - 1, bisect.bisect_right(self.times, seconds) - 1))
 
     def _speeds(self):
-        from MAVProxy.modules.lib import mp_util
-        previous = None
-        speed = None
+        estimator = _SpeedEstimator()
         for sample in self.samples:
-            pos = position(sample.record)
-            raw = source(sample.record, 'position')
-            utc = sample.record.get('utc_us') if sample.record else None
-            if pos is None or not finite(utc):
-                previous, speed = None, None
-                continue
-            timestamp = utc * 1e-6 - raw.get('age_ms', 0) * .001
-            if previous is not None:
-                dt = timestamp - previous[0]
-                # Repeated snapshots include the same GPS fix with increasing age.
-                # Millisecond age quantization can jitter the reconstructed time.
-                if dt < -.01 or dt > 10:
-                    speed = None
-                    previous = None
-                elif dt > .02:
-                    speed = mp_util.gps_distance(*previous[1][:2], *pos[:2]) / dt
-                    previous = (timestamp, pos)
-            if previous is None:
-                previous = (timestamp, pos)
-            sample.speed = speed
+            estimator.update(sample)
 
 
 class FlatElevation:
