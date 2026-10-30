@@ -270,6 +270,8 @@ class VideoIndex:
         if not isinstance(telemetry, dict) or telemetry.get('schema') != 'apcg.telemetry.v1':
             return None
         record = dict(telemetry)
+        record['thermal'] = {key: meta.get(key) for key in (
+            'temperature_scale_k', 'temperature_offset_k', 'minimum_c', 'maximum_c')}
         if not finite(record.get('hfov_deg')):
             fov = meta.get('hfov_deg')
             if finite(fov) and 0 < fov < 180:

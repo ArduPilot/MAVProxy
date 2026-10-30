@@ -58,12 +58,29 @@ pixels above the horizon also have no ground location.
   altitude are printed to the terminal. They last for the playback session.
 
 The yellow outline is the camera footprint; the white circle is camera position.
+The telemetry panel beside the image displays the current frame's recorded UTC date and time, including
+milliseconds, beneath elapsed playback time. This uses the telemetry's absolute
+timestamp for APCG, MISB, SIYI and thermal recordings, so it can be matched to a
+flight log. Missing or invalid timestamps show `--`. During capture gaps the
+recorded time stays with the displayed frame.
+Telemetry is kept outside the video so the image remains unobscured.
 Vehicle and gimbal roll/pitch/yaw are shown in degrees. The gimbal OSD shows its
 recorded vehicle-relative yaw; projection adds vehicle yaw to obtain earth yaw,
 as in `mavproxy_camera`. The OSD heading comes from recorded vehicle heading.
 Ground speed (m/s) is estimated from successive GPS positions and their source
 times; it is unavailable until two distinct position updates are available.
 Missing values are shown as `--`, rather than retaining data from another frame.
+
+For lossless FFV1 thermal recordings, hovering over the image also shows the
+pixel's temperature in Celsius in the telemetry panel. It uses the original
+16-bit sample and the frame's recorded Kelvin scale/offset, independently of
+display contrast adjustment. The readout follows the displayed frame during
+playback, seeking and frame stepping, and works without map/terrain coverage.
+Leaving the image clears it; missing radiometric calibration shows `--`.
+The panel shows the raw frame's temperature range and separately displays
+`TMIN`/`TMAX` from `telemetry.named_values` (the tlog measurements), including
+their ages or invalid flags. Missing tlog measurements show `--`. Compressed
+colour video is not treated as radiometric data.
 
 Telemetry is indexed at startup without decoding the video. Playback uses container
 presentation timestamps, including when packets are stored out of display order;

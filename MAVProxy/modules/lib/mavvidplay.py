@@ -1,5 +1,7 @@
 """Video/OSD window and synchronized terrain map for mavvidplay.py."""
 import math
+from datetime import datetime, timezone
+from dataclasses import dataclass
 import queue
 import threading
 import time
@@ -11,6 +13,13 @@ from MAVProxy.modules.lib.wx_loader import wx
 from MAVProxy.modules.lib.video_telemetry import (
     camera_pose, attitude, finite, image_pixel, image_rect, position)
 from MAVProxy.modules.mavproxy_map import mp_slipmap
+
+
+@dataclass
+class ThermalFrame:
+    image: object  # contrast-adjusted BGR image, for display only
+    pixels: object  # original uint16 sensor samples, from the same decoded frame
+
 
 
 class FrameReader(threading.Thread):
@@ -93,7 +102,8 @@ class FrameReader(threading.Thread):
                         break
                 if image is None:
                     raise ValueError('Cannot decode frame %u' % number)
-                frame = self._thermal_to_bgr(image.to_ndarray())
+                pixels = image.to_ndarray()
+                frame = ThermalFrame(self._thermal_to_bgr(pixels), pixels)
                 result = (number, generation, frame, None)
             except Exception as error:
                 result = (number, generation, None, str(error))
@@ -180,12 +190,6 @@ class VideoPanel(wx.Panel):
         if self.bitmap is None:
             return
         dc.DrawBitmap(self.bitmap, self.rect[0], self.rect[1])
-        dc.SetFont(wx.Font(12, wx.FONTFAMILY_TELETYPE, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
-        dc.SetTextForeground(wx.Colour(255, 255, 255))
-        dc.SetTextBackground(wx.Colour(0, 0, 0))
-        dc.SetBackgroundMode(wx.SOLID)
-        for row, text in enumerate(self.owner.osd()):
-            dc.DrawText(text, self.rect[0] + 12, self.rect[1] + 10 + row * 23)
 
     def pixel(self, point):
         return image_pixel(self.rect, self.owner.index.width, self.owner.index.height, point.x, point.y)
@@ -226,6 +230,7 @@ class Player(wx.Frame):
         super().__init__(None, title='MAV Video: ' + index.filename, size=(1000, 740))
         self.index, self.projection, self.map = index, projection, map_display
         self.frame = None
+        self.thermal_pixels = None
         self.number = None
         self.requested = None
         self.generation = 0
@@ -242,6 +247,11 @@ class Player(wx.Frame):
         self.closing = False
         self.reader = FrameReader(index)
         self.panel = VideoPanel(self)
+        self.telemetry_text = wx.TextCtrl(self, value='Loading telemetry...',
+            style=wx.TE_MULTILINE | wx.TE_READONLY | wx.BORDER_NONE)
+        self.telemetry_text.SetFont(wx.Font(10, wx.FONTFAMILY_TELETYPE, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
+        self.telemetry_text.SetMinSize((self.telemetry_text.GetTextExtent('M' * 40)[0] + 20, -1))
+        self._telemetry_text = None
         self.slider = wx.Slider(self, minValue=0, maxValue=max(1, len(index.samples) - 1))
         self.play_button = wx.Button(self, label='Pause' if self.playing else 'Play')
         self.play_button.Bind(wx.EVT_BUTTON, self.toggle)
@@ -265,7 +275,10 @@ class Player(wx.Frame):
         self.follow.Bind(wx.EVT_CHECKBOX, lambda event: self.update_map())
         controls.Add(self.follow, 0, wx.ALL | wx.ALIGN_CENTER_VERTICAL, 8)
         layout = wx.BoxSizer(wx.VERTICAL)
-        layout.Add(self.panel, 1, wx.EXPAND)
+        content = wx.BoxSizer(wx.HORIZONTAL)
+        content.Add(self.panel, 1, wx.EXPAND)
+        content.Add(self.telemetry_text, 0, wx.EXPAND | wx.ALL, 8)
+        layout.Add(content, 1, wx.EXPAND)
         layout.Add(self.slider, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 5)
         layout.Add(controls, 0, wx.EXPAND)
         self.SetSizer(layout)
@@ -295,21 +308,68 @@ class Player(wx.Frame):
         hfov = self.projection.effective_fov(record)
         fov_text = '%.2f deg' % hfov if hfov is not None else '-- (use --fov)'
         state = 'PLAY' if self.playing else 'PAUSED'
+        utc_text = '--'
+        utc_us = record.get('utc_us') if record else None
+        if finite(utc_us) and utc_us > 0:
+            try:
+                seconds, micros = divmod(int(utc_us), 1000000)
+                utc = datetime.fromtimestamp(seconds, timezone.utc)
+                utc_text = utc.strftime('%Y-%m-%d %H:%M:%S') + '.%03u' % (micros // 1000)
+            except (OverflowError, OSError, ValueError):
+                pass
         lines = [
             '%s / %s   %s %gx' % (clock_text(sample.time), clock_text(self.index.duration), state, self.rate),
+            'Recorded UTC: ' + utc_text,
             'Vehicle ' + angle_text(attitude(record, 'vehicle_attitude')),
             'Gimbal  ' + angle_text(attitude(record, 'gimbal_attitude')),
-            'Ground speed (%s): %s   Heading: %s' % (sample.speed_source, speed, heading),
+            'Ground speed (%s): %s' % (sample.speed_source, speed),
+            'Heading: %s' % heading,
             'HFOV: %s (%s)%s' % (fov_text,
                 'recorded' if self.projection.fov is None else 'override',
-                '   NO FRAME TELEMETRY' if record is None else '')]
+                '\nNO FRAME TELEMETRY' if record is None else '')]
         if record and record.get('schema') == 'siyi.subtitle.v1':
-            from datetime import datetime, timezone
-            utc = datetime.fromtimestamp(record['utc_us'] * 1e-6, timezone.utc)
-            lines.append('Recorded UTC: ' + utc.strftime('%Y-%m-%d %H:%M:%S'))
             if camera_pose(record) is None:
                 lines.append('Map projection needs vehicle attitude (--tlog)')
         return lines
+
+    def thermal_lines(self):
+        if not getattr(self.index, 'thermal', False):
+            return []
+        record = self.sample.record if self.sample else None
+        meta = record.get('thermal', {}) if record else {}
+        lines = ['', 'THERMAL', 'Pixel temperature: --']
+        pixels = self.thermal_pixels
+        scale, offset = meta.get('temperature_scale_k'), meta.get('temperature_offset_k')
+        if (pixels is not None and self.hover is not None and
+                finite(scale) and scale > 0 and finite(offset)):
+            x, y = self.hover
+            if 0 <= x < pixels.shape[1] and 0 <= y < pixels.shape[0]:
+                raw = int(pixels[int(y), int(x)])
+                celsius = raw * scale + offset - 273.15
+                lines[-1] = 'Pixel (%u, %u): %.2f °C' % (int(x), int(y), celsius)
+        low, high = meta.get('minimum_c'), meta.get('maximum_c')
+        if finite(low) and finite(high):
+            lines.append('Frame min/max: %.2f / %.2f °C' % (low, high))
+        named = record.get('named_values', {}) if record else {}
+        for name in ('TMIN', 'TMAX'):
+            measurement = named.get(name)
+            value = measurement.get('value') if isinstance(measurement, dict) else None
+            text = '%.2f °C' % value if finite(value) else '--'
+            if finite(value):
+                if measurement.get('valid') is False:
+                    text += ' [invalid]'
+                elif finite(measurement.get('age_ms')):
+                    text += ' (%.2f s old)' % (measurement['age_ms'] / 1000)
+            lines.append('%s (tlog): %s' % (name, text))
+        return lines
+
+
+    def update_telemetry(self):
+        text = '\n'.join(self.osd() + self.thermal_lines())
+        if text != self._telemetry_text:
+            self.telemetry_text.ChangeValue(text)
+            self._telemetry_text = text
+
 
     def media_time(self):
         if self.playing:
@@ -392,7 +452,11 @@ class Player(wx.Frame):
                     self.set_playing(False)
                     self.SetStatusText(error)
                 else:
-                    self.number, self.frame = number, frame
+                    self.number = number
+                    if isinstance(frame, ThermalFrame):
+                        self.frame, self.thermal_pixels = frame.image, frame.pixels
+                    else:
+                        self.frame, self.thermal_pixels = frame, None
                     self.slider.SetValue(number)
                     self.panel.update_bitmap()
                     self.map_dirty = True
@@ -444,15 +508,20 @@ class Player(wx.Frame):
             self.map.remove_object('video-hover')
         self.hover_visible = False
         self.hover_location = None
+        self.update_telemetry()
 
     def update_hover(self):
-        if not self.map.is_alive() or not self.IsShown():
+        if not self.IsShown():
             return
         # Re-evaluate after resizing, playback and seeking, including a stationary
         # mouse. Letterbox bars are outside the video and have no ground location.
         mouse = wx.GetMousePosition()
         point = self.panel.ScreenToClient(mouse)
         self.hover = self.panel.pixel(point) if wx.FindWindowAtPoint(mouse) == self.panel else None
+        self.update_telemetry()
+        # Pixel temperatures do not need vehicle pose, terrain or a running map.
+        if not self.map.is_alive():
+            return
         location = (self.projection.pixel(self.sample.record, *self.hover)
                     if self.sample is not None and self.hover is not None else None)
         if location is None:
