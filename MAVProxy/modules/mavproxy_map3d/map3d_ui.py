@@ -22,6 +22,10 @@ from MAVProxy.modules.mavproxy_map3d.map3d import (
 import vtk
 
 KML_REFRESH_DELAY = 0.5
+# while the camera moves, terrain results get this many seconds of each timer
+# tick, until this long after the last wheel event
+INTERACTION_BUDGET = 0.008
+INTERACTION_HOLD = 0.3
 
 
 class RenderSettingsDialog(wx.Dialog):
@@ -89,6 +93,8 @@ class Map3DFrame(wx.Frame):
         self.terrain = None
         self.elements = None
         self.tc = None
+        self.wheel_steps = 0.0
+        self.last_wheel_time = 0.0
         self.mt = None
         self.follow = bool(state.follow)
         self.last_vehicle = None
@@ -117,6 +123,9 @@ class Map3DFrame(wx.Frame):
 
         self.widget = wxVTKRenderWindowInteractor(self, -1)
         self.widget.Enable(1)
+        # replaces the stock handler, bound earlier, which zooms a full step
+        # per event whatever its size
+        self.widget.Bind(wx.EVT_MOUSEWHEEL, self.on_mouse_wheel)
         self.ren = vtk.vtkRenderer()
         self.ren.SetBackground(0.45, 0.62, 0.85)
         self.widget.GetRenderWindow().AddRenderer(self.ren)
@@ -190,6 +199,26 @@ class Map3DFrame(wx.Frame):
             self.style.zoom_step(False)
         else:
             event.Skip()
+
+    def on_mouse_wheel(self, event):
+        # a trackpad sends a stream of small wheel events where a mouse sends
+        # one per notch, so zoom by the amount scrolled. Horizontal swipes
+        # and zero deltas are ignored rather than read as zoom out
+        rotation = event.GetWheelRotation()
+        if (self.tc is None or rotation == 0 or
+                event.GetWheelAxis() != wx.MOUSE_WHEEL_VERTICAL):
+            return
+        # events already queued are summed into one zoom and one render, so
+        # a burst does not back up behind a terrain update and render each
+        if self.wheel_steps == 0.0:
+            wx.CallAfter(self.apply_wheel_zoom)
+        self.wheel_steps += rotation / float(event.GetWheelDelta())
+
+    def apply_wheel_zoom(self):
+        steps, self.wheel_steps = self.wheel_steps, 0.0
+        self.last_wheel_time = time.monotonic()
+        if steps:
+            self.style.zoom_step(steps > 0, abs(steps))
 
     # ----------------------------------------------------------------- scene
     def init_scene(self, lat0, lon0, amsl_ref):
@@ -522,7 +551,13 @@ class Map3DFrame(wx.Frame):
             drained = True
         # drain terrain worker results
         if self.terrain is not None:
-            terrain_changed = self.terrain.process(self.tc)
+            # tile builds held the main thread for ~100ms a tick, and macOS
+            # delivers the scroll saved up meanwhile as one large jump
+            interacting = (
+                time.monotonic() - self.last_wheel_time < INTERACTION_HOLD or
+                self.style.active_button is not None)
+            terrain_changed = self.terrain.process(
+                self.tc, budget=INTERACTION_BUDGET if interacting else None)
             if self.terrain.mesh_revision != self.overlay_mesh_revision:
                 self.overlay_mesh_revision = self.terrain.mesh_revision
                 self.elements.refresh_fence(self.terrain.height_at)

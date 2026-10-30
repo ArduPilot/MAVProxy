@@ -468,9 +468,11 @@ class TerrainManager:
             self.inflight.add(jid)
             self.jobs.put(("texture", jid, (key, tkey, params, rank)))
 
-    def process(self, tc):
+    def process(self, tc, budget=None):
         '''main thread: drain worker results, build/update VTK. Returns True if
-        anything changed (caller should render).'''
+        anything changed (caller should render). budget, in seconds, stops
+        draining early so the main thread stays free while the camera moves'''
+        start = time.monotonic()
         self.last_tc = tc
         changed = False
         revision = self.mt.download_revision()
@@ -479,6 +481,8 @@ class TerrainManager:
             self.redrape_pending = True
         want = self.desired_set(*self.focal_latlon(tc)) if tc is not None else None
         for _ in range(64):
+            if budget is not None and time.monotonic() - start > budget:
+                break
             try:
                 kind, jid, payload = self.results.get_nowait()
             except queue.Empty:
