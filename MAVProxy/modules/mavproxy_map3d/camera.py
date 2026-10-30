@@ -164,13 +164,14 @@ class TerrainStyle(vtk.vtkInteractorStyleUser):
             self.tc.pan(dx, dy)
         self._render()
 
-    def zoom_step(self, zoom_in):
+    def zoom_step(self, zoom_in, steps=1.0):
         if not self.interaction_enabled:
             return
-        self.tc.zoom(1.0 / 1.2 if zoom_in else 1.2)
+        self.tc.zoom((1.0 / 1.2 if zoom_in else 1.2) ** steps)
         if self.on_change:
             self.on_change()
-        self._render()
+        else:
+            self._render()
 
     def _wf(self, o, e):
         self.zoom_step(True)
