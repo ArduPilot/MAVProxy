@@ -1468,11 +1468,95 @@ class CameraModuleTest(unittest.TestCase):
         VideoView(self.module, camera, stream, uri, 75)
         pipeline = image.set_gstreamer.call_args.args[0]
         self.assertTrue(image.set_gstreamer.call_args.kwargs['reconnect'])
-        self.assertIn("rtspsrc location=" + uri, pipeline)
+        self.assertIn('rtspsrc location="' + uri + '"', pipeline)
         self.assertIn("latency=75 protocols=tcp", pipeline)
         self.assertIn("rtph265depay", pipeline)
         self.assertIn("h265parse ! avdec_h265", pipeline)
         image.set_video.assert_not_called()
+
+    def test_misb_transport_pipeline_uses_ts_depayloader_and_video_pad(self):
+        from MAVProxy.modules.mavproxy_camera.video_view import video_pipeline
+        for encoding, codec in ((1, 'h264'), (2, 'h265')):
+            stream = stream_information(4)
+            stream.encoding = encoding
+            pipeline = video_pipeline(stream, 'rtsp://camera/video1.misb?session=abc', 75)
+            self.assertIn('rtpmp2tdepay ! tsdemux ! video/x-'+codec, pipeline)
+            self.assertIn(codec+'parse ! avdec_'+codec, pipeline)
+            self.assertNotIn('rtp'+codec+'depay', pipeline)
+            stream.type = mavutil.mavlink.VIDEO_STREAM_TYPE_MPEG_TS
+            pipeline = video_pipeline(stream, 'http://camera/live', 0)
+            self.assertIn('souphttpsrc', pipeline)
+            self.assertIn('tsdemux ! video/x-'+codec, pipeline)
+
+    def test_format_change_removes_stale_streams_but_retains_preview_viewers(self):
+        self.module.mavlink_packet(camera_information())
+        regular = stream_information(1)
+        regular.count = 5
+        self.module.mavlink_packet(regular)
+        variant = stream_information(4, uri='rtsp://camera/video1.misb')
+        variant.count = 5
+        self.module.mavlink_packet(variant)
+        preview, misb = mock.Mock(), mock.Mock()
+        self.module.views[(1, 100, 1)] = preview
+        self.module.views[(1, 100, 4)] = misb
+        regular.count = 3
+        self.module.mavlink_packet(regular)
+        self.assertNotIn(4, self.module.cameras[(1, 100)].streams)
+        self.assertNotIn((1, 100, 4), self.module.views)
+        misb.close.assert_called_once()
+        preview.close.assert_not_called()
+        self.assertIs(self.module.views[(1, 100, 1)], preview)
+
+    @mock.patch("MAVProxy.modules.mavproxy_camera.video_view.VideoView")
+    def test_selected_format_primary_stream_and_restart_cleanup(self, viewer):
+        with mock.patch("MAVProxy.modules.lib.mp_util.has_wxpython", True):
+            self.module.mavlink_packet(camera_information())
+            primary = stream_information(1, uri='rtsp://camera/video1.misb')
+            primary.count = 5
+            primary.name = 'Visible MISB KLV'
+            compatibility = stream_information(4, uri='rtsp://camera/video1')
+            compatibility.count = 5
+            compatibility.name = 'Visible APCG JSON'
+            self.module.mavlink_packet(primary)
+            self.module.mavlink_packet(compatibility)
+            self.module.cmd_camera(['view', 'rgb'])
+            self.assertEqual(viewer.call_args.args[2].stream_id, 1)
+            self.assertTrue(viewer.call_args.args[3].endswith('.misb'))
+            primary_view, compatibility_view = mock.Mock(), mock.Mock()
+            self.module.views[(1, 100, 1)] = primary_view
+            self.module.views[(1, 100, 4)] = compatibility_view
+            replacement = stream_information(1, uri='rtsp://camera/video1')
+            replacement.count = 3
+            self.module.mavlink_packet(replacement)
+            self.assertNotIn(4, self.module.cameras[(1, 100)].streams)
+            self.assertNotIn((1, 100, 4), self.module.views)
+            compatibility_view.close.assert_called_once()
+            primary_view.close.assert_called_once()
+            self.module.cmd_camera(['view', 'rgb'])
+            self.assertEqual(viewer.call_args.args[3], replacement.uri)
+
+    @mock.patch("MAVProxy.modules.mavproxy_camera.video_view.VideoView")
+    def test_misb_stream_discovery_menu_and_selection(self, viewer):
+        with mock.patch("MAVProxy.modules.lib.mp_util.has_wxpython", True):
+            self.module.mavlink_packet(camera_information())
+            regular = stream_information(1)
+            regular.count = 5
+            self.module.mavlink_packet(regular)
+            requested = [row[5] for row in self.state._master.mav.commands
+                         if row[2] == mavutil.mavlink.MAV_CMD_REQUEST_MESSAGE and
+                         row[4] == mavutil.mavlink.MAVLINK_MSG_ID_VIDEO_STREAM_INFORMATION]
+            self.assertTrue(set((2, 3, 4, 5)).issubset(requested))
+            stream = stream_information(4, uri='rtsp://192.168.144.25:8554/video1.misb')
+            stream.count = 5
+            stream.name = 'Visible MISB KLV'
+            self.module.mavlink_packet(stream)
+            self.module._sync_menus()
+            video = next(item for item in self.module.menus[0].items if item.name == 'Video')
+            self.assertIn(('Visible MISB KLV 1920x1080', '# camera for 1:100 view 4'),
+                          [(item.name, item.returnkey) for item in video.items])
+            self.module.cmd_camera(['view', '4'])
+            self.assertEqual(viewer.call_args.args[2].stream_id, 4)
+            self.assertTrue(viewer.call_args.args[3].endswith('/video1.misb'))
 
     def test_roi_and_mount_never_modify_target_rate_or_bypass_manager(self):
         self.setup_camera_roi()

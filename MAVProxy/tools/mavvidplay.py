@@ -8,7 +8,7 @@ import subprocess
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('video', help='H.264/H.265 recording with AP_CameraGimbal SEI or SIYI subtitle telemetry, or a thermal_to_video.py FFV1/Matroska thermal recording (first video track)')
+    parser.add_argument('video', help='H.264/H.265 recording with AP_CameraGimbal SEI, MISB KLV (MPEG-TS) or SIYI subtitle telemetry, or a thermal_to_video.py FFV1/Matroska thermal recording (first video track)')
     parser.add_argument('--tlog', help='optional MAVLink flight log for SIYI vehicle attitude, heading and speed')
     parser.add_argument('--tlog-system', type=int, help='flight-controller system ID (default: first autopilot heartbeat)')
     parser.add_argument('--tlog-offset', type=float, default=0, help='seconds to add to SIYI UTC timestamps when matching the flight log')
@@ -33,16 +33,22 @@ def main():
         parser.error('--tlog-system must be 1..255')
     if args.zoom_fov and args.fov is None:
         parser.error('--zoom-fov requires --fov; recorded FOV already includes zoom')
+    index = None
     try:
-        from MAVProxy.modules.lib.video_telemetry import VideoIndex, FlatElevation, ViewProjection, position, finite
+        from MAVProxy.modules.lib.video_telemetry import VideoIndex, FlatElevation, ViewProjection, position
         print('Indexing video telemetry...', flush=True)
-        index = VideoIndex(args.video)
-        if args.fov is None and not any(
-                s.record and finite(s.record.get('hfov_deg')) and 0 < s.record['hfov_deg'] < 180
-                for s in index.samples):
+        def progress(percent, frames):
+            print('Indexing telemetry: %.0f%% (%u frames)' % (percent, frames), flush=True)
+        index = VideoIndex(args.video, background=not bool(args.tlog), progress=progress)
+        if index.index_error:
+            raise ValueError(index.index_error)
+        if args.fov is None and not index.indexing and not index.has_fov():
             parser.error('This video has no recorded FOV; supply --fov in degrees')
-        print('%u frames, %u with telemetry, %.2f seconds' % (
-            len(index.samples), index.telemetry_count, index.duration), flush=True)
+        print('%u frames available, %u with telemetry, %.2f seconds%s' % (
+            len(index.samples), index.telemetry_count, index.duration,
+            ' (indexing continues during playback)' if index.indexing else ''), flush=True)
+        if index.misb_count:
+            print('%u frames with MISB ST 0601 KLV telemetry' % index.misb_count, flush=True)
         for warning in index.warnings:
             print(warning, file=sys.stderr)
         if args.tlog:
@@ -72,12 +78,17 @@ def main():
             player = Player(index, projection, map_display, paused=args.paused)
             player.Show()
             app.MainLoop()
+            if index.index_error or (args.fov is None and index.index_progress == 100 and not index.has_fov()):
+                return 1
         finally:
             if map_display.is_alive():
                 map_display.close()
     except (OSError, ValueError, ImportError, subprocess.SubprocessError) as error:
         print('mavvidplay: %s' % error, file=sys.stderr)
         return 1
+    finally:
+        if index is not None:
+            index.close()
     return 0
 
 

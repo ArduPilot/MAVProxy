@@ -189,7 +189,6 @@ class ThermalMetadataTests(unittest.TestCase):
         meta['temperature_scale_k'] = None
         self.assertIsNone(self.parse(meta)['thermal']['temperature_scale_k'])
 
-
     def test_rejects_unusable_metadata(self):
         for meta in (dict(schema='other', telemetry=record()),
                      dict(schema='apcg.thermal.v1', telemetry=None),
@@ -224,6 +223,48 @@ class RecordingTests(unittest.TestCase):
             # escaped JSON payload cannot be injected
             raise unittest.SkipTest('ffmpeg cannot inject the SEI bitstream filter (exit %d); '
                                     'ffmpeg 5.0 or later is required' % error.returncode)
+
+    def test_sei_only_mpegts_bframe_seeks_use_decode_timestamps(self):
+        try:
+            import av
+        except ImportError:
+            self.skipTest('PyAV required for MPEG-TS playback')
+        from MAVProxy.modules.lib.mavvidplay import FrameReader
+        source_path = str(Path(self.temp.name)/'source-bframes.ts')
+        video = str(Path(self.temp.name)/'sei-bframes.ts')
+        subprocess.run(['ffmpeg', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=160x120:rate=10',
+                        '-t', '2', '-c:v', 'libx264', '-bf', '2', '-g', '5', source_path], check=True)
+        with av.open(source_path) as source, av.open(video, 'w', format='mpegts') as output:
+            stream = output.add_stream_from_template(source.streams.video[0])
+            first = True
+            for packet in source.demux(video=0):
+                if not packet.size:
+                    continue
+                if first:
+                    nals = list(packet_nals(bytes(packet), 0))
+                    nals.insert(1 if nals[0][0]&31 == 9 else 0, sei(dict(record(), hfov_deg=60)))
+                    data = av.Packet(b''.join(b'\0\0\0\1'+nal for nal in nals))
+                    data.pts, data.dts, data.duration, data.time_base = packet.pts, packet.dts, packet.duration, packet.time_base
+                    packet, first = data, False
+                packet.stream = stream
+                output.mux(packet)
+        index = VideoIndex(video)
+        self.assertEqual(len(index.samples), 20)
+        self.assertGreater(index.telemetry_count, 0)
+        self.assertTrue(any(index.keyframe_dts[pts] != pts for pts in index.keyframe_pts))
+        with av.open(video) as source:
+            reference = [frame.to_ndarray(format='bgr24') for frame in source.decode(video=0)]
+        reader = FrameReader(index)
+        try:
+            for generation, target in enumerate((0, 12, 3, 19, 1)):
+                reader.request(target, generation)
+                number, gen, image, error = reader.results.get(timeout=10)
+                self.assertIsNone(error)
+                self.assertEqual((number, gen), (target, generation))
+                self.assertTrue((image == reference[target]).all())
+        finally:
+            reader.stop()
+            index.close()
 
     def test_index_and_decoder_seeking(self):
         import cv2

@@ -2,7 +2,9 @@
 import math
 from datetime import datetime, timezone
 from dataclasses import dataclass
+import bisect
 import queue
+import sys
 import threading
 import time
 
@@ -21,7 +23,6 @@ class ThermalFrame:
     pixels: object  # original uint16 sensor samples, from the same decoded frame
 
 
-
 class FrameReader(threading.Thread):
     """Own the decoder in one worker; coalesce seeks without blocking wx."""
     def __init__(self, source):
@@ -30,10 +31,13 @@ class FrameReader(threading.Thread):
         # filename for the OpenCV path used by callers and tests.
         if isinstance(source, str):
             self.filename, self.thermal, self.frame_pts = source, False, None
+            self.keyframe_pts = None
         else:
             self.filename = source.filename
             self.thermal = getattr(source, 'thermal', False)
             self.frame_pts = getattr(source, 'frame_pts', None)
+            self.keyframe_pts = getattr(source, 'keyframe_pts', None)
+        self.keyframe_dts = getattr(source, 'keyframe_dts', {})
         self.condition = threading.Condition()
         self.pending = None
         self.stopping = False
@@ -52,8 +56,8 @@ class FrameReader(threading.Thread):
         self.join(timeout=5)
 
     def run(self):
-        if self.thermal:
-            self._run_thermal()
+        if self.frame_pts is not None:
+            self._run_timestamped()
         else:
             self._run_opencv()
 
@@ -70,14 +74,15 @@ class FrameReader(threading.Thread):
         scaled = np.clip((data - low) * (255.0 / (high - low)), 0, 255).astype(np.uint8)
         return cv2.cvtColor(scaled, cv2.COLOR_GRAY2BGR)
 
-    def _run_thermal(self):
-        import av
+    def _run_timestamped(self):
         try:
+            import av
             container = av.open(self.filename)
             stream = container.streams.video[0]
         except Exception as error:
             container = None
             open_error = str(error)
+        decoder, next_number = None, None
         while True:
             with self.condition:
                 self.condition.wait_for(lambda: self.stopping or self.pending is not None)
@@ -87,25 +92,36 @@ class FrameReader(threading.Thread):
                 self.pending = None
             try:
                 if container is None:
-                    raise ValueError('PyAV could not open the thermal video: %s' % open_error)
+                    raise ValueError('PyAV could not open the video: %s' % open_error)
                 target = self.frame_pts[number]
-                container.seek(target, stream=stream, backward=True, any_frame=False)
+                if next_number is None or number < next_number or number-next_number > 30:
+                    seek = target
+                    if self.keyframe_pts:
+                        i = max(0, bisect.bisect_right(self.keyframe_pts, target)-1)
+                        seek = self.keyframe_pts[i]
+                        # Demuxer seeks use decoding time. With B-frames the
+                        # keyframe's presentation time can land in the next GOP.
+                        seek = self.keyframe_dts.get(seek, seek)
+                    # MPEG-TS binary seeking locates PCR packets, which may be
+                    # P-frames. Start at an indexed keyframe and decode preroll.
+                    container.seek(seek, stream=stream, backward=True, any_frame=False)
+                    decoder = container.decode(stream)
                 image = None
-                for packet in container.demux(stream):
-                    if packet.size == 0:
-                        continue
-                    for decoded in packet.decode():
-                        if decoded.pts is not None and decoded.pts >= target:
-                            image = decoded
-                            break
-                    if image is not None:
+                for decoded in decoder:
+                    if decoded.pts is not None and decoded.pts >= target:
+                        image = decoded
                         break
-                if image is None:
+                if image is None or image.pts != target:
                     raise ValueError('Cannot decode frame %u' % number)
-                pixels = image.to_ndarray()
-                frame = ThermalFrame(self._thermal_to_bgr(pixels), pixels)
+                next_number = number+1
+                if self.thermal:
+                    pixels = image.to_ndarray()
+                    frame = ThermalFrame(self._thermal_to_bgr(pixels), pixels)
+                else:
+                    frame = image.to_ndarray(format='bgr24')
                 result = (number, generation, frame, None)
             except Exception as error:
+                next_number = None
                 result = (number, generation, None, str(error))
             try:
                 self.results.get_nowait()
@@ -245,6 +261,8 @@ class Player(wx.Frame):
         self.last_map_update = 0
         self.map_dirty = True
         self.closing = False
+        self.pending_seek = None
+        self._was_indexing = bool(getattr(index, '_index_thread', None))
         self.reader = FrameReader(index)
         self.panel = VideoPanel(self)
         self.telemetry_text = wx.TextCtrl(self, value='Loading telemetry...',
@@ -252,7 +270,8 @@ class Player(wx.Frame):
         self.telemetry_text.SetFont(wx.Font(10, wx.FONTFAMILY_TELETYPE, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
         self.telemetry_text.SetMinSize((self.telemetry_text.GetTextExtent('M' * 40)[0] + 20, -1))
         self._telemetry_text = None
-        self.slider = wx.Slider(self, minValue=0, maxValue=max(1, len(index.samples) - 1))
+        total = max(len(index.samples), round(index.duration*index.fps)) if self._was_indexing else len(index.samples)
+        self.slider = wx.Slider(self, minValue=0, maxValue=max(1, total - 1))
         self.play_button = wx.Button(self, label='Pause' if self.playing else 'Play')
         self.play_button.Bind(wx.EVT_BUTTON, self.toggle)
         controls = wx.BoxSizer(wx.HORIZONTAL)
@@ -363,13 +382,11 @@ class Player(wx.Frame):
             lines.append('%s (tlog): %s' % (name, text))
         return lines
 
-
     def update_telemetry(self):
         text = '\n'.join(self.osd() + self.thermal_lines())
         if text != self._telemetry_text:
             self.telemetry_text.ChangeValue(text)
             self._telemetry_text = text
-
 
     def media_time(self):
         if self.playing:
@@ -382,7 +399,12 @@ class Player(wx.Frame):
             self.reader.request(number, self.generation)
 
     def seek(self, number):
-        number = max(0, min(len(self.index.samples) - 1, number))
+        if getattr(self.index, 'indexing', False) and number >= len(self.index.times):
+            self.pending_seek = number
+            self.SetStatusText('Waiting for telemetry index at frame %u' % number)
+            return
+        self.pending_seek = None
+        number = max(0, min(len(self.index.times) - 1, number))
         self.generation += 1
         self.anchor_media = self.index.times[number]
         self.anchor_wall = time.monotonic()
@@ -401,7 +423,7 @@ class Player(wx.Frame):
         self.panel.Refresh(False)
 
     def toggle(self, event=None):
-        if not self.playing and self.number == len(self.index.samples) - 1:
+        if not self.playing and self.number == len(self.index.samples) - 1 and not getattr(self.index, 'indexing', False):
             self.playing = True
             self.seek(0)
             self.play_button.SetLabel('Pause')
@@ -410,7 +432,10 @@ class Player(wx.Frame):
 
     def skip(self, seconds):
         now = self.sample.time if self.sample else 0
-        self.seek(self.index.frame_at(now + seconds))
+        if getattr(self.index, 'indexing', False) and now+seconds > self.index.times[-1]:
+            self.seek(round((now+seconds)*self.index.fps))
+        else:
+            self.seek(self.index.frame_at(now + seconds))
 
     def step(self, frames):
         self.set_playing(False)
@@ -431,7 +456,8 @@ class Player(wx.Frame):
         elif code in (ord(','), ord('.')):
             self.step(-1 if code == ord(',') else 1)
         elif code in (wx.WXK_HOME, wx.WXK_END):
-            self.seek(0 if code == wx.WXK_HOME else len(self.index.samples) - 1)
+            end = round(self.index.duration*self.index.fps)-1 if getattr(self.index, 'indexing', False) else len(self.index.samples)-1
+            self.seek(0 if code == wx.WXK_HOME else end)
         else:
             event.Skip()
 
@@ -442,6 +468,31 @@ class Player(wx.Frame):
         event.Skip()
 
     def tick(self, event=None):
+        indexing = getattr(self.index, 'indexing', False)
+        if indexing or getattr(self, '_was_indexing', False):
+            count = len(self.index.times)
+            total = max(count, round(self.index.duration*self.index.fps)) if indexing else count
+            self.slider.SetMax(max(1, total-1))
+            if indexing:
+                self.SetStatusText('Indexing telemetry: %.0f%% (%u frames available)' % (self.index.index_progress, count))
+            elif self.index.index_error:
+                self.set_playing(False)
+                message = 'Telemetry index failed: '+self.index.index_error
+                self.SetStatusText(message)
+                print('mavvidplay: '+message, file=sys.stderr)
+            elif self.projection.fov is None and not self.index.has_fov():
+                self.set_playing(False)
+                message = 'No recorded FOV; reopen with --fov in degrees'
+                self.SetStatusText(message)
+                print('mavvidplay: '+message, file=sys.stderr)
+            else:
+                self.SetStatusText('Telemetry index complete: %u frames' % count)
+            self._was_indexing = indexing
+            self.map_dirty = True
+            self.panel.Refresh(False)
+        pending = getattr(self, 'pending_seek', None)
+        if pending is not None and (pending < len(self.index.times) or not indexing):
+            self.seek(pending)
         try:
             number, generation, frame, error = self.reader.results.get_nowait()
         except queue.Empty:
@@ -461,13 +512,16 @@ class Player(wx.Frame):
                     self.panel.update_bitmap()
                     self.map_dirty = True
                     self.update_hover()
-        if self.playing:
+        if self.playing and getattr(self, 'pending_seek', None) is None:
+            if indexing and self.media_time() > self.index.times[-1]:
+                self.anchor_media = self.index.times[-1]
+                self.anchor_wall = time.monotonic()
             target = self.index.frame_at(self.media_time())
             self.request(target)
             # A restart/seek can leave the last image on screen while the
             # worker decodes the new target. Only stop at the playback clock's
             # end, not merely because the previous image was the last frame.
-            if self.number == len(self.index.samples) - 1 and target == self.number:
+            if not indexing and self.number == len(self.index.samples) - 1 and target == self.number:
                 self.set_playing(False)
         if time.monotonic() - self.last_hover_update > .05:
             self.last_hover_update = time.monotonic()
@@ -554,5 +608,6 @@ class Player(wx.Frame):
         self.closing = True
         self.timer.Stop()
         self.reader.stop()
+        self.index.close()
         self.map.close()
         self.Destroy()
