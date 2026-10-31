@@ -130,9 +130,20 @@ class messagerate(mp_module.MPModule):
             if  m.message_id in mavlink_map:
                 msg_type =  mavlink_map[m.message_id]
                 mav_cmd_name = msg_type.msgname if hasattr(msg_type, "msgname") else msg_type.name
-                print("Msg:%s  rate:%0.2fHz" % (mav_cmd_name, (1E6/m.interval_us) ) )
             else:
-                print("Msg ID:%s  rate:%0.2fHz" % (m.message_id, (1E6/m.interval_us) ) )
+                mav_cmd_name = "ID:%s" % m.message_id
+            print("Msg:%s  rate:%s" % (mav_cmd_name, self.interval_us_to_rate_string(m.interval_us)))
+
+    @staticmethod
+    def interval_us_to_rate_string(interval_us):
+        '''convert a MESSAGE_INTERVAL interval_us to a human-readable rate'''
+        if interval_us == -1:
+            return "disabled"
+        if interval_us == 0:
+            return "not available"
+        if interval_us < 0:
+            return "invalid (%d)" % interval_us
+        return "%0.2fHz" % (1E6/interval_us)
 
 
 def init(mpstate):
