@@ -78,3 +78,53 @@ class Graph_UI(object):
                 return False
             self.xlim = xlim
         return True
+
+
+class Histogram_UI(object):
+    '''UI class for displaying histograms from log data'''
+
+    def __init__(self, mestate):
+        self.mestate = mestate
+        self.xlim = None
+        self.xlim_pipe = multiproc.Pipe()
+
+    def display_histogram(self, graphdef, bins=50, show_stats=True):
+        '''display a histogram'''
+        if 'mestate' in globals():
+            self.mestate.console.write("Histogram: %s\n" % ' '.join(graphdef.expression.split()))
+        else:
+            self.mestate.child_pipe_send_console.send("Histogram: %s\n" % ' '.join(graphdef.expression.split()))
+
+        mh = grapher.MavHistogram()
+        if self.mestate.settings.title is not None:
+            mh.set_title(self.mestate.settings.title)
+        else:
+            mh.set_title(graphdef.name)
+        mh.set_bins(bins)
+        mh.set_show_stats(show_stats)
+        mh.set_condition(self.mestate.settings.condition)
+        mh.set_legend(self.mestate.settings.legend)
+        mh.add_mav(copy.copy(self.mestate.mlog))
+        for f in graphdef.expression.split():
+            mh.add_field(f)
+        mh.process(self.mestate.flightmode_selections, self.mestate.mlog._flightmodes)
+        lenmavlist = len(mh.mav_list)
+        mh.mav_list = []
+        child = multiproc.Process(target=mh.show, args=[lenmavlist], kwargs={'xlim_pipe': self.xlim_pipe})
+        child.start()
+        self.xlim_pipe[1].close()
+        self.mestate.mlog.rewind()
+
+    def check_xlim_change(self):
+        '''histogram never drives xlim changes in other graphs'''
+        return None
+
+    def set_xlim(self, xlim):
+        '''forward a time-range update to the histogram child process'''
+        if self.xlim_pipe is not None and self.xlim != xlim:
+            try:
+                self.xlim_pipe[0].send(xlim)
+            except IOError:
+                return False
+            self.xlim = xlim
+        return True
