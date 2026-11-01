@@ -62,6 +62,9 @@ class ConsoleModule(mp_module.MPModule):
         self.safety_on = False
         self.unload_check_interval = 5 # seconds
         self.last_unload_check_time = time.time()
+        self.last_nav_controller_progress = None  # time.time() of last NAV_CONTROLLER_PROGRESS shown
+        self.nav_progress_requests = {}  # (sysid, compid) -> NavControllerProgressRequest for each autopilot
+        self.message_interval_requests = {}  # sysid -> (msgid, compid, time.time()) of the request awaiting its ACK
         self.add_command('console', self.cmd_console, "console module", ['add','list','remove','title'])
         mpstate.console = wxconsole.MessageConsole(title='Console')
 
@@ -92,6 +95,7 @@ class ConsoleModule(mp_module.MPModule):
         mpstate.console.set_status('WP', 'WP --', row=3)
         mpstate.console.set_status('WPDist', 'Distance ---', row=3)
         mpstate.console.set_status('WPBearing', 'Bearing ---', row=3)
+        mpstate.console.set_status('WPProgress', 'Progress --', row=3)
         mpstate.console.set_status('AltError', 'AltError --', row=3)
         mpstate.console.set_status('AspdError', 'AspdError --', row=3)
         mpstate.console.set_status('FlightTime', 'FlightTime --', row=3)
@@ -783,6 +787,98 @@ class ConsoleModule(mp_module.MPModule):
             self.console.set_status('AltError', 'AltError %s' % alt_error)
             self.console.set_status('AspdError', 'AspdError %s%s' % (self.speed_string(msg.aspd_error*0.01), aspd_error_sign))
 
+    def nav_controller_progress_string(self, msg):
+        '''describe a NAV_CONTROLLER_PROGRESS message's progress through the current
+        task of a mission item or, with MAV_MISSION_TYPE_ALL, towards the target of
+        a mode such as GUIDED or RTL'''
+        if msg.mission_type not in (mavutil.mavlink.MAV_MISSION_TYPE_MISSION,
+                                    mavutil.mavlink.MAV_MISSION_TYPE_RALLY,
+                                    mavutil.mavlink.MAV_MISSION_TYPE_ALL):
+            return None
+        remaining = []
+        if math.isfinite(msg.distance_remaining):
+            remaining.append(self.dist_string(msg.distance_remaining))
+        if math.isfinite(msg.time_remaining):
+            seconds = int(round(msg.time_remaining))
+            remaining.append('%u:%02u' % (seconds/60, seconds%60))
+        if math.isfinite(msg.count_remaining):
+            remaining.append('count %.1f' % msg.count_remaining)
+        if msg.percentage_complete != 255:
+            remaining.append('(%u%%)' % msg.percentage_complete)
+        if len(remaining) == 0:
+            return None
+        return ' '.join(remaining)
+
+    class NavControllerProgressRequest():
+        def __init__(self):
+            self.answered = False  # the vehicle has answered the request
+            self.last_sent = None  # time.time() the request was last sent
+            self.highest_boot_ms = 0  # highest SYSTEM_TIME.time_boot_ms seen
+
+    def request_nav_controller_progress(self, msg):
+        '''NAV_CONTROLLER_PROGRESS is only sent on request: ask each
+        autopilot for it until it answers, and again if it reboots'''
+        if not hasattr(mavutil.mavlink, 'MAVLINK_MSG_ID_NAV_CONTROLLER_PROGRESS'):
+            # message not in this dialect
+            return
+        key = (msg.get_srcSystem(), msg.get_srcComponent())
+        type = msg.get_type()
+        if (type == 'HEARTBEAT' and msg.autopilot != mavutil.mavlink.MAV_AUTOPILOT_INVALID and
+                key not in self.nav_progress_requests):
+            self.nav_progress_requests[key] = ConsoleModule.NavControllerProgressRequest()
+        req = self.nav_progress_requests.get(key)
+        if req is None:
+            return
+        if type == 'SYSTEM_TIME':
+            # a boot time well behind the highest seen means the vehicle
+            # rebooted, forgetting the request; a smaller step back may
+            # just be a sample from a slower link
+            if msg.time_boot_ms + 5000 < req.highest_boot_ms:
+                req.answered = False
+                req.highest_boot_ms = msg.time_boot_ms
+            elif msg.time_boot_ms > req.highest_boot_ms:
+                req.highest_boot_ms = msg.time_boot_ms
+        elif type == 'NAV_CONTROLLER_PROGRESS':
+            req.answered = True
+        if req.answered:
+            return
+        # ask again every 10 seconds until the vehicle answers
+        now = time.time()
+        if req.last_sent is not None and now - req.last_sent < 10:
+            return
+        if self.send_message_interval_request(key[0], key[1], mavutil.mavlink.MAVLINK_MSG_ID_NAV_CONTROLLER_PROGRESS, 500000):
+            req.last_sent = now
+
+    def send_message_interval_request(self, sysid, compid, msgid, interval_us):
+        '''ask a vehicle to send msgid every interval_us.  The COMMAND_ACK
+        does not say which message it answers, so only one request is
+        sent to a vehicle at a time; returns False if one is outstanding'''
+        now = time.time()
+        outstanding = self.message_interval_requests.get(sysid)
+        if outstanding is not None and now - outstanding[2] < 2:
+            return False
+        self.message_interval_requests[sysid] = (msgid, compid, now)
+        self.master.mav.command_long_send(
+            sysid,
+            compid,
+            mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL,
+            0,  # confirmation
+            msgid,  # msg id
+            interval_us,  # interval
+            0,  # p3
+            0,  # p4
+            0,  # p5
+            0,  # p6
+            0)  # p7
+        return True
+
+    def handle_nav_controller_progress(self, msg):
+            progress = self.nav_controller_progress_string(msg)
+            if progress is None:
+                progress = '--'
+            self.console.set_status('WPProgress', 'Progress %s' % progress)
+            self.last_nav_controller_progress = time.time()
+
     def handle_param_value(self, msg):
             rec, tot = self.module('param').param_status()
             self.console.set_status('Params', 'Param %u/%u' % (rec,tot))
@@ -860,6 +956,25 @@ class ConsoleModule(mp_module.MPModule):
         if msg.command != mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL:
             return
 
+        if msg.result == mavutil.mavlink.MAV_RESULT_IN_PROGRESS:
+            # a final ACK will follow
+            return
+
+        # the ACK answers the one request outstanding to this vehicle
+        outstanding = self.message_interval_requests.pop(sysid, None)
+        if outstanding is None:
+            return
+        (msgid, compid, _) = outstanding
+
+        if msgid == getattr(mavutil.mavlink, 'MAVLINK_MSG_ID_NAV_CONTROLLER_PROGRESS', None):
+            req = self.nav_progress_requests.get((sysid, compid))
+            if req is not None:
+                req.answered = True
+            return
+
+        if msgid != mavutil.mavlink.MAVLINK_MSG_ID_FLIGHT_INFORMATION:
+            return
+
         if sysid not in self.flight_information:
             return
 
@@ -926,6 +1041,13 @@ class ConsoleModule(mp_module.MPModule):
         if type == 'SYS_STATUS':
             self.check_critical_error(msg)
 
+        if type in ('HEARTBEAT', 'SYSTEM_TIME', 'NAV_CONTROLLER_PROGRESS'):
+            # ask every vehicle, not just the one shown
+            self.request_nav_controller_progress(msg)
+
+        if type == 'COMMAND_ACK':
+            self.handle_command_ack(msg)
+
         if not self.message_is_from_primary_vehicle(msg):
             # don't process msgs from other than primary vehicle, other than
             # updating vehicle list
@@ -965,6 +1087,9 @@ class ConsoleModule(mp_module.MPModule):
         elif type == 'NAV_CONTROLLER_OUTPUT':
             self.handle_nav_controller_output(msg)
 
+        elif type == 'NAV_CONTROLLER_PROGRESS':
+            self.handle_nav_controller_progress(msg)
+
         elif type == 'PARAM_VALUE':
             self.handle_param_value(msg)
 
@@ -974,9 +1099,6 @@ class ConsoleModule(mp_module.MPModule):
 
         elif type == 'FLIGHT_INFORMATION':
             self.handle_flight_information(msg)
-
-        elif type == 'COMMAND_ACK':
-            self.handle_command_ack(msg)
 
         self.update_user_added_keys(msg)
 
@@ -1018,23 +1140,17 @@ class ConsoleModule(mp_module.MPModule):
         if (fi.last_set_message_interval_sent is not None and
             now - fi.last_set_message_interval_sent < 10):
             return
-        fi.last_set_message_interval_sent = now
-
-        self.master.mav.command_long_send(
-            sysid,
-            compid,
-            mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL,
-            0,  # confirmation
-            mavutil.mavlink.MAVLINK_MSG_ID_FLIGHT_INFORMATION,  # msg id
-            500000,  # interval - 2Hz
-            0,  # p3
-            0,  # p4
-            0,  # p5
-            0,  # p6
-            0)  # p7
+        if self.send_message_interval_request(sysid, compid, mavutil.mavlink.MAVLINK_MSG_ID_FLIGHT_INFORMATION, 500000):
+            fi.last_set_message_interval_sent = now
 
     def idle_task(self):
         now = time.time()
+        # ArduPilot only sends NAV_CONTROLLER_PROGRESS while flying a
+        # mission, so don't leave the last item's progress showing
+        if (self.last_nav_controller_progress is not None and
+            now - self.last_nav_controller_progress > 3):
+            self.last_nav_controller_progress = None
+            self.console.set_status('WPProgress', 'Progress --')
         if self.last_unload_check_time + self.unload_check_interval < now:
             self.last_unload_check_time = now
             if not self.console.is_alive():
