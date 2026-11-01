@@ -48,10 +48,25 @@ flightmode_colours = [
 
 edge_colour = (0.1, 0.1, 0.1)
 
+# a plain MSG.Field or MSG[instance].Field, whose unit can be looked up
+field_unit_re = re.compile(r'^([A-Z_][A-Z0-9_]*)(\[[^\]]*\])?\.([A-Za-z_][A-Za-z0-9_]*)$')
+
 graph_num = 1
 
 tday_base = None
 tday_basetime = None
+
+def figure_renderer(fig):
+    '''return a renderer for measuring the artists of fig'''
+    get_renderer = getattr(fig.canvas, 'get_renderer', None)
+    if get_renderer is not None:
+        return get_renderer()
+    # vector backends (svg, pdf, ps) have no get_renderer
+    get_renderer = getattr(fig, '_get_renderer', None)
+    if get_renderer is not None:
+        return get_renderer()
+    from matplotlib.backend_bases import _get_renderer
+    return _get_renderer(fig)
 
 def timestamp_to_days(timestamp, timeshift=0):
     '''convert log timestamp to days, public so that mavflightview can access'''
@@ -128,6 +143,16 @@ class MavGraph(object):
             self.text_types = frozenset([unicode, str])
         self.max_message_rate = 0
         self.axis_mode = 'auto'
+        self.unit_axes = True
+        self.units = []
+        self.label_boxes = {}
+        self.restack_cid = None
+        self.draw_cid = None
+        self.restack_axes = []
+        self.restacking = False
+        self.restack_pending = False
+        self.left_layout = None
+        self.redraw_timer = None
 
     def set_axis_mode(self, mode):
         '''set y-axis layout mode: 'auto' (dual for 1-2 axes, multi for 3+),
@@ -136,6 +161,62 @@ class MavGraph(object):
         if mode not in ('auto', 'dual', 'multi'):
             raise ValueError("axis_mode must be 'auto', 'dual' or 'multi'")
         self.axis_mode = mode
+
+    def set_unit_axes(self, enable):
+        '''if enabled, label y axes with units and, when no field has an
+        explicit :N axis, give each unit its own y axis'''
+        self.unit_axes = enable
+
+    def field_unit(self, i, msg):
+        '''return the unit of field i if it is a plain MSG.Field, else "".
+        Returns None if msg is not the field's message, so a later message
+        can supply the unit'''
+        m = field_unit_re.match(self.fields[i])
+        if m is None:
+            return ""
+        if m.group(1) != msg.get_type():
+            return None
+        field = m.group(3)
+        fmt = getattr(msg, 'fmt', None)
+        if fmt is not None:
+            # DataFlash message; units come from the log's FMTU metadata
+            try:
+                unit = fmt.get_unit(field)
+            except (AttributeError, KeyError):
+                return ""
+            if unit == "UNKNOWN":
+                # ArduPilot's placeholder for a unit it has not specified
+                return ""
+            return unit
+        # MAVLink message; units come from the message definition
+        return getattr(msg, 'fieldunits_by_name', {}).get(field, "")
+
+    def field_axes(self):
+        '''work out which y axis each field is plotted on'''
+        if not self.unit_axes or max(self.axes, default=1) > 1:
+            # axes chosen by hand with :N suffixes
+            return self.axes[:]
+        # give each unit its own axis; fields without a unit share the first
+        ret = []
+        axis_units = []
+        for unit in self.units:
+            if not unit:
+                ret.append(1)
+                continue
+            if unit not in axis_units:
+                axis_units.append(unit)
+            ret.append(axis_units.index(unit) + 1)
+        return ret
+
+    def axis_label_parts(self, labels, units):
+        '''add units to the field labels for one axis, returning the labels
+        and a suffix for the whole axis'''
+        if not self.unit_axes:
+            return labels, ""
+        if len(set(units)) == 1 and units[0]:
+            # one unit for the whole axis
+            return labels, " (%s)" % units[0]
+        return [("%s (%s)" % (l, u)) if u else l for (l, u) in zip(labels, units)], ""
 
     def set_max_message_rate(self, rate_hz):
         '''set maximum rate we will graph any message'''
@@ -194,7 +275,7 @@ class MavGraph(object):
         '''set multiple graph option'''
         self.multi = multi
 
-    def _set_multicolor_ylabel(self, ax_n, labels, lines):
+    def _set_multicolor_ylabel(self, ax_n, labels, lines, suffix=""):
         '''attach a y-axis label whose comma-separated parts are each coloured
         to match the line they refer to'''
         from matplotlib.offsetbox import (AnchoredOffsetbox, TextArea, VPacker)
@@ -205,6 +286,9 @@ class MavGraph(object):
                     color='black', rotation=90, ha='center', va='bottom')))
             children.append(TextArea(lbl, textprops=dict(
                 color=line.get_color(), rotation=90, ha='center', va='bottom')))
+        if suffix:
+            children.append(TextArea(suffix, textprops=dict(
+                color='black', rotation=90, ha='center', va='bottom')))
         # VPacker stacks first child on top; reverse so visual order matches
         # the default y-label direction (text reads bottom-to-top)
         vp = VPacker(children=list(reversed(children)),
@@ -219,6 +303,93 @@ class MavGraph(object):
                                 bbox_transform=ax_n.transAxes, borderpad=0)
         ax_n.add_artist(box)
         ax_n.set_ylabel('')
+        return box
+
+    def _stack_left_axes(self, label_boxes):
+        '''in 'multi' mode place each extra y axis to the left of the one
+        inside it, just clear of that axis's tick labels and label, and
+        reserve room for them all. label_boxes holds the composite labels
+        made by _set_multicolor_ylabel, keyed by axis number. Return
+        True if anything moved'''
+        if self.restacking:
+            # measuring the labels can autoscale an axis, changing its y range
+            return False
+        self.restacking = True
+        try:
+            layout = self._place_left_axes(label_boxes)
+        finally:
+            self.restacking = False
+        changed = layout != self.left_layout
+        self.left_layout = layout
+        return changed
+
+    def _ylim_changed(self):
+        '''a y range has changed, which changes how much room the tick labels
+        need. Panning changes every axis's range at every mouse step, so
+        restack once, after the next draw, rather than on every change'''
+        if not self.restacking:
+            self.restack_pending = True
+
+    def _restack_after_draw(self):
+        '''restack the y axes if a y range has changed, drawing again if
+        that moved anything'''
+        if not self.restack_pending:
+            return
+        self.restack_pending = False
+        if self._stack_left_axes(self.label_boxes):
+            # backends ignore a request to draw made during a draw, so
+            # make it once this draw has finished
+            canvas = self.fig.canvas
+            self.redraw_timer = canvas.new_timer(interval=0)
+            self.redraw_timer.single_shot = True
+            self.redraw_timer.add_callback(canvas.draw_idle)
+            self.redraw_timer.start()
+
+    def _place_left_axes(self, label_boxes):
+        '''do the work of _stack_left_axes, returning the layout chosen'''
+        self.label_boxes = label_boxes
+        nums = sorted(self.ax_by_num.keys())
+        if len(nums) < 2 and not label_boxes:
+            return None
+        for n in nums[1:]:
+            self.ax_by_num[n].spines['left'].set_position(('axes', 0))
+            self.ax_by_num[n].yaxis.get_offset_text().set_x(0)
+        # a vector backend's renderer can change the figure's dpi
+        dpi = self.fig.dpi
+        renderer = figure_renderer(self.fig)
+        x0 = self.ax1.bbox.x0
+        gap = 6 * self.fig.dpi / 72.0
+        # how far each axis's tick labels, and then its label, reach left
+        # of its line
+        tick_widths = {}
+        widths = {}
+        for n in nums:
+            ax_n = self.ax_by_num[n]
+            tick_widths[n] = x0 - ax_n.yaxis.get_tightbbox(renderer).x0
+            widths[n] = tick_widths[n]
+            if n in label_boxes:
+                widths[n] += gap + label_boxes[n].get_window_extent(renderer).width
+        offsets = {nums[0]: 0}
+        for prev, n in zip(nums, nums[1:]):
+            offsets[n] = offsets[prev] + widths[prev] + gap
+        left = (offsets[nums[-1]] + widths[nums[-1]] + gap) / self.fig.bbox.width
+        self.fig.subplots_adjust(left=min(0.6, left))
+        ax_width = self.ax1.bbox.width
+        layout = [min(0.6, left)]
+        for n in nums:
+            ax_n = self.ax_by_num[n]
+            if n != nums[0]:
+                ax_n.spines['left'].set_position(('axes', -offsets[n] / ax_width))
+                # put the axis's scale (e.g. 1e6) over the axis, not the plot
+                ax_n.yaxis.get_offset_text().set_x(-offsets[n] / ax_width)
+                layout.append(offsets[n])
+            if n in label_boxes:
+                x = -(offsets[n] + tick_widths[n] + gap) / ax_width
+                label_boxes[n].set_bbox_to_anchor((x, 0.5), transform=ax_n.transAxes)
+                layout.append(x)
+        if self.fig.dpi != dpi:
+            self.fig.dpi = dpi
+        return layout
 
     def make_format(self, current_axis):
         '''build a format_coord that reports y for every active axis'''
@@ -276,6 +447,9 @@ class MavGraph(object):
         
     def rescale_yaxis(self, axis):
         '''rescale Y axes to fit'''
+        if len(axis.lines) == 0:
+            # e.g. axis 1 when every field is on another axis
+            return
         ylim = [None,None]
 
         for line in axis.lines:
@@ -306,15 +480,21 @@ class MavGraph(object):
 
     def plotit(self, x, y, fields, colors=[], title=None, interactive=True):
         '''plot a set of graphs using date for x axis'''
+        if self.ax_by_num and not any(len(xi) > 0 for xi in x):
+            # show() plots each log in turn, but all the data is plotted
+            # with the first; keep the axes it made
+            print("No data to graph")
+            return
         if interactive:
             plt.ion()
         self.fig = plt.figure(num=1, figsize=(12,6))
         self.ax1 = self.fig.gca()
         self.ax_by_num = {1: self.ax1}
         self.ax2 = None
+        axes = self.field_axes()
         # resolve 'auto' to 'dual' (1-2 axes) or 'multi' (3+ axes) up front
         if self.axis_mode == 'auto':
-            max_axis = max(self.axes) if self.axes else 1
+            max_axis = max(axes) if axes else 1
             axis_mode = 'multi' if max_axis >= 3 else 'dual'
         else:
             axis_mode = self.axis_mode
@@ -340,6 +520,7 @@ class MavGraph(object):
         empty = True
         labels_by_axis = {1: []}
         lines_by_axis = {1: []}
+        units_by_axis = {1: []}
         label_strip_re = re.compile(r'^(.*):[2-9]$')
 
         for i in range(len(fields)):
@@ -352,7 +533,7 @@ class MavGraph(object):
                 color = 'red'
                 (tz, tzdst) = time.tzname
 
-            axis_num = self.axes[i]
+            axis_num = axes[i]
             if axis_mode == 'dual' and axis_num > 2:
                 # legacy 2-axis layout: anything above axis 1 goes on the right
                 axis_num = 2
@@ -361,6 +542,7 @@ class MavGraph(object):
                 self.ax_by_num[axis_num] = new_ax
                 labels_by_axis[axis_num] = []
                 lines_by_axis[axis_num] = []
+                units_by_axis[axis_num] = []
                 if self.grid:
                     new_ax.grid(None)
                     self.ax1.grid(True)
@@ -382,6 +564,7 @@ class MavGraph(object):
             labels_by_axis[axis_num].append(label)
             if self.custom_labels[i] is not None:
                 labels_by_axis[axis_num][-1] = self.custom_labels[i]
+            units_by_axis[axis_num].append(self.units[i] or "")
             if axis_num == 2 and self.ax2 is None:
                 # back-compat alias
                 self.ax2 = ax
@@ -443,17 +626,6 @@ class MavGraph(object):
 
             empty = False
 
-        # in 'multi' mode stack each extra axis further LEFT and reserve room
-        if axis_mode == 'multi':
-            extra_nums = sorted(n for n in self.ax_by_num.keys() if n >= 2)
-            offset_step = 0.10
-            for idx, n in enumerate(extra_nums):
-                self.ax_by_num[n].spines['left'].set_position(
-                    ("axes", -(idx + 1) * offset_step))
-            if extra_nums:
-                self.fig.subplots_adjust(
-                    left=min(0.5, 0.08 + len(extra_nums) * offset_step))
-
         # install hover readout on every twinx axis when there are multiple axes
         if len(self.ax_by_num) > 1:
             for n, ax_n in self.ax_by_num.items():
@@ -496,20 +668,36 @@ class MavGraph(object):
         # in its line's colour. Single-field axes additionally get the spine
         # and ticks coloured to match.
         if axis_mode == 'multi':
+            label_boxes = {}
             for n, ax_n in self.ax_by_num.items():
                 labels_n = labels_by_axis.get(n, [])
                 lines_n = lines_by_axis.get(n, [])
                 if not labels_n:
                     continue
+                labels_n, suffix = self.axis_label_parts(labels_n, units_by_axis[n])
                 if len(lines_n) >= 2 and len(lines_n) == len(labels_n):
-                    self._set_multicolor_ylabel(ax_n, labels_n, lines_n)
+                    label_boxes[n] = self._set_multicolor_ylabel(ax_n, labels_n, lines_n, suffix)
                 else:
-                    ax_n.set_ylabel(", ".join(labels_n))
+                    ax_n.set_ylabel(", ".join(labels_n) + suffix)
                 if len(lines_n) == 1:
                     line_color = lines_n[0].get_color()
                     ax_n.tick_params(axis='y', colors=line_color)
                     ax_n.spines['left'].set_color(line_color)
                     ax_n.yaxis.label.set_color(line_color)
+            # stack the extra axes on the left, each clear of the one inside,
+            # and again whenever the window is resized or a y range changes,
+            # as both change how much room the labels need
+            self._stack_left_axes(label_boxes)
+            if self.restack_cid is None:
+                self.restack_cid = self.fig.canvas.mpl_connect(
+                    'resize_event', lambda event: self._stack_left_axes(self.label_boxes))
+                self.draw_cid = self.fig.canvas.mpl_connect(
+                    'draw_event', lambda event: self._restack_after_draw())
+            for ax_n in self.ax_by_num.values():
+                if ax_n not in self.restack_axes:
+                    self.restack_axes.append(ax_n)
+                    ax_n.callbacks.connect(
+                        'ylim_changed', lambda ax: self._ylim_changed())
 
         any_data_labels = any(labels_by_axis.get(n) for n in self.ax_by_num)
 
@@ -536,6 +724,13 @@ class MavGraph(object):
                     continue
                 self.ax_by_num[n].legend(
                     labels_n, loc=legend_positions.get(n, self.legend2))
+                units_n = []
+                for u in units_by_axis[n]:
+                    if u not in units_n:
+                        units_n.append(u)
+                # only label the axis if every field on it has a unit
+                if self.unit_axes and units_n and "" not in units_n:
+                    self.ax_by_num[n].set_ylabel(", ".join(units_n))
 
     def add_data(self, t, msg, vars):
         '''add some data'''
@@ -596,6 +791,10 @@ class MavGraph(object):
                 xv = mavutil.evaluate_expression(self.xaxis, vars)
                 if xv is None:
                     continue
+            if self.units[i] is None:
+                # only fields with data get a unit, so an instance that
+                # is not in the log does not get an empty axis
+                self.units[i] = self.field_unit(i, msg)
             self.y[i].append(v)
             self.x[i].append(xv)
 
@@ -713,6 +912,7 @@ class MavGraph(object):
         self.modes = []
         self.axes = []
         self.first_only = []
+        self.units = []
         re_caps = re.compile('[A-Z_][A-Z0-9_]+')
         re_instance = re.compile(r'([A-Z_][A-Z0-9_]+)\[([0-9A-Z_]+)\]')
         for f in self.fields:
@@ -730,6 +930,7 @@ class MavGraph(object):
             self.x.append([])
             self.axes.append(1)
             self.first_only.append(False)
+            self.units.append(None)
 
         timeshift = self.timeshift
 
@@ -826,6 +1027,8 @@ if __name__ == "__main__":
                              "and multi for 3+, 'dual' forces the legacy 2-axis "
                              "layout, 'multi' stacks each :N axis on the left "
                              "with vertical labels")
+    parser.add_argument("--no-unit-axes", dest="unit_axes", action='store_false',
+                        help="don't label y axes with units or give each unit its own y axis")
     parser.add_argument("logs_fields", metavar="<LOG or FIELD>", nargs="+")
     args = parser.parse_args()
 
@@ -850,5 +1053,6 @@ if __name__ == "__main__":
     mg.set_grid(args.grid)
     mg.set_show_flightmode(args.show_flightmode)
     mg.set_axis_mode(args.axis_mode)
+    mg.set_unit_axes(args.unit_axes)
     mg.process([],[],0)
     mg.show(len(mg.mav_list), output=args.output)
