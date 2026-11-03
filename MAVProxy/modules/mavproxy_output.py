@@ -14,6 +14,32 @@ from pymavlink import mavutil
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_util
 
+
+def add_output(mpstate, device):
+    '''open device as a new output and return its connection. Raises an
+    exception if it cannot be opened. Shared with the outputctl module'''
+    conn = mavutil.mavlink_connection(device, input=False, source_system=mpstate.settings.source_system, autoreconnect=True)
+    conn.mav.srcComponent = mpstate.settings.source_component
+    try:
+        mp_util.child_fd_list_add(conn.port.fileno())
+    except Exception:
+        pass
+    # replace the list rather than change it, so a loop over the outputs
+    # on another thread carries on with the list it started with
+    mpstate.mav_outputs = mpstate.mav_outputs + [conn]
+    return conn
+
+
+def remove_output(mpstate, conn):
+    '''remove an output and close it. Shared with the outputctl module'''
+    mpstate.mav_outputs = [c for c in mpstate.mav_outputs if c is not conn]
+    try:
+        mp_util.child_fd_list_remove(conn.port.fileno())
+    except Exception:
+        pass
+    conn.close()
+
+
 class OutputModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super().__init__(mpstate, "output", "output control", public=True)
@@ -69,16 +95,9 @@ class OutputModule(mp_module.MPModule):
         device = args[0]
         print("Adding output %s" % device)
         try:
-            conn = mavutil.mavlink_connection(device, input=False, source_system=self.settings.source_system, autoreconnect=True)
-            conn.mav.srcComponent = self.settings.source_component
-        except Exception:
-            print("Failed to connect to %s" % device)
-            return
-        self.mpstate.mav_outputs.append(conn)
-        try:
-            mp_util.child_fd_list_add(conn.port.fileno())
-        except Exception:
-            pass
+            add_output(self.mpstate, device)
+        except Exception as ex:
+            print("Failed to connect to %s: %s" % (device, ex))
 
     def cmd_output_sysid(self, args):
         '''add new output for a specific MAVLink sysID'''
@@ -145,12 +164,7 @@ class OutputModule(mp_module.MPModule):
             conn = self.mpstate.mav_outputs[i]
             if str(i) == device or conn.address == device:
                 print("Removing output %s" % conn.address)
-                try:
-                    mp_util.child_fd_list_add(conn.port.fileno())
-                except Exception:
-                    pass
-                conn.close()
-                self.mpstate.mav_outputs.pop(i)
+                remove_output(self.mpstate, conn)
                 return
 
     def idle_task(self):
