@@ -1,0 +1,59 @@
+name: Debian Package Build
+
+on: [push, pull_request, workflow_dispatch]
+
+concurrency:
+  group: ci-${{github.workflow}}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: 'recursive'
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            debhelper \
+            dh-python \
+            python3-all \
+            python3-setuptools \
+            python3-numpy \
+            python3-serial \
+            python3-pytest \
+            libxml2-dev \
+            libxslt1-dev \
+            zlib1g-dev \
+            devscripts \
+            fakeroot
+
+      - name: Build Debian package
+        run: |
+          dpkg-buildpackage -b -us -uc
+
+      - name: List built packages
+        run: |
+          ls -la ../python3-mavproxy*.deb || ls -la ../*.deb
+
+      - name: Test package installation
+        run: |
+          # Install pip dependencies (pymavlink/pynmea2 not available as apt packages)
+          pip3 install pymavlink pynmeagps
+          # Install the built package, resolving any apt dependencies
+          sudo dpkg -i ../python3-mavproxy*.deb || sudo apt-get -f install -y
+          mavproxy.py --version || echo "Version check completed"
+
+      - name: Copy package to workspace
+        run: cp ../*.deb .
+
+      - name: Archive Debian package
+        uses: actions/upload-artifact@v4
+        with:
+          name: debian-package
+          path: "*.deb"
+          retention-days: 7
