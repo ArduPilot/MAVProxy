@@ -67,8 +67,10 @@ def gps_distance(lat1, lon1, lat2, lon2):
     # take the shorter way around the globe, so that a pair either side of
     # the antimeridian is a short hop rather than most of the way around
     dlon = radians(wrap_180(lon2 - lon1))
-    lat1 = radians(lat1)
-    lat2 = radians(lat2)
+    # keep off the poles themselves, where the rhumb line formula divides by
+    # zero (gps_newpos does the same)
+    lat1 = constrain(radians(lat1), -pi/2+1.0e-15, pi/2-1.0e-15)
+    lat2 = constrain(radians(lat2), -pi/2+1.0e-15, pi/2-1.0e-15)
 
     if abs(lat2-lat1) < 1.0e-15:
         q = cos(lat1)
@@ -82,8 +84,8 @@ def gps_bearing(lat1, lon1, lat2, lon2):
     thanks to http://www.movable-type.co.uk/scripts/latlong.html'''
     # as for gps_distance, head the short way around the antimeridian
     dlon = radians(wrap_180(lon2 - lon1))
-    lat1 = radians(lat1)
-    lat2 = radians(lat2)
+    lat1 = constrain(radians(lat1), -pi/2+1.0e-15, pi/2-1.0e-15)
+    lat2 = constrain(radians(lat2), -pi/2+1.0e-15, pi/2-1.0e-15)
     tc = -fmod(atan2(-dlon,log(tan(lat2/2+pi/4)/tan(lat1/2+pi/4))),2*pi)
     if tc < 0:
         tc += 2*pi
@@ -127,7 +129,9 @@ def gps_newpos(lat, lon, bearing, distance):
             raise
         q = (lat-lat1)/dphi
     dlon = -d*sin(tc)/q
-    lon = fmod(lon1+dlon+pi,2*pi)-pi
+    # fmod() keeps the sign of its first argument, so it would leave a
+    # longitude west of the antimeridian below -180
+    lon = (lon1+dlon+pi) % (2*pi) - pi
     return (degrees(lat), degrees(lon))
 
 def gps_offset(lat, lon, east, north):
