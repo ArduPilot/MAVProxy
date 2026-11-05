@@ -22,6 +22,8 @@ import struct
 import time
 import zlib
 
+from pymavlink import mavutil
+
 from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import mp_settings
 from MAVProxy.modules.lib import mp_util
@@ -64,7 +66,12 @@ REQUEST_TRIES = 5
 MAX_OUT_OF_ORDER = 100
 MAX_UNDECODED = 50
 
-# event timestamps going back by more than this mean the sender rebooted
+# time_boot_ms in a component's other messages going back by more than
+# this means it rebooted.  Event timestamps going back by more than
+# REBOOT_TIMESTAMP_MARGIN_MS are taken to mean the same, but only for a
+# component which sends nothing else with a time_boot_ms, because
+# events re-sent for other GCSs have old timestamps too
+BOOT_TIME_MARGIN_MS = 3000
 REBOOT_TIMESTAMP_MARGIN_MS = 10000
 
 # component information is requested this often, this many times
@@ -122,6 +129,8 @@ class ReceiveSequence(object):
         self.reset()
         self.events_received = 0
         self.events_lost = 0
+        # set once reboots are detected from the sender's other messages
+        self.reboots_from_boot_time = False
 
     def reset(self):
         # sequence number of the next event to be returned
@@ -136,7 +145,8 @@ class ReceiveSequence(object):
         self.request_tries = 0
 
     def handle_event(self, m, now):
-        if (self.last_time_boot_ms is not None and
+        if (not self.reboots_from_boot_time and
+                self.last_time_boot_ms is not None and
                 m.event_time_boot_ms + REBOOT_TIMESTAMP_MARGIN_MS < self.last_time_boot_ms):
             self.reset()
         if self.expected is None:
@@ -192,12 +202,23 @@ class ReceiveSequence(object):
         return self.skip_to((last + 1) & 0xFFFF, now)
 
     def skip_to(self, sequence, now):
-        count = (sequence - self.expected) & 0xFFFF
-        self.events_lost += count
-        self.lost(count)
-        self.expected = sequence
+        '''give up on the events before sequence, returning those of
+        them we hold'''
+        ret = []
+        count = 0
+        while self.expected != sequence:
+            m = self.out_of_order.pop(self.expected, None)
+            if m is None:
+                count += 1
+            else:
+                self.last_time_boot_ms = m.event_time_boot_ms
+                ret.append(m)
+            self.expected = (self.expected + 1) & 0xFFFF
+        if count:
+            self.events_lost += count
+            self.lost(count)
         self.requested = None
-        ret = self.take_out_of_order()
+        ret.extend(self.take_out_of_order())
         self.request_missing(now)
         return ret
 
@@ -265,12 +286,13 @@ class ComponentEvents(object):
         self.general_metadata_crc = None
         self.events_metadata_uri = None
         self.events_metadata_crc = None
+        self.last_boot_ms = None
 
     def name(self):
         return "%u:%u" % (self.sysid, self.compid)
 
     def request_events(self, first, last):
-        self.module.master.mav.request_event_send(self.sysid, self.compid, first, last)
+        self.module.master_for(self.sysid).mav.request_event_send(self.sysid, self.compid, first, last)
 
     def events_lost(self, count):
         self.module.show(MAV_SEVERITY_WARNING,
@@ -295,6 +317,26 @@ class ComponentEvents(object):
         undecoded = self.undecoded
         self.undecoded = []
         self.receive(undecoded)
+
+    def handle_boot_time(self, time_boot_ms):
+        '''notice a reboot from the time_boot_ms in the component's
+        other messages'''
+        self.sequence.reboots_from_boot_time = True
+        if (self.last_boot_ms is not None and
+                time_boot_ms + BOOT_TIME_MARGIN_MS < self.last_boot_ms):
+            self.rebooted()
+        self.last_boot_ms = time_boot_ms
+
+    def rebooted(self):
+        self.sequence.reset()
+        if self.state == 'fetching':
+            return
+        # it may have new firmware, and so new metadata.  Events are
+        # shown with the old metadata until the new arrives
+        self.unavailable = None
+        self.state = 'request-component-information'
+        self.tries = 0
+        self.next_attempt = 0
 
     def handle_component_metadata(self, uri, crc):
         if self.state != 'wait-component-information':
@@ -354,6 +396,8 @@ class ComponentEvents(object):
         self.state = 'fetching'
 
         def fetched(fh):
+            if self.module.unloaded:
+                return
             if fh is None:
                 self.state = retry_state
                 self.next_attempt = time.time() + FETCH_RETRY_DELAY
@@ -469,12 +513,19 @@ def format_message(message, values):
 class event(mp_module.MPModule):
     def __init__(self, mpstate):
         """Initialise module"""
-        super(event, self).__init__(mpstate, "event", "MAVLink events")
+        super(event, self).__init__(mpstate, "event", "MAVLink events", multi_vehicle=True)
 
         # ComponentEvents keyed by (sysid, compid)
         self.components = {}
         self.warned = set()
         self.cache_dir = mp_util.dot_mavproxy("component_metadata")
+        # metadata downloads still running when the module is unloaded
+        # call back into it
+        self.unloaded = False
+
+        if not hasattr(mavutil.mavlink, 'MAVLINK_MSG_ID_EVENT'):
+            print("event: the %s MAVLink dialect has no EVENT message, so no events will be shown" %
+                  mavutil.current_dialect)
 
         self.event_settings = mp_settings.MPSettings(
             [('verbose', bool, False),
@@ -485,6 +536,10 @@ class event(mp_module.MPModule):
                          ['status', 'set (EVENTSETTING)'])
         self.add_completion_function('(EVENTSETTING)',
                                      self.event_settings.completion)
+
+    def unload(self):
+        self.unloaded = True
+        super(event, self).unload()
 
     def usage(self):
         '''show help on command line options'''
@@ -540,10 +595,19 @@ class event(mp_module.MPModule):
         # COMPONENT_METADATA replaces COMPONENT_INFORMATION; a component
         # may support either
         for msgid in (MAVLINK_MSG_ID_COMPONENT_METADATA, MAVLINK_MSG_ID_COMPONENT_INFORMATION):
-            self.master.mav.command_long_send(
+            self.master_for(sysid).mav.command_long_send(
                 sysid, compid,
                 MAV_CMD_REQUEST_MESSAGE, 0,
                 msgid, 0, 0, 0, 0, 0, 0)
+
+    def master_for(self, sysid):
+        '''the link a system was last heard on'''
+        return self.mpstate.master(sysid)
+
+    def is_target(self, component):
+        if component.sysid != self.target_system:
+            return False
+        return self.target_component in (0, component.compid)
 
     def component(self, m):
         key = (m.get_srcSystem(), m.get_srcComponent())
@@ -569,7 +633,7 @@ class event(mp_module.MPModule):
                 m.destination_component not in (0, self.settings.source_component)):
             return
         prefix = "Event: "
-        if (component.sysid, component.compid) != (self.target_system, self.target_component):
+        if not self.is_target(component):
             prefix = "Event (%s): " % component.name()
         found = component.find_event(m.id)
         if found is None:
@@ -617,6 +681,13 @@ class event(mp_module.MPModule):
             key = (m.get_srcSystem(), m.get_srcComponent())
             if key in self.components:
                 self.components[key].handle_component_metadata(m.uri, m.file_crc)
+        else:
+            time_boot_ms = getattr(m, 'time_boot_ms', None)
+            if time_boot_ms is None:
+                return
+            key = (m.get_srcSystem(), m.get_srcComponent())
+            if key in self.components:
+                self.components[key].handle_boot_time(time_boot_ms)
 
 
 def init(mpstate):

@@ -144,6 +144,24 @@ class ReceiveSequenceTest(unittest.TestCase):
         self.seq.handle_event(event_msg(40, time_boot_ms=60000), 0)
         self.assertEqual(seqs(self.seq.handle_event(event_msg(0, time_boot_ms=2000), 0)), [0])
 
+    def test_unavailable_events_skipped_past_held_event(self):
+        self.seq.handle_event(event_msg(5), 0)
+        self.seq.handle_event(event_msg(10), 0)
+        # the sender's oldest event is after the one we hold
+        self.assertEqual(seqs(self.seq.handle_error(6, 12, 0)), [10])
+        self.assertEqual(self.rec.lost, [5])
+        self.assertEqual(self.seq.expected, 12)
+        self.assertEqual(self.seq.requested, None)
+        self.assertEqual(seqs(self.seq.handle_event(event_msg(12), 0)), [12])
+
+    def test_old_event_ignored_when_boot_time_known(self):
+        self.seq.reboots_from_boot_time = True
+        self.seq.handle_event(event_msg(40, time_boot_ms=60000), 0)
+        # re-sent for another GCS, or answering a request already given up on
+        self.assertEqual(self.seq.handle_event(event_msg(38, time_boot_ms=2000), 0), [])
+        self.assertEqual(seqs(self.seq.handle_event(event_msg(41, time_boot_ms=61000), 0)), [41])
+        self.assertEqual(self.rec.requests, [])
+
 
 class FormatTest(unittest.TestCase):
     COMPONENT = {
@@ -265,11 +283,13 @@ class FakeMPState:
                                               target_system=1, target_component=1)
         self.mav = FakeMAV()
         self.modules = {'link': FakeLink()}
+        self.master_sysids = []
 
     def module(self, name):
         return self.modules.get(name)
 
-    def master(self):
+    def master(self, target_sysid=-1):
+        self.master_sysids.append(target_sysid)
         return types.SimpleNamespace(mav=self.mav)
 
 
@@ -384,6 +404,65 @@ class EventModuleTest(unittest.TestCase):
         self.ftp.complete()
         self.assertEqual(self.lines(), ["Event: Fence enabled"])
         self.assertEqual(self.module.cache_get(1234), None)
+
+    def boot_time(self, time_boot_ms, sysid=1, compid=1):
+        '''a message carrying the sender's time since boot'''
+        self.module.mavlink_packet(types.SimpleNamespace(
+            time_boot_ms=time_boot_ms, get_type=lambda: 'SYSTEM_TIME',
+            get_srcSystem=lambda: sysid, get_srcComponent=lambda: compid))
+
+    def test_reboot_detected_from_boot_time(self):
+        self.module.mavlink_packet(event_msg(40, 0x0100000a, time_boot_ms=59000))
+        self.connect()
+        self.boot_time(60000)
+        sent = len(self.mpstate.mav.sent)
+        self.boot_time(1500)
+        # after the reboot the sequence starts again, and the metadata
+        # is asked for again in case the firmware changed
+        self.module.mavlink_packet(event_msg(0, 0x0100000a, time_boot_ms=1600))
+        self.assertEqual(self.lines(), ["Event: Fence enabled"] * 2)
+        self.module.idle_task()
+        self.assertIn(('COMMAND_LONG', 1, 1, mavproxy_event.MAV_CMD_REQUEST_MESSAGE,
+                       mavproxy_event.MAVLINK_MSG_ID_COMPONENT_INFORMATION), self.mpstate.mav.sent[sent:])
+
+    def test_resent_event_not_shown_again(self):
+        self.module.mavlink_packet(event_msg(40, 0x0100000a, time_boot_ms=59000))
+        self.connect()
+        self.boot_time(60000)
+        self.module.mavlink_packet(event_msg(41, 0x0100000a, time_boot_ms=70000))
+        # re-sent for another GCS
+        self.module.mavlink_packet(event_msg(40, 0x0100000a, time_boot_ms=59000))
+        self.assertEqual(self.lines(), ["Event: Fence enabled"] * 2)
+        self.assertEqual([s for s in self.mpstate.mav.sent if s[0] == 'REQUEST_EVENT'], [])
+
+    def test_unload_ignores_pending_fetch(self):
+        self.module.mavlink_packet(event_msg(0, 0x0100000a))
+        files = files_for(EVENTS_METADATA)
+        self.ftp.files[(1, 1)] = files
+        self.module.idle_task()
+        crc = mavproxy_event.metadata_crc(files["@SYS/general_metadata.json"])
+        self.module.mavlink_packet(component_information("mftp://@SYS/general_metadata.json", crc))
+        self.module.idle_task()
+        self.module.unload()
+        self.ftp.complete()
+        self.assertEqual(self.lines(), [])
+        self.assertEqual(self.module.cache_get(crc), None)
+
+    def test_gets_packets_from_other_vehicles(self):
+        self.assertTrue(self.module.multi_vehicle)
+
+    def test_requests_sent_on_the_vehicles_link(self):
+        self.module.mavlink_packet(event_msg(0, 0x0100000a, sysid=2))
+        self.module.idle_task()
+        self.module.mavlink_packet(event_msg(2, 0x0100000a, sysid=2))
+        self.assertEqual(set(self.mpstate.master_sysids), {2})
+        self.assertIn(('REQUEST_EVENT', 2, 1, 1, 1), self.mpstate.mav.sent)
+
+    def test_no_prefix_when_targeting_all_components(self):
+        self.mpstate.settings.target_component = 0
+        self.module.mavlink_packet(event_msg(0, 0x0100000a))
+        self.connect()
+        self.assertEqual(self.lines(), ["Event: Fence enabled"])
 
 
 class URITest(unittest.TestCase):
