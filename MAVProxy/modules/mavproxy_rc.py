@@ -192,8 +192,8 @@ class RCModule(mp_module.MPModule):
         if len(args) == 1 and args[0] == "guiin":
             if not mp_util.has_wxpython:
                 print("No wxpython detected. Cannot show GUI")
-            elif sys.version_info >= (3, 10) and sys.modules['wx'].__version__ < '4.2.1':
-                print("wxpython needs to be >=4.2.1 on Python >=3.10. Cannot show GUI")
+            elif sys.modules['wx'].__version__ < '4.2.1':
+                print("wxpython needs to be >=4.2.1. Cannot show GUI")
             elif not self.rcin_gui:
                 from MAVProxy.modules.lib import wxrc
                 self.rcin_gui = wxrc.RCStatus(panelType=wxrc.PanelType.RC_IN)
@@ -201,8 +201,8 @@ class RCModule(mp_module.MPModule):
         if len(args) == 1 and args[0] == "guiout":
             if not mp_util.has_wxpython:
                 print("No wxpython detected. Cannot show GUI")
-            elif sys.version_info >= (3, 10) and sys.modules['wx'].__version__ < '4.2.1':
-                print("wxpython needs to be >=4.2.1 on Python >=3.10. Cannot show GUI")
+            elif sys.modules['wx'].__version__ < '4.2.1':
+                print("wxpython needs to be >=4.2.1. Cannot show GUI")
             elif not self.servoout_gui:
                 from MAVProxy.modules.lib import wxrc
                 self.servoout_gui = wxrc.RCStatus(panelType=wxrc.PanelType.SERVO_OUT)
