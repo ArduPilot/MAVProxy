@@ -1668,6 +1668,28 @@ if __name__ == '__main__':
 
     mpstate.mav_master = []
 
+    # readline disables echo and canonical input while waiting at its prompt.
+    # os._exit() skips readline's cleanup, so keep the original tty settings.
+    terminal_attributes = None
+    try:
+        import termios
+        terminal_fd = sys.stdin.fileno()
+        terminal_attributes = termios.tcgetattr(terminal_fd)
+    except Exception:
+        # Windows, redirected stdin, or a terminal that has already closed.
+        pass
+
+    def restore_terminal():
+        if terminal_attributes is not None:
+            try:
+                # A background process group must not stop here before _exit.
+                if hasattr(signal, 'SIGTTOU'):
+                    signal.signal(signal.SIGTTOU, signal.SIG_IGN)
+                # Restore immediately; do not wait for pending output to drain.
+                termios.tcsetattr(terminal_fd, termios.TCSANOW, terminal_attributes)
+            except Exception:
+                pass
+
     mpstate.rl = rline.rline("MAV> ", mpstate)
 
     # Signal handling.  When waiting for a command the main thread sits
@@ -1796,6 +1818,7 @@ if __name__ == '__main__':
                     pass
         finally:
             # No print, flush, module unload or atexit handler may delay this.
+            restore_terminal()
             os._exit(128 + signum)
 
     def quit_handler(signum=None, frame=None):
@@ -1809,6 +1832,7 @@ if __name__ == '__main__':
             # not sys.exit(): SystemExit is swallowed if we have
             # interrupted interpreter shutdown joining a thread, which
             # is exactly where a stuck shutdown is likely to be
+            restore_terminal()
             os._exit(0)
         if not repeat:
             signal_state.shutdown_started = now
