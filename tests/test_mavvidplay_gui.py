@@ -49,6 +49,23 @@ class PlayerTests(unittest.TestCase):
         try:
             wait_until(lambda: player.number == 0 and 'viewport' in objects)
             self.assertEqual(projection.current_fov, 60)
+            # Applying a typed offset changes projection while paused and
+            # returns focus so the bracket shortcut can reset it immediately.
+            frame = player.frame
+            player.offset_control.SetFocus()
+            player.offset_control.SetValue(.1)
+            enter = wx.CommandEvent(wx.wxEVT_TEXT_ENTER, player.offset_control.GetId())
+            enter.SetEventObject(player.offset_control)
+            player.offset_control.GetEventHandler().ProcessEvent(enter)
+            wait_until(lambda: wx.Window.FindFocus() == player.panel and 'viewport' not in objects)
+            self.assertEqual(player.telemetry_offset, .1)
+            self.assertEqual(player.number, 0)
+            self.assertIs(player.frame, frame)
+            self.assertFalse(player.playing)
+            bracket = wx.KeyEvent(wx.wxEVT_CHAR_HOOK)
+            bracket.SetKeyCode(ord('['))
+            player.GetEventHandler().ProcessEvent(bracket)
+            wait_until(lambda: player.telemetry_offset == 0 and 'viewport' in objects)
             def center_pixel():
                 left, top, width, height = player.panel.rect
                 return wx.Point(left + width // 2, top + height // 2)
