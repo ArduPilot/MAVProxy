@@ -12,6 +12,8 @@ def main():
     parser.add_argument('--tlog', help='optional MAVLink flight log for SIYI vehicle attitude, heading and speed')
     parser.add_argument('--tlog-system', type=int, help='flight-controller system ID (default: first autopilot heartbeat)')
     parser.add_argument('--tlog-offset', type=float, default=0, help='seconds to add to SIYI UTC timestamps when matching the flight log')
+    parser.add_argument('--telemetry-offset', type=float, default=0,
+                        help='seconds added to telemetry UTC (video time if UTC unavailable); negative uses earlier telemetry; adjustable during playback')
     parser.add_argument('--fov', type=float, help='override horizontal FOV in degrees (default: recorded per-frame FOV)')
     parser.add_argument('--zoom-fov', action='store_true', help='FOV is at 1x; scale focal length by recorded zoom')
     parser.add_argument('--ground-alt', type=float, help='use a flat ground plane at this AMSL altitude in metres')
@@ -29,6 +31,8 @@ def main():
         parser.error('--ground-alt must be finite')
     if not math.isfinite(args.tlog_offset):
         parser.error('--tlog-offset must be finite')
+    if not math.isfinite(args.telemetry_offset):
+        parser.error('--telemetry-offset must be finite')
     if args.tlog_system is not None and not 1 <= args.tlog_system <= 255:
         parser.error('--tlog-system must be 1..255')
     if args.zoom_fov and args.fov is None:
@@ -75,7 +79,7 @@ def main():
         try:
             from MAVProxy.modules.lib.mavvidplay import Player, wx
             app = wx.App(False)
-            player = Player(index, projection, map_display, paused=args.paused)
+            player = Player(index, projection, map_display, paused=args.paused, telemetry_offset=args.telemetry_offset)
             player.Show()
             app.MainLoop()
             if index.index_error or (args.fov is None and index.index_progress == 100 and not index.has_fov()):

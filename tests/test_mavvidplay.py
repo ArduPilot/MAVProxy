@@ -20,6 +20,50 @@ class PlaybackTests(unittest.TestCase):
         state.thermal_lines = lambda: Player.thermal_lines(state)
         return state
 
+    def test_adjusting_offset_keeps_paused_image_and_refreshes_projection(self):
+        from MAVProxy.modules.lib.mavvidplay import Player
+        state = self.thermal_state()
+        state.number, state.frame = 7, object()
+        original_pixels, original_frame = state.thermal_pixels, state.frame
+        state.telemetry_sample = SimpleNamespace(record={'thermal': {'temperature_scale_k': 99}})
+        state.telemetry_offset = 0
+        state.offset_control = SimpleNamespace(SetRange=mock.Mock(), SetValue=mock.Mock())
+        state.update_hover = mock.Mock()
+        state.update_telemetry = mock.Mock()
+        state.panel = SimpleNamespace(Refresh=mock.Mock())
+        state.reader = SimpleNamespace(request=mock.Mock())
+        Player.set_telemetry_offset(state, -11.5)
+        self.assertEqual(state.telemetry_offset, -11.5)
+        self.assertTrue(state.map_dirty)
+        self.assertEqual(state.number, 7)
+        self.assertIs(state.frame, original_frame)
+        self.assertIs(state.thermal_pixels, original_pixels)
+        state.reader.request.assert_not_called()
+        state.update_hover.assert_called_once()
+        self.assertIn('Pixel (1, 0): 1.85 °C', state.thermal_lines())
+        with self.assertRaises(ValueError):
+            Player.set_telemetry_offset(state, float('nan'))
+
+    def test_map_and_clicked_marker_use_shifted_telemetry(self):
+        from MAVProxy.modules.lib.mavvidplay import Player
+        from MAVProxy.modules.lib.video_telemetry import Sample
+        original, shifted = {'image': True}, {'aligned': True}
+        projection = SimpleNamespace(footprint=mock.Mock(return_value=None),
+                                     pixel=mock.Mock(return_value=(-35., 149., 550)))
+        display = SimpleNamespace(is_alive=lambda: True, add_object=mock.Mock(),
+                                  remove_object=mock.Mock())
+        state = SimpleNamespace(sample=Sample(3, .1, original),
+            telemetry_sample=Sample(4, .1, shifted), map=display, projection=projection,
+            update_hover=mock.Mock(), follow=SimpleNamespace(GetValue=lambda: False),
+            markers=[], SetStatusText=mock.Mock(), telemetry_offset=1, telemetry_basis='UTC')
+        Player.update_map(state)
+        projection.footprint.assert_called_once_with(shifted)
+        with mock.patch('builtins.print'):
+            Player.place_marker(state, (10, 20))
+        projection.pixel.assert_called_once_with(shifted, 10, 20)
+        self.assertEqual(state.markers[0][1], 3)  # original picture time
+        self.assertIs(state.sample.record, original)
+
     def test_hover_uses_raw_pixel_scale_and_named_extrema(self):
         state = self.thermal_state()
         lines = state.thermal_lines()

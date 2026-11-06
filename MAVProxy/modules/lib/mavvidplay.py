@@ -13,7 +13,7 @@ import numpy as np
 from MAVProxy.modules.lib import wx_processguard  # noqa: F401
 from MAVProxy.modules.lib.wx_loader import wx
 from MAVProxy.modules.lib.video_telemetry import (
-    camera_pose, attitude, finite, image_pixel, image_rect, position)
+    camera_pose, attitude, finite, image_pixel, image_rect, position, TelemetryAlignment)
 from MAVProxy.modules.mavproxy_map import mp_slipmap
 
 
@@ -242,9 +242,13 @@ def circle_image(colour, radius=5):
 
 
 class Player(wx.Frame):
-    def __init__(self, index, projection, map_display, paused=False):
+    def __init__(self, index, projection, map_display, paused=False, telemetry_offset=0):
+        if not finite(telemetry_offset):
+            raise ValueError('Telemetry offset must be finite')
         super().__init__(None, title='MAV Video: ' + index.filename, size=(1000, 740))
         self.index, self.projection, self.map = index, projection, map_display
+        self.alignment = TelemetryAlignment(index)
+        self.telemetry_offset = float(telemetry_offset)
         self.frame = None
         self.thermal_pixels = None
         self.number = None
@@ -293,6 +297,26 @@ class Player(wx.Frame):
         self.follow.SetValue(True)
         self.follow.Bind(wx.EVT_CHECKBOX, lambda event: self.update_map())
         controls.Add(self.follow, 0, wx.ALL | wx.ALIGN_CENTER_VERTICAL, 8)
+        alignment_controls = wx.BoxSizer(wx.HORIZONTAL)
+        alignment_controls.Add(wx.StaticText(self, label='Telemetry offset (s):'),
+                               0, wx.ALL | wx.ALIGN_CENTER_VERTICAL, 4)
+        limit = max(86400, abs(self.telemetry_offset))
+        self.offset_control = wx.SpinCtrlDouble(self, min=-limit, max=limit,
+            initial=self.telemetry_offset, inc=.1,
+            style=wx.SP_ARROW_KEYS | wx.TE_PROCESS_ENTER, size=(115, -1))
+        self.offset_control.SetDigits(2)
+        self.offset_control.SetToolTip('Negative: earlier telemetry; positive: later telemetry. '
+            'Uses recorded UTC seconds when available, otherwise video time. '
+            'Enter or leave the field to apply a typed value.')
+        self.offset_control.Bind(wx.EVT_SPINCTRLDOUBLE, self.apply_telemetry_offset)
+        self.offset_control.Bind(wx.EVT_TEXT_ENTER, self.apply_telemetry_offset)
+        self.offset_control.Bind(wx.EVT_KILL_FOCUS, self.change_telemetry_offset)
+        alignment_controls.Add(self.offset_control, 0, wx.ALL, 4)
+        reset = wx.Button(self, label='Reset offset')
+        reset.Bind(wx.EVT_BUTTON, lambda event: self.set_telemetry_offset(0))
+        alignment_controls.Add(reset, 0, wx.ALL, 4)
+        alignment_controls.Add(wx.StaticText(self, label='− earlier / + later telemetry'),
+                               0, wx.ALL | wx.ALIGN_CENTER_VERTICAL, 4)
         layout = wx.BoxSizer(wx.VERTICAL)
         content = wx.BoxSizer(wx.HORIZONTAL)
         content.Add(self.panel, 1, wx.EXPAND)
@@ -300,9 +324,10 @@ class Player(wx.Frame):
         layout.Add(content, 1, wx.EXPAND)
         layout.Add(self.slider, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 5)
         layout.Add(controls, 0, wx.EXPAND)
+        layout.Add(alignment_controls, 0, wx.EXPAND)
         self.SetSizer(layout)
         self.CreateStatusBar()
-        self.SetStatusText('Space: pause | Arrows: +/-10s | , / .: frame | Click: map marker')
+        self.SetStatusText('Space: pause | Arrows: +/-10s | , / .: frame | [ / ]: offset (Shift: 1s) | Click: marker')
         self.slider.Bind(wx.EVT_SLIDER, lambda event: self.seek(self.slider.GetValue()))
         self.Bind(wx.EVT_CHAR_HOOK, self.key)
         self.Bind(wx.EVT_CLOSE, self.close)
@@ -316,19 +341,56 @@ class Player(wx.Frame):
     def sample(self):
         return self.index.samples[self.number] if self.number is not None else None
 
+    @property
+    def telemetry_sample(self):
+        return self.alignment.at(self.number, self.telemetry_offset)[0]
+
+    @property
+    def telemetry_basis(self):
+        return self.alignment.at(self.number, self.telemetry_offset)[1]
+
+    def set_telemetry_offset(self, value):
+        if not finite(value):
+            raise ValueError('Telemetry offset must be finite')
+        self.telemetry_offset = float(value)
+        limit = max(86400, abs(value))
+        self.offset_control.SetRange(-limit, limit)
+        self.offset_control.SetValue(value)
+        self.map_dirty = True
+        self.update_hover()
+        self.update_telemetry()
+        self.panel.Refresh(False)
+
+    def change_telemetry_offset(self, event=None):
+        if self.closing:
+            if event is not None:
+                event.Skip()
+            return
+        value = self.offset_control.GetValue()
+        if value != self.telemetry_offset:
+            self.set_telemetry_offset(value)
+        if event is not None:
+            event.Skip()
+
+    def apply_telemetry_offset(self, event):
+        self.change_telemetry_offset(event)
+        if not self.closing:
+            self.panel.SetFocus()
+
     def osd(self):
         sample = self.sample
         if sample is None:
             return []
-        record = sample.record
+        aligned = self.telemetry_sample
+        record = aligned.record if aligned else None
         heading = record.get('heading_rad') if record else None
         heading = '%05.1f deg' % (math.degrees(heading) % 360) if finite(heading) else '--'
-        speed = '%.1f m/s' % sample.speed if sample.speed is not None else '--'
+        speed = '%.1f m/s' % aligned.speed if aligned and aligned.speed is not None else '--'
         hfov = self.projection.effective_fov(record)
         fov_text = '%.2f deg' % hfov if hfov is not None else '-- (use --fov)'
         state = 'PLAY' if self.playing else 'PAUSED'
         utc_text = '--'
-        utc_us = record.get('utc_us') if record else None
+        utc_us = sample.record.get('utc_us') if sample.record else None
         if finite(utc_us) and utc_us > 0:
             try:
                 seconds, micros = divmod(int(utc_us), 1000000)
@@ -341,11 +403,22 @@ class Player(wx.Frame):
             'Recorded UTC: ' + utc_text,
             'Vehicle ' + angle_text(attitude(record, 'vehicle_attitude')),
             'Gimbal  ' + angle_text(attitude(record, 'gimbal_attitude')),
-            'Ground speed (%s): %s' % (sample.speed_source, speed),
+            'Ground speed (%s): %s' % (aligned.speed_source if aligned else '--', speed),
             'Heading: %s' % heading,
             'HFOV: %s (%s)%s' % (fov_text,
                 'recorded' if self.projection.fov is None else 'override',
-                '\nNO FRAME TELEMETRY' if record is None else '')]
+                '\nNO ALIGNED TELEMETRY' if record is None else '')]
+        lines.insert(2, 'Telemetry offset: %+.2f s (%s)' % (
+            self.telemetry_offset, self.telemetry_basis))
+        telemetry_utc = record.get('utc_us') if record else None
+        if self.telemetry_offset:
+            text = '--'
+            if finite(telemetry_utc) and telemetry_utc > 0:
+                try:
+                    text = datetime.fromtimestamp(telemetry_utc / 1e6, timezone.utc).isoformat(timespec='milliseconds')
+                except (OverflowError, OSError, ValueError):
+                    pass
+            lines.insert(3, 'Telemetry UTC: ' + text)
         if record and record.get('schema') == 'siyi.subtitle.v1':
             if camera_pose(record) is None:
                 lines.append('Map projection needs vehicle attitude (--tlog)')
@@ -449,7 +522,14 @@ class Player(wx.Frame):
 
     def key(self, event):
         code = event.GetKeyCode()
-        if code == wx.WXK_SPACE:
+        focus = wx.Window.FindFocus()
+        if focus is not None and (focus == self.offset_control or self.offset_control.IsDescendant(focus)):
+            event.Skip()
+            return
+        if code in (ord('['), ord(']'), ord('{'), ord('}')):
+            sign = -1 if code in (ord('['), ord('{')) else 1
+            self.set_telemetry_offset(round(self.telemetry_offset + sign * (1 if event.ShiftDown() else .1), 2))
+        elif code == wx.WXK_SPACE:
             self.toggle()
         elif code in (wx.WXK_LEFT, wx.WXK_RIGHT):
             self.skip((-1 if code == wx.WXK_LEFT else 1) * (60 if event.ShiftDown() else 10))
@@ -537,7 +617,8 @@ class Player(wx.Frame):
         if self.sample is None or not self.map.is_alive():
             return
         self.last_map_update = time.monotonic()
-        record = self.sample.record
+        aligned = self.telemetry_sample
+        record = aligned.record if aligned else None
         pos = position(record)
         if pos is not None:
             self.map.add_object(mp_slipmap.SlipIcon('vehicle', pos[:2], circle_image((255, 255, 255)),
@@ -576,8 +657,9 @@ class Player(wx.Frame):
         # Pixel temperatures do not need vehicle pose, terrain or a running map.
         if not self.map.is_alive():
             return
-        location = (self.projection.pixel(self.sample.record, *self.hover)
-                    if self.sample is not None and self.hover is not None else None)
+        aligned = self.telemetry_sample
+        location = (self.projection.pixel(aligned.record, *self.hover)
+                    if aligned is not None and self.hover is not None else None)
         if location is None:
             self.clear_hover()
             return
@@ -590,7 +672,8 @@ class Player(wx.Frame):
     def place_marker(self, pixel):
         if self.sample is None or not self.map.is_alive():
             return
-        location = self.projection.pixel(self.sample.record, *pixel)
+        aligned = self.telemetry_sample
+        location = self.projection.pixel(aligned.record, *pixel) if aligned else None
         if location is None:
             self.SetStatusText('No ground intersection: check telemetry, FOV and terrain coverage')
             return
@@ -599,6 +682,8 @@ class Player(wx.Frame):
         self.map.add_object(mp_slipmap.SlipIcon(label, location[:2],
             circle_image((0, 0, 255), 6), layer='Markers', label=label))
         message = '%s  %s  %.7f, %.7f  %.1f m AMSL' % (label, clock_text(self.sample.time), *location)
+        if self.telemetry_offset:
+            message += '  telemetry offset %+.2f s (%s)' % (self.telemetry_offset, self.telemetry_basis)
         self.SetStatusText(message)
         print(message, flush=True)
 

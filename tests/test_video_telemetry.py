@@ -9,7 +9,7 @@ import tempfile
 import unittest
 
 from MAVProxy.modules.lib.video_telemetry import (
-    UUID, FlatElevation, Sample, VideoIndex, ViewProjection, attitude, camera_pose,
+    UUID, FlatElevation, Sample, TelemetryAlignment, VideoIndex, ViewProjection, attitude, camera_pose,
     image_pixel, image_rect, packet_nals, position, sei_records, unhex)
 
 
@@ -35,6 +35,113 @@ def sei(value, codec='h264', suffix=False):
         escaped.append(byte)
         zeros = zeros + 1 if byte == 0 else 0
     return (b'\x06' if codec == 'h264' else bytes([(40 if suffix else 39) << 1, 1])) + escaped
+
+
+
+class AlignmentTests(unittest.TestCase):
+    def timeline(self, utc_values=(100, 101, 102), video_times=(0, .1, .2)):
+        from types import SimpleNamespace
+        samples = []
+        for n, (utc, pts) in enumerate(zip(utc_values, video_times)):
+            rec = record()
+            rec['utc_us'] = round(utc * 1e6) if utc is not None else None
+            rec['position']['lat_e7'] += n * 100
+            samples.append(Sample(pts, .1, rec, n * 10, 'test'))
+        index = SimpleNamespace(samples=samples, times=list(video_times))
+        return index, TelemetryAlignment(index)
+
+    def test_offset_uses_utc_seconds_and_interpolates_wrapped_angles(self):
+        index, alignment = self.timeline()
+        index.samples[0].record['heading_rad'] = math.radians(350)
+        index.samples[1].record['heading_rad'] = math.radians(10)
+        index.samples[0].record['gimbal_attitude']['yaw_rad'] = math.radians(350)
+        index.samples[1].record['gimbal_attitude']['yaw_rad'] = math.radians(10)
+        original = copy.deepcopy([s.record for s in index.samples])
+        sample, basis = alignment.at(0, .5)
+        self.assertEqual(basis, 'UTC')
+        self.assertEqual(sample.record['utc_us'], 100500000)
+        self.assertEqual(sample.record['position']['lat_e7'], original[0]['position']['lat_e7'] + 50)
+        self.assertAlmostEqual(sample.time, .05)  # not +0.5 playback seconds
+        self.assertAlmostEqual(math.sin(sample.record['heading_rad']), 0)
+        self.assertAlmostEqual(math.cos(sample.record['gimbal_attitude']['yaw_rad']), 1)
+        self.assertAlmostEqual(sample.speed, 5)
+        self.assertEqual(sample.record['position']['age_ms'], 500)
+        self.assertEqual([s.record for s in index.samples], original)
+        earlier, basis = alignment.at(2, -1)
+        self.assertIs(earlier, index.samples[1])
+
+    def test_zero_keeps_missing_frame_telemetry_and_image_metadata(self):
+        index, alignment = self.timeline()
+        index.samples[1].record = None
+        sample, _ = alignment.at(1, 0)
+        self.assertIs(sample, index.samples[1])
+        self.assertIsNone(sample.record)
+        self.assertIs(alignment.at(0, 0)[0], index.samples[0])
+
+    def test_outside_coverage_and_large_utc_gap_have_no_pose(self):
+        index, alignment = self.timeline((100, 120, 121))
+        self.assertIsNone(alignment.at(0, -1)[0])
+        self.assertIsNone(alignment.at(2, 1)[0])
+        self.assertIsNone(alignment.at(0, 10)[0])
+        self.assertIs(alignment.at(0, 20)[0], index.samples[1])
+        with self.assertRaises(ValueError):
+            alignment.at(0, math.nan)
+
+    def test_interpolates_missing_seconds_in_vendor_rgb_utc(self):
+        index, alignment = self.timeline((1787886130, 1787886135, 1787886136))
+        shifted, basis = alignment.at(0, 3)
+        self.assertEqual(basis, 'UTC')
+        self.assertEqual(shifted.record['utc_us'], 1787886133000000)
+        self.assertAlmostEqual(shifted.record['position']['lat_e7'], index.samples[0].record['position']['lat_e7'] + 60)
+
+    def test_missing_or_regressing_utc_uses_video_time(self):
+        for timestamps in ((None, None, None), (100, 99, 101)):
+            index, alignment = self.timeline(timestamps, (0, 1, 2))
+            sample, basis = alignment.at(1, .5)
+            self.assertEqual(basis, 'video time')
+            self.assertEqual(sample.record['position']['lat_e7'], index.samples[1].record['position']['lat_e7'] + 50)
+
+    def test_appended_background_samples_make_offset_available(self):
+        index, alignment = self.timeline((100,), (0,))
+        self.assertIsNone(alignment.at(0, 1)[0])
+        rec = record()
+        rec['utc_us'] = 101000000
+        index.samples.append(Sample(1, .1, rec))
+        index.times.append(1)
+        self.assertIs(alignment.at(0, 1)[0], index.samples[1])
+
+    def test_late_background_metadata_invalidates_cached_alignment(self):
+        index, alignment = self.timeline()
+        index.indexing, index.telemetry_count = True, 2
+        late = index.samples[1].record
+        index.samples[1].record = None
+        self.assertIsNot(alignment.at(0, 1)[0], index.samples[1])
+        index.samples[1].record = late
+        index.telemetry_count += 1
+        self.assertIs(alignment.at(0, 1)[0], index.samples[1])
+        shifted, basis = alignment.at(0, .5)
+        self.assertEqual(basis, 'UTC')
+        self.assertAlmostEqual(shifted.speed, 5)
+
+    def test_finished_index_refreshes_interpolated_speed(self):
+        index, alignment = self.timeline()
+        index.indexing = True
+        self.assertAlmostEqual(alignment.at(0, .5)[0].speed, 5)
+        index.samples[1].speed = 20
+        index.indexing = False
+        self.assertAlmostEqual(alignment.at(0, .5)[0].speed, 10)
+
+    def test_longitude_interpolates_across_date_line(self):
+        index, alignment = self.timeline()
+        index.samples[0].record['position']['lon_e7'] = 1799999900
+        index.samples[1].record['position']['lon_e7'] = -1799999900
+        shifted, _ = alignment.at(0, .5)
+        self.assertAlmostEqual(abs(position(shifted.record)[1]), 180)
+
+    def test_repeated_utc_keeps_current_sample_at_small_offset(self):
+        index, alignment = self.timeline((100, 100, 101), (0, .1, .2))
+        shifted, _ = alignment.at(1, .1)
+        self.assertAlmostEqual(shifted.record['position']['lat_e7'], index.samples[1].record['position']['lat_e7'] + 10)
 
 
 class TelemetryTests(unittest.TestCase):

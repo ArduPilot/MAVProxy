@@ -137,6 +137,159 @@ class Sample:
     has_misb: bool = False
 
 
+class TelemetryAlignment:
+    """Select pose telemetry independently of the displayed video frame.
+
+    Offsets use recorded UTC when the current frame has a usable UTC clock,
+    otherwise presentation time. Positive offsets select later telemetry.
+    The original samples (including image-specific thermal data) stay intact.
+    """
+    def __init__(self, index):
+        self.index = index
+        self._seen = 0
+        self._pending = {}
+        self._records_seen = 0
+        self._utc_numbers = []
+        self._utc_times = []
+        self._utc_samples = []
+        self._utc_ordered = True
+        self._cache_key = None
+        self._cache_value = None
+
+    def _update(self):
+        samples = self.index.samples
+        # times is published after samples by the background indexer.
+        count = len(self.index.times)
+        indexing = getattr(self.index, 'indexing', False)
+        records, pending = [], {}
+        for number in range(self._seen, count):
+            record = samples[number].record
+            if record is not None:
+                self._records_seen += 1
+                records.append((number, record))
+            elif indexing:
+                pending[number] = None
+        # KLV often follows its video packet. Revisit missing records newest
+        # first, stopping once all published metadata has been accounted for.
+        # Long stretches without KLV then cost no repeated full-tail scan.
+        available = getattr(self.index, 'telemetry_count', None)
+        resolved = []
+        for number in reversed(self._pending):
+            if indexing and available is not None and self._records_seen >= available:
+                break
+            record = samples[number].record
+            if record is not None:
+                records.append((number, record))
+                self._records_seen += 1
+            if record is not None or not indexing:
+                resolved.append(number)
+        for number in resolved:
+            del self._pending[number]
+        self._pending.update(pending)
+        for number, record in records:
+            sample = samples[number]
+            value = record.get('utc_us')
+            if not finite(value) or value <= 0:
+                continue
+            timestamp = value * 1e-6
+            slot = bisect.bisect_left(self._utc_numbers, number)
+            if ((slot and timestamp < self._utc_times[slot - 1]) or
+                    (slot < len(self._utc_times) and timestamp > self._utc_times[slot])):
+                self._utc_ordered = False
+            self._utc_numbers.insert(slot, number)
+            self._utc_times.insert(slot, timestamp)
+            self._utc_samples.insert(slot, sample)
+        self._seen = count
+
+    @staticmethod
+    def _blend(first, second, fraction, gap):
+        near = first if fraction < .5 else second
+        record = dict(near.record)
+        for name, keys in (
+                ('position', ('lat_e7', 'lon_e7', 'alt_amsl_m', 'alt_relative_m')),
+                ('vehicle_attitude', ('roll_rad', 'pitch_rad', 'yaw_rad')),
+                ('gimbal_attitude', ('roll_rad', 'pitch_rad', 'yaw_rad')),
+                ('velocity', ('vn_m_s', 've_m_s', 'vd_m_s'))):
+            a, b = source(first.record, name), source(second.record, name)
+            if a is None or b is None:
+                record[name] = None
+                continue
+            entry = dict(a if fraction < .5 else b)
+            for key in keys:
+                va, vb = a.get(key), b.get(key)
+                if not finite(va) or not finite(vb):
+                    entry.pop(key, None)
+                    continue
+                delta = vb - va
+                if key.endswith('_rad'):
+                    delta = (delta + math.pi) % (2 * math.pi) - math.pi
+                elif key == 'lon_e7':
+                    delta = (delta + 180e7) % 360e7 - 180e7
+                entry[key] = va + fraction * delta
+                if key == 'lon_e7':
+                    entry[key] = (entry[key] + 180e7) % 360e7 - 180e7
+            entry['age_ms'] = max(a.get('age_ms', 0), b.get('age_ms', 0)) + min(fraction, 1 - fraction) * gap * 1000
+            record[name] = entry
+        for key in ('heading_rad', 'hfov_deg', 'zoom', 'utc_us', 'pose_utc_us'):
+            a, b = first.record.get(key), second.record.get(key)
+            if finite(a) and finite(b):
+                delta = b - a
+                if key == 'heading_rad':
+                    delta = (delta + math.pi) % (2 * math.pi) - math.pi
+                value = a + fraction * delta
+                record[key] = round(value) if key.endswith('utc_us') else value
+            else:
+                record[key] = None
+        speed = (first.speed + fraction * (second.speed - first.speed)
+                 if finite(first.speed) and finite(second.speed) else None)
+        return Sample(first.time + fraction * (second.time - first.time), 0,
+                      record, speed, 'interpolated', first.has_misb or second.has_misb)
+
+    def at(self, number, offset):
+        if not finite(offset):
+            raise ValueError('Telemetry offset must be finite')
+        if number is None:
+            return None, 'video time'
+        current = self.index.samples[number]
+        utc = current.record.get('utc_us') if current.record else None
+        if offset == 0:
+            return current, 'UTC' if finite(utc) and utc > 0 else 'video time'
+        indexing = getattr(self.index, 'indexing', False)
+        key = number, offset, len(self.index.times), indexing
+        # Metadata and speed can change in place until indexing is complete.
+        if not indexing and key == self._cache_key:
+            return self._cache_value
+        self._update()
+        if finite(utc) and utc > 0 and self._utc_ordered:
+            times, samples = self._utc_times, self._utc_samples
+            target, basis = utc * 1e-6 + offset, 'UTC'
+        else:
+            times, samples = self.index.times, self.index.samples
+            target, basis = current.time + offset, 'video time'
+        aligned = None
+        if times and times[0] - 1e-6 <= target <= times[-1] + 1e-6:
+            target = min(max(target, times[0]), times[-1])
+            right = bisect.bisect_left(times, target)
+            if right < len(times) and abs(times[right] - target) <= 1e-6:
+                aligned = samples[right]
+            elif 0 < right < len(times):
+                left = right - 1
+                gap = times[right] - times[left]
+                # Do not manufacture pose across an acquisition/metadata gap.
+                if gap <= 10 + 1e-6 and samples[left].record and samples[right].record:
+                    before, after = samples[left], samples[right]
+                    # Preserve this frame's phase when UTC labels repeat.
+                    if basis == 'UTC':
+                        now = utc * 1e-6
+                        if abs(times[left] - now) < 1e-7:
+                            before = current
+                        if abs(times[right] - now) < 1e-7:
+                            after = current
+                    aligned = self._blend(before, after, (target - times[left]) / gap, gap)
+        self._cache_key, self._cache_value = key, (aligned, basis)
+        return self._cache_value
+
+
 class _SpeedEstimator:
     def __init__(self):
         from MAVProxy.modules.lib import mp_util
