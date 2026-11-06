@@ -50,23 +50,34 @@ class LogModule(mp_module.MPModule):
 
     def handle_log_data(self, m):
         '''handling incoming log data'''
-        if self.download_file is None:
+        if self.download_file is None or m.id != self.download_lognum:
             return
         # lose some data
         # import random
         # if random.uniform(0,1) < 0.05:
         #    print('dropping ', str(m))
         #    return
+        count = m.count
+        entry = self.entries.get(m.id, None)
+        if entry is not None and m.ofs + count > entry.size:
+            # don't write past the size LOG_ENTRY gave for this log
+            if m.ofs < entry.size:
+                count = entry.size - m.ofs
+            elif len(self.download_set) == (entry.size + 89) // 90:
+                # past the end with nothing missing: the download is complete
+                count = 0
+            else:
+                return
         if m.ofs != self.download_ofs:
             self.download_file.seek(m.ofs)
             self.download_ofs = m.ofs
-        if m.count != 0:
-            s = bytearray(m.data[:m.count])
+        if count != 0:
+            s = bytearray(m.data[:count])
             self.download_file.write(s)
             self.download_set.add(m.ofs // 90)
-            self.download_ofs += m.count
+            self.download_ofs += count
         self.download_last_timestamp = time.time()
-        if m.count == 0 or (m.count < 90 and len(self.download_set) == 1 + (m.ofs // 90)):
+        if count == 0 or (count < 90 and len(self.download_set) == 1 + (m.ofs // 90)):
             dt = time.time() - self.download_start
             if dt == 0:
                 dt = 0.0000001
