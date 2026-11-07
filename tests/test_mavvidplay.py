@@ -112,7 +112,10 @@ class PlaybackTests(unittest.TestCase):
         from pathlib import Path
         import tempfile
         import numpy as np
-        import av
+        try:
+            import av
+        except ImportError:
+            self.skipTest('PyAV required for thermal playback')
         from MAVProxy.modules.lib.mavvidplay import FrameReader, ThermalFrame
         with tempfile.TemporaryDirectory() as directory:
             path = str(Path(directory)/'thermal.mkv')

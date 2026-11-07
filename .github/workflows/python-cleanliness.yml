@@ -37,7 +37,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y python3-venv python3-wxgtk4.0 xvfb ffmpeg
           python3 -m venv --system-site-packages test-venv
-          test-venv/bin/pip install pytest 'numpy<2' 'opencv-python-headless<4.12' matplotlib defusedxml pyserial pynmeagps pexpect PyYAML requests
+          test-venv/bin/pip install pytest 'numpy<2' 'opencv-python-headless<4.12' av matplotlib defusedxml pyserial pynmeagps pexpect PyYAML requests
           # Exercise the released dialect, which lacks some newer extensions.
           test-venv/bin/pip install 'pymavlink==2.4.49'
       - name: Run regression tests with released pymavlink
@@ -55,7 +55,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y python3-venv python3-wxgtk4.0 xvfb ffmpeg
           python3 -m venv --system-site-packages test-venv
-          test-venv/bin/pip install pytest 'numpy<2' 'opencv-python-headless<4.12' matplotlib defusedxml pyserial pynmeagps pexpect PyYAML requests
+          test-venv/bin/pip install pytest 'numpy<2' 'opencv-python-headless<4.12' av matplotlib defusedxml pyserial pynmeagps pexpect PyYAML requests
       - name: Install pymavlink from the mavlink repository
         run: |
           git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/ArduPilot/mavlink.git "$RUNNER_TEMP/mavlink"
