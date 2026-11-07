@@ -227,6 +227,11 @@ class FTPWorker(mp_module.MPModule):
         self.last_op_reply = False
         self.request_retries = 0
 
+    @property
+    def master(self):
+        '''the link the vehicle being talked to was last heard on'''
+        return self.mpstate.master(self.ftp_target_system)
+
     def prepare_send(self, op, preserve_seq=False):
         '''prepare a request and update protocol state as if it was sent'''
         if not preserve_seq:
@@ -1441,7 +1446,9 @@ class FTPModule(mp_module.MPModule):
     '''Public FTP module and concurrent-session manager.'''
 
     def __init__(self, mpstate):
-        super().__init__(mpstate, "ftp", public=True)
+        # transfers can be with other vehicles than the target; each
+        # reply goes to the worker for the system it came from
+        super().__init__(mpstate, "ftp", public=True, multi_vehicle=True)
         self.add_command('ftp', self.cmd_ftp, "file transfer",
                          ["<list|get|rm|rmdir|rename|mkdir|crc|cancel|status>",
                           "set (FTPSETTING)",
