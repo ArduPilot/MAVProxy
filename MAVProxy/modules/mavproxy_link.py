@@ -41,6 +41,7 @@ delayedPackets = frozenset([
     'GPS_RAW_INT',
     'MISSION_CURRENT',
     'NAV_CONTROLLER_OUTPUT',
+    'NAV_CONTROLLER_PROGRESS',
     'SCALED_PRESSURE',
     'SYS_STATUS',
     'VFR_HUD',
