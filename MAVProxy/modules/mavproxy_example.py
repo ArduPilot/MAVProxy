@@ -79,7 +79,7 @@ class example(mp_module.MPModule):
             self.say("%s: %s" % (self.name,message))
             # See if whatever we're connected to would like to play:
             self.master.mav.statustext_send(mavutil.mavlink.MAV_SEVERITY_NOTICE,
-                                            message)
+                                            message.encode('utf8'))
 
     def mavlink_packet(self, m):
         '''handle mavlink packets'''
