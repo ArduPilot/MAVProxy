@@ -324,10 +324,22 @@ def complete(text, state):
     last_clist = ret
     return last_clist[state]
 
+def readline_is_libedit():
+    '''return True if the readline module uses libedit'''
+    # Python 3.13 and later give the library name.
+    backend = getattr(readline, "backend", None)
+    if backend is not None:
+        return backend == "editline"
+    return "libedit" in (readline.__doc__ or "")
+
 # Configure readline for linux/mac systems
 if platform.system() != 'Windows' or sys.version_info < (3, 0):
     readline.set_completer_delims(' \t\n;')
-    readline.parse_and_bind("tab: complete")
+    # libedit does not accept the GNU readline syntax.
+    if readline_is_libedit():
+        readline.parse_and_bind("bind ^I rl_complete")
+    else:
+        readline.parse_and_bind("tab: complete")
     readline.set_completer(complete)
     #redisplay = readline.redisplay
 
