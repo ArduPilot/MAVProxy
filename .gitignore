@@ -16,3 +16,7 @@ MANIFEST
 *.orig
 windows/version.txt
 /.vscode
+# local files: vehicle parameters, parameter XML downloads, Windows installer builds
+/mav.parm
+/Parameters/
+windows/Output/
