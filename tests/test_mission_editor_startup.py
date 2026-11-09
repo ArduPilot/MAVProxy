@@ -1,4 +1,4 @@
-"""Mission editor GUI startup must not serialize live MAVProxy state."""
+"""Mission editor GUI startup must not fork MAVProxy's threaded parent."""
 import multiprocessing
 import sys
 import threading
@@ -57,58 +57,114 @@ def run_headless_gui(target, args, started, loaded):
         target(*args)
 
 
+def context_probe_child(q, lock, gui_queue, gui_lock, close_window, elemodel,
+                        object_queue):
+    """Check the actual spawn context's queues, locks and semaphore."""
+    with lock:
+        q.put(('child-ready', elemodel))
+    with gui_lock:
+        gui_queue.put(('child-ready', elemodel))
+    assert object_queue.get(timeout=5) == 'layout'
+    close_window.acquire()
+
+
+def close_queue(queue):
+    queue.close()
+    queue.join_thread()
+
+
 class MissionEditorStartupTests(unittest.TestCase):
-    def test_empty_mission_starts_without_serializing_closed_parent_handles(self):
+    def test_child_entry_round_trips_ipc_for_supported_contexts(self):
+        """The static target works with every supported standard context."""
         for method in ('spawn', 'forkserver', 'fork'):
             if method not in multiprocessing.get_all_start_methods():
                 continue
             with self.subTest(method=method):
                 ctx = multiprocessing.get_context(method)
                 started, loaded = ctx.Event(), ctx.Event()
-                queues = []
-
-                def process_factory(target, args):
-                    # Keep the production target in the pickle: a bound method
-                    # would bring the closed connection and lock along with it.
-                    return ctx.Process(target=run_headless_gui, args=(target, args, started, loaded))
-
-                def make_queue():
-                    q = ctx.Queue()
-                    queues.append(q)
-                    return q
-
-                closed, other = ctx.Pipe()
-                closed.close()
-                other.close()
-                wp = types.SimpleNamespace(wploader=mavwp.MAVWPLoader())
-                state = types.SimpleNamespace(
-                    console=types.SimpleNamespace(child_pipe_send=closed),
-                    lock=threading.Lock(), module=lambda name: wp if name == 'wp' else None)
-                backend = types.SimpleNamespace(Process=process_factory, Queue=make_queue,
-                                                Lock=ctx.Lock, Semaphore=ctx.Semaphore)
-                editor = None
+                queues = [ctx.Queue(), ctx.Queue(), ctx.Queue()]
+                event_queue, gui_event_queue, object_queue = queues
+                event_lock, gui_event_lock = ctx.Lock(), ctx.Lock()
+                close_window = ctx.Semaphore(0)
+                process = ctx.Process(
+                    target=run_headless_gui,
+                    args=(mission_editor.MissionEditorMain.child_task,
+                          (event_queue, event_lock, gui_event_queue, gui_event_lock,
+                           close_window, 'SRTM3', object_queue), started, loaded))
                 try:
-                    with mock.patch.object(mission_editor, 'multiproc', backend):
-                        editor = mission_editor.MissionEditorMain(state, 'SRTM3')
+                    process.start()
                     self.assertTrue(started.wait(5), 'GUI did not start')
-                    editor.set_layout('layout')
-                    editor.get_wps_from_module()
-                    self.assertTrue(loaded.wait(5), 'GUI did not receive the empty mission and layout')
-                    self.assertTrue(editor.child.is_alive())
+                    with gui_event_lock:
+                        gui_event_queue.put(mission_editor.MissionEditorEvent(
+                            me_event.MEGE_LOAD_MISSION, wploader=mavwp.MAVWPLoader()))
+                    object_queue.put('layout')
+                    self.assertTrue(loaded.wait(5), 'GUI did not receive IPC messages')
+                    self.assertTrue(process.is_alive())
                 finally:
-                    if editor is not None:
-                        editor.close()
-                        editor.event_thread.join(5)
-                        editor.child.join(5)
-                        self.assertFalse(editor.event_thread.is_alive())
-                        self.assertFalse(editor.child.is_alive())
-                        self.assertEqual(editor.child.exitcode, 0)
-                        editor.child.close()
-                    for q in queues:
-                        q.close()
-                        q.join_thread()
-                        q._reader.close()
-                        q._writer.close()
+                    close_window.release()
+                    process.join(5)
+                    self.assertFalse(process.is_alive())
+                    self.assertEqual(process.exitcode, 0)
+                    process.close()
+                    for queue in queues:
+                        close_queue(queue)
+
+    def test_threaded_parent_uses_spawn_context_and_repeatedly_starts(self):
+        """Mission Editor avoids fork after MAVProxy has started worker threads."""
+        parent_thread_ready = threading.Event()
+        parent_thread_stop = threading.Event()
+
+        def parent_worker():
+            parent_thread_ready.set()
+            parent_thread_stop.wait(10)
+
+        parent_thread = threading.Thread(target=parent_worker)
+        parent_thread.start()
+        self.assertTrue(parent_thread_ready.wait(5))
+
+        try:
+            for attempt in range(3):
+                with self.subTest(attempt=attempt):
+                    closed, other = multiprocessing.Pipe()
+                    closed.close()
+                    other.close()
+                    wp = types.SimpleNamespace(wploader=mavwp.MAVWPLoader())
+                    state = types.SimpleNamespace(
+                        console=types.SimpleNamespace(child_pipe_send=closed),
+                        lock=threading.Lock(),
+                        module=lambda name: wp if name == 'wp' else None)
+                    editor = None
+                    try:
+                        with mock.patch.object(
+                                mission_editor.MissionEditorMain, 'child_task',
+                                staticmethod(context_probe_child)), mock.patch.object(
+                                    mission_editor.multiprocessing, 'get_context',
+                                    wraps=multiprocessing.get_context) as get_context:
+                            editor = mission_editor.MissionEditorMain(state, 'SRTM3')
+                        get_context.assert_called_once_with('spawn')
+                        self.assertEqual(editor.event_queue.get(timeout=5),
+                                         ('child-ready', 'SRTM3'))
+                        self.assertEqual(editor.gui_event_queue.get(timeout=5),
+                                         ('child-ready', 'SRTM3'))
+                        editor.set_layout('layout')
+                        self.assertTrue(editor.child.is_alive())
+                    finally:
+                        if editor is not None:
+                            editor.close()
+                            editor.event_thread.join(5)
+                            editor.child.join(5)
+                            self.assertFalse(editor.event_thread.is_alive())
+                            self.assertFalse(editor.child.is_alive())
+                            self.assertEqual(editor.child.exitcode, 0)
+                            editor.child.close()
+                            for queue in (editor.event_queue, editor.gui_event_queue,
+                                          editor.object_queue,
+                                          editor.mavlink_message_queue):
+                                close_queue(queue)
+        finally:
+            parent_thread_stop.set()
+            parent_thread.join(5)
+            self.assertFalse(parent_thread.is_alive())
 
 
 if __name__ == '__main__':
