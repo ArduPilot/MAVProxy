@@ -102,7 +102,7 @@ class Graph():
 
         for i in range(len(self.fields)):
             # special handling for NAMED_VALUE_FLOAT
-            m = re.match("^NAMED_VALUE_FLOAT\[([A-Z0-9_]+)\]\.(.*)$", self.fields[i])
+            m = re.match(r"^NAMED_VALUE_FLOAT\[([A-Z0-9_]+)\]\.(.*)$", self.fields[i])
             if m:
                 self.fields[i] = "NAMED_VALUE_FLOAT['%s'].%s" % (m.group(1), m.group(2))
 
