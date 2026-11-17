@@ -4,9 +4,11 @@ GNSS receiver status
 
 Tabulates the GNSS message the vehicle sends for each of its GNSS
 receivers, alongside the receiver's GPSn_TYPE, where it is connected
-and the driver ArduPilot detected for it (if MAVProxy saw the
-"GPS n: detected" message), as of the latest message for each
-receiver.
+and the driver ArduPilot detected for it, as of the latest message
+for each receiver.  The detected driver, and for u-blox receivers the
+module, software and protocol versions, come from the messages
+ArduPilot sends when it detects and configures a receiver, usually at
+boot, so they are only known if MAVProxy was running then.
 
 "gnss probe" asks each DroneCAN GPS node for its node information
 (uavcan.protocol.GetNodeInfo) through the vehicle's MAVLink CAN
@@ -99,6 +101,7 @@ class GNSSModule(mp_module.MPModule):
         super(GNSSModule, self).__init__(mpstate, "gnss", "GNSS receiver status", public=True)
         self.gnss = {}  # (sysid, id) -> (time received, GNSS message)
         self.detected = {}  # (sysid, id) -> driver name from "GPS n: detected NAME"
+        self.announced = {}  # (sysid, id) -> {field: value} from the drivers' announcements
         self.node_info = {}  # (sysid, node ID) -> NodeInfo
         self.probe = None  # state of a running "gnss probe"
         self.gnss_settings = mp_settings.MPSettings([
@@ -323,10 +326,53 @@ class GNSSModule(mp_module.MPModule):
         elif mtype == 'GNSS':
             self.gnss[(m.get_srcSystem(), m.id)] = (time.time(), m)
         elif mtype == 'STATUSTEXT':
-            # ArduPilot announces the driver it found for each receiver:
-            match = re.match(r'GPS (\d+): detected (.*)', m.text)
-            if match is not None:
-                self.detected[(m.get_srcSystem(), int(match.group(1))-1)] = match.group(2)
+            self.handle_statustext(m)
+
+    # what the GPS drivers announce about a receiver when they detect
+    # and configure it: (pattern, field); the first group is the GPS
+    # number (1-based)
+    announcements = [
+        (re.compile(r'GPS (\d+): u-blox module: (.*)'), 'module'),
+        (re.compile(r'GPS (\d+): u-blox protocol: (.*)'), 'protocol'),
+        (re.compile(r'u-blox (?:\S+ )?(\d+) HW: (\S+) SW: (.*)'), 'version'),
+    ]
+
+    def handle_statustext(self, m):
+        '''remember what ArduPilot announces about each receiver'''
+        sysid = m.get_srcSystem()
+        match = re.match(r'GPS (\d+): detected (.*)', m.text)
+        if match is not None:
+            self.detected[(sysid, int(match.group(1))-1)] = match.group(2)
+            return
+        for (pattern, field) in self.announcements:
+            match = pattern.match(m.text)
+            if match is None:
+                continue
+            fields = self.announced.setdefault((sysid, int(match.group(1))-1), {})
+            if field == 'version':
+                fields['hw'] = match.group(2)
+                fields['sw'] = match.group(3).strip()
+            else:
+                fields[field] = match.group(2).strip()
+            return
+
+    def announced_device(self, sysid, instance):
+        '''return a description of a receiver from its driver's
+        announcements, or None'''
+        fields = None
+        for ((s, i), f) in self.announced.items():
+            if i == instance and (sysid == 0 or s == sysid):
+                fields = f
+        if fields is None:
+            return None
+        parts = []
+        if 'module' in fields:
+            parts.append(fields['module'])
+        if 'sw' in fields:
+            parts.append('SW %s' % fields['sw'])
+        if 'protocol' in fields:
+            parts.append('protocol %s' % fields['protocol'])
+        return ' '.join(parts)
 
     def param(self, name):
         '''return an integer parameter of the primary vehicle, or None'''
@@ -417,7 +463,7 @@ class GNSSModule(mp_module.MPModule):
             for ((s, d), name) in self.detected.items():
                 if d == i and (sysid == 0 or s == sysid):
                     detected = name
-            device = ''
+            device = self.announced_device(sysid, i) or ''
             if gps_type in dronecan_types:
                 node = self.param('GPS%u_CAN_NODEID' % (i+1)) or self.param('GPS%u_CAN_OVRIDE' % (i+1))
                 info = self.node_info.get((sysid, node))
