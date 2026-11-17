@@ -63,6 +63,7 @@ class MapModule(mp_module.MPModule):
         self.trajectory_layers = set()
         self.vehicle_type_override = {}
         self.icon_sources = {}  # icon key -> {source label: time last seen}
+        self.hacc_circles = set()  # keys of the horizontal accuracy circles on the map
         self.map_settings = mp_settings.MPSettings([
             ('showgpspos', int, 1),
             ('showgps2pos', int, 1),
@@ -71,6 +72,7 @@ class MapModule(mp_module.MPModule):
             ('showahrs2pos', int, 0),
             ('showahrs3pos', int, 0),
             ('showsourcelabels', bool, False),
+            ('showhacc', bool, False),
             ('brightness', float, 1),
             ('rallycircle', bool, False),
             ('loitercircle', bool, True),
@@ -1267,8 +1269,44 @@ Usage: map circle <radius> <colour>
             icon[:, :, channel][blue] = (tint[channel] * scale).astype(np.uint8)
         return icon
 
-    def update_vehicle_icon_to_loc(self, name, vehicle, colour, display, latlon, yaw, source):
-        '''update display of a vehicle on the map at latlon
+    # RGB colours for drawing in the colour of the named vehicle icons
+    icon_rgb = {
+        'blue': (0, 0, 255),
+        'green': (0, 255, 0),
+        'red': (255, 0, 0),
+        'purple': (128, 0, 128),
+        'orange': (255, 165, 0),
+    }
+
+    def update_hacc_circle(self, key, h_acc, latlon, colour):
+        '''draw a circle of radius h_acc (m) around vehicle icon key,
+        in the colour of the icon (a colour name or a BGR tint), or
+        remove the circle if h_acc is None or unknown'''
+        circle_key = key + 'HAcc'
+        if (h_acc is None or not self.map_settings.showhacc or
+                math.isnan(h_acc) or math.isinf(h_acc) or h_acc <= 0):
+            if circle_key in self.hacc_circles:
+                self.map.remove_object(circle_key)
+                self.hacc_circles.discard(circle_key)
+            return
+        from MAVProxy.modules.mavproxy_map import mp_slipmap
+        if isinstance(colour, tuple):
+            rgb = tuple(reversed(colour))
+        else:
+            rgb = self.icon_rgb.get(colour, (255, 255, 255))
+        self.map.add_object(mp_slipmap.SlipCircle(
+            circle_key,
+            'HAcc',
+            latlon,
+            h_acc,
+            rgb,
+            self.map_settings.circle_linewidth,
+        ))
+        self.hacc_circles.add(circle_key)
+
+    def update_vehicle_icon_to_loc(self, name, vehicle, colour, display, latlon, yaw, source, h_acc=None):
+        '''update display of a vehicle on the map at latlon, with a
+        circle of radius h_acc (m) around it if showhacc is set
         '''
         key = name + vehicle
 
@@ -1276,6 +1314,7 @@ Usage: map circle <radius> <colour>
         if not display:
             # remove from display if it was being displayed:
             self.remove_vehicle_icon(key)
+            self.update_hacc_circle(key, None, latlon, colour)
             return
 
         # create the icon if we weren't displaying:
@@ -1283,6 +1322,7 @@ Usage: map circle <radius> <colour>
 
         # update placement on map:
         self.map.set_position(key, latlon, rotation=yaw, label=self.icon_label(key, source))
+        self.update_hacc_circle(key, h_acc, latlon, colour)
 
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
@@ -1326,7 +1366,7 @@ Usage: map circle <radius> <colour>
                 if m.id == 1:
                     display = self.map_settings.showgps2pos
                 self.update_vehicle_icon_to_loc(label, vehicle, self.gnss_icon_colour(m.id), display, (lat, lon), heading,
-                                                'GNSS[%u]' % m.id)
+                                                'GNSS[%u]' % m.id, h_acc=m.h_acc)
         elif mtype == "GPS_RAW_INT":
             (lat, lon) = (m.lat*1.0e-7, m.lon*1.0e-7)
             if lat != 0 or lon != 0:
@@ -1334,13 +1374,14 @@ Usage: map circle <radius> <colour>
                     heading = m.cog*0.01
                 else:
                     (_, _, heading) = self.lat_lon_heading[m.get_srcSystem()]
+                # h_acc is in mm, 0 if unknown:
                 self.update_vehicle_icon_to_loc('GPS', vehicle, 'blue', self.map_settings.showgpspos, (lat, lon), heading,
-                                                'GR')
+                                                'GR', h_acc=m.h_acc*0.001)
         elif mtype == "GPS2_RAW":
             (lat, lon) = (m.lat*1.0e-7, m.lon*1.0e-7)
             if lat != 0 or lon != 0:
                 self.update_vehicle_icon_to_loc('GPS2', vehicle, 'green', self.map_settings.showgps2pos, (lat, lon),
-                                                m.cog*0.01, 'G2R')
+                                                m.cog*0.01, 'G2R', h_acc=m.h_acc*0.001)
         elif mtype == 'GLOBAL_POSITION_INT':
             (lat, lon, heading) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01)
             self.lat_lon_heading[m.get_srcSystem()] = (lat, lon, heading)
