@@ -62,6 +62,7 @@ class MapModule(mp_module.MPModule):
         self.unload_check_interval = 0.1 # seconds
         self.trajectory_layers = set()
         self.vehicle_type_override = {}
+        self.icon_sources = {}  # icon key -> {source label: time last seen}
         self.map_settings = mp_settings.MPSettings([
             ('showgpspos', int, 1),
             ('showgps2pos', int, 1),
@@ -69,6 +70,7 @@ class MapModule(mp_module.MPModule):
             ('showahrspos', int, 1),
             ('showahrs2pos', int, 0),
             ('showahrs3pos', int, 0),
+            ('showsourcelabels', bool, False),
             ('brightness', float, 1),
             ('rallycircle', bool, False),
             ('loitercircle', bool, True),
@@ -1203,13 +1205,28 @@ Usage: map circle <radius> <colour>
         self.create_vehicle_icon('VehiclePos2', 'blue', follow=False, vehicle_type='plane')
         self.map.set_position('VehiclePos2', (lat, lon), rotation=heading, label=agl_s, colour=(0, 255, 255))
 
-    def update_vehicle_icon(self, name, vehicle, colour, m, display):
+    def update_vehicle_icon(self, name, vehicle, colour, m, display, source):
         '''update display of a vehicle on the map.  m is expected to store
         location in lat/lng *1e7
         '''
         latlon = (m.lat*1.0e-7, m.lng*1.0e-7)
         yaw = math.degrees(m.yaw)
-        self.update_vehicle_icon_to_loc(name, vehicle, colour, display, latlon, yaw)
+        self.update_vehicle_icon_to_loc(name, vehicle, colour, display, latlon, yaw, source)
+
+    def icon_label(self, key, source, sysid=None):
+        '''return the label for vehicle icon key, which source (a short
+        name for a message) has just moved.  With showsourcelabels the
+        label lists every source which moved the icon in the last 5
+        seconds; sysid is shown when there is more than one vehicle'''
+        now = time.time()
+        sources = self.icon_sources.setdefault(key, {})
+        sources[source] = now
+        parts = []
+        if sysid is not None and len(self.vehicle_type_by_sysid) > 1:
+            parts.append(str(sysid))
+        if self.map_settings.showsourcelabels:
+            parts.extend(sorted(s for (s, t) in sources.items() if now - t < 5))
+        return ' '.join(parts)
 
     # tints (BGR) for the icons of GNSS receivers after the first
     # two, chosen to differ from the colours of the other vehicle icons
@@ -1250,7 +1267,7 @@ Usage: map circle <radius> <colour>
             icon[:, :, channel][blue] = (tint[channel] * scale).astype(np.uint8)
         return icon
 
-    def update_vehicle_icon_to_loc(self, name, vehicle, colour, display, latlon, yaw):
+    def update_vehicle_icon_to_loc(self, name, vehicle, colour, display, latlon, yaw, source):
         '''update display of a vehicle on the map at latlon
         '''
         key = name + vehicle
@@ -1265,7 +1282,7 @@ Usage: map circle <radius> <colour>
         self.create_vehicle_icon(key, colour)
 
         # update placement on map:
-        self.map.set_position(key, latlon, rotation=yaw)
+        self.map.set_position(key, latlon, rotation=yaw, label=self.icon_label(key, source))
 
     def mavlink_packet(self, m):
         '''handle an incoming mavlink packet'''
@@ -1288,11 +1305,11 @@ Usage: map circle <radius> <colour>
         vehicle = 'Vehicle%u' % m.get_srcSystem()
 
         if mtype == "SIMSTATE":
-            self.update_vehicle_icon('Sim', vehicle, 'green', m, self.map_settings.showsimpos)
+            self.update_vehicle_icon('Sim', vehicle, 'green', m, self.map_settings.showsimpos, 'SIM')
         elif mtype == "AHRS2" and self.map_settings.showahrs2pos:
-            self.update_vehicle_icon('AHRS2', vehicle, 'purple', m, self.map_settings.showahrs2pos)
+            self.update_vehicle_icon('AHRS2', vehicle, 'purple', m, self.map_settings.showahrs2pos, 'AHRS2')
         elif mtype == "AHRS3" and self.map_settings.showahrs3pos:
-            self.update_vehicle_icon('AHRS3', vehicle, 'orange', m, self.map_settings.showahrs3pos)
+            self.update_vehicle_icon('AHRS3', vehicle, 'orange', m, self.map_settings.showahrs3pos, 'AHRS3')
         elif mtype == "GNSS":
             (lat, lon) = (m.lat*1.0e-7, m.lon*1.0e-7)
             if lat != 0 or lon != 0:
@@ -1308,7 +1325,8 @@ Usage: map circle <radius> <colour>
                 display = self.map_settings.showgpspos
                 if m.id == 1:
                     display = self.map_settings.showgps2pos
-                self.update_vehicle_icon_to_loc(label, vehicle, self.gnss_icon_colour(m.id), display, (lat, lon), heading)
+                self.update_vehicle_icon_to_loc(label, vehicle, self.gnss_icon_colour(m.id), display, (lat, lon), heading,
+                                                'GNSS[%u]' % m.id)
         elif mtype == "GPS_RAW_INT":
             (lat, lon) = (m.lat*1.0e-7, m.lon*1.0e-7)
             if lat != 0 or lon != 0:
@@ -1316,11 +1334,13 @@ Usage: map circle <radius> <colour>
                     heading = m.cog*0.01
                 else:
                     (_, _, heading) = self.lat_lon_heading[m.get_srcSystem()]
-                self.update_vehicle_icon_to_loc('GPS', vehicle, 'blue', self.map_settings.showgpspos, (lat, lon), heading)
+                self.update_vehicle_icon_to_loc('GPS', vehicle, 'blue', self.map_settings.showgpspos, (lat, lon), heading,
+                                                'GR')
         elif mtype == "GPS2_RAW":
             (lat, lon) = (m.lat*1.0e-7, m.lon*1.0e-7)
             if lat != 0 or lon != 0:
-                self.update_vehicle_icon_to_loc('GPS2', vehicle, 'green', self.map_settings.showgps2pos, (lat, lon), m.cog*0.01)  # noqa:E501
+                self.update_vehicle_icon_to_loc('GPS2', vehicle, 'green', self.map_settings.showgps2pos, (lat, lon),
+                                                m.cog*0.01, 'G2R')
         elif mtype == 'GLOBAL_POSITION_INT':
             (lat, lon, heading) = (m.lat*1.0e-7, m.lon*1.0e-7, m.hdg*0.01)
             self.lat_lon_heading[m.get_srcSystem()] = (lat, lon, heading)
@@ -1328,10 +1348,7 @@ Usage: map circle <radius> <colour>
                 if abs(lat) > 1.0e-3 or abs(lon) > 1.0e-3:
                     self.have_global_position = True
                     self.create_vehicle_icon('Pos' + vehicle, 'red', follow=True)
-                    if len(self.vehicle_type_by_sysid) > 1:
-                        label = str(sysid)
-                    else:
-                        label = None
+                    label = self.icon_label('Pos' + vehicle, 'GPI', sysid=sysid)
                     self.map.set_position('Pos' + vehicle, (lat, lon), rotation=heading, label=label, colour=(255, 255, 255))
                     self.map.set_follow_object('Pos' + vehicle, self.message_is_from_primary_vehicle(m))
             else:
@@ -1343,10 +1360,7 @@ Usage: map circle <radius> <colour>
                 cog = m.heading * 2
                 self.have_global_position = True
                 self.create_vehicle_icon('Pos' + vehicle, 'red', follow=True)
-                if len(self.vehicle_type_by_sysid) > 1:
-                    label = str(sysid)
-                else:
-                    label = None
+                label = self.icon_label('Pos' + vehicle, 'HL2', sysid=sysid)
                 self.map.set_position('Pos' + vehicle, (lat, lon), rotation=cog, label=label, colour=(255, 255, 255))
                 self.map.set_follow_object('Pos' + vehicle, self.message_is_from_primary_vehicle(m))
 
