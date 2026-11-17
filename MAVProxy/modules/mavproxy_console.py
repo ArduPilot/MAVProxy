@@ -71,9 +71,6 @@ class ConsoleModule(mp_module.MPModule):
         mpstate.console.set_status('ARM', 'ARM', fg='grey', row=0)
         mpstate.console.set_status('GPS', 'GPS: --', fg='red', row=0)
         mpstate.console.set_status('GPS2', '', fg='red', row=0)
-        mpstate.console.set_status('GPS3', '', fg='red', row=0)
-        mpstate.console.set_status('GPS4', '', fg='red', row=0)
-        mpstate.console.set_status('GPS5', '', fg='red', row=0)
         mpstate.console.set_status('Vcc', 'Vcc: --', fg='red', row=0)
         mpstate.console.set_status('Radio', 'Radio: --', row=0)
         mpstate.console.set_status('INS', 'INS', fg='grey', row=0)
@@ -115,6 +112,7 @@ class ConsoleModule(mp_module.MPModule):
         self.last_param_sysid_timestamp = None
         self.flight_information = {}
         self.gnss = {}
+        self.gnss_fields = set()
 
         # create the main menu
         if mp_util.has_wxpython:
@@ -465,6 +463,25 @@ class ConsoleModule(mp_module.MPModule):
             self.console.set_status(field, '%s OK%s (%s)%s' % (prefix, fix_type, nsats, gnss_heading_status), fg=green)
         else:
             self.console.set_status(field, '%s %u (%s)' % (prefix, fix_type, nsats), fg='red')
+
+    # console row for the GNSS receivers after the first two, which
+    # have their own row so that any number of them fit; the first two
+    # are on row 0, as for GPS_RAW_INT and GPS2_RAW
+    gnss_row = 5
+
+    def gnss_field(self, gnss_id):
+        '''return the console status field for GNSS receiver gnss_id.
+        Fields for receivers after the first two are created on the GNSS
+        row, along with any missing lower-numbered fields so the
+        receivers stay in order'''
+        if gnss_id == 0:
+            return 'GPS'
+        for i in range(2, gnss_id+1):
+            field = 'GPS%u' % (i+1)
+            if field not in self.gnss_fields:
+                self.console.set_status(field, '', fg='red', row=self.gnss_row)
+                self.gnss_fields.add(field)
+        return 'GPS%u' % (gnss_id+1)
 
     def gnss_recently_seen(self, sysid):
         '''return True if GNSS messages are being received from sysid'''
@@ -895,9 +912,7 @@ class ConsoleModule(mp_module.MPModule):
             self.gnss[sysid] = ConsoleModule.GNSS(sysid)
         self.gnss[sysid].last_seen = time.time()
 
-        field = "GPS"
-        if msg.id > 0:
-            field += str(msg.id+1)
+        field = self.gnss_field(msg.id)
 
         gnss_heading_status = ''
         if msg.yaw < 36000:
