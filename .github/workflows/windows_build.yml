@@ -26,7 +26,7 @@ jobs:
           python3 -m pip install -U wheel setuptools pip
           python3 -m pip install -U pywin32 lxml pymavlink numpy matplotlib pyserial opencv-python PyYAML Pygame Pillow wxpython prompt-toolkit scipy av
           python3 -m pip install -U openai pyaudio
-          python3 -m pip install -U pyinstaller==6.7.0 packaging 
+          python3 -m pip install -U pyinstaller==6.22.3 packaging
       - name: Download Inno Setup installer
         run: curl -L -o installer.exe https://github.com/jrsoftware/issrc/releases/download/is-6_7_1/innosetup-6.7.1.exe
       - name: Install Inno Setup
@@ -41,6 +41,8 @@ jobs:
           copy ..\\windows\\mavproxy.spec
           pyinstaller --clean mavproxy.spec
           del mavproxy.spec
+      - name: Check bundled MAVExplorer MagFit dependencies
+        run: python3 windows/check_mavexplorer_bundle.py MAVProxy/dist/MAVExplorer/MAVExplorer.exe
       - name: Download parameters
         run: |          
           mkdir Parameters
