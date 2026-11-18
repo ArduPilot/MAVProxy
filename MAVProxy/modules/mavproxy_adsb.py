@@ -40,6 +40,8 @@ obc_height = {
     104 : 200
 }
 
+MAX_TRACKED_VEHICLES = 4096
+
 def get_threat_radius(emitter_type, squawk):
 
     if emitter_type == 255:
@@ -214,25 +216,22 @@ class ADSBModule(mp_module.MPModule):
         return alt2 - alt1
 
     def check_threat_timeout(self):
-        '''check and handle threat time out'''
-        for id in self.threat_vehicles.keys():
-            if self.threat_vehicles[id].update_time == 0:
-                self.threat_vehicles[id].update_time = self.get_time()
-            dt = self.get_time() - self.threat_vehicles[id].update_time
-            if dt > self.ADSB_settings.timeout:
-                # if the threat has timed out...
-                del self.threat_vehicles[id]  # remove the threat from the dict
-                for mp in self.module_matching('map*'):
-                    # remove the threat from the map
-                    mp.map.remove_object(id)
-                    mp.map.remove_object(id+":circle")
-                # we've modified the dict we're iterating over, so
-                # we'll get any more timed-out threats next time we're
-                # called:
-                return
+         '''check and handle threat time out'''
+         expired = []
+         for id, vehicle in self.threat_vehicles.items():
+              if vehicle.update_time == 0:
+                   vehicle.update_time = self.get_time()
+dt = self.get_time() - vehicle.update_time
+if dt > self.ADSB_settings.timeout:
+     expired.append(id)
+             for id in expired:
+                              del self.threat_vehicles[id]
+            for mp in self.module_matching('map*'):
+                                 mp.map.remove_object(id)
+                 mp.map.remove_object(id+":circle")
 
-    def add_vehicle(self, state):
-        '''handle an incoming vehicle packet'''
+def add_vehicle(self, state):
+            '''handle an incoming vehicle packet'''
         id = 'ADSB-' + str(state['ICAO_address'])
         lat = state['lat']
         lon = state['lon']
@@ -253,6 +252,8 @@ class ADSBModule(mp_module.MPModule):
         squawk = state['squawk']
 
         if id not in self.threat_vehicles.keys():  # check to see if the vehicle is in the dict
+            if len(self.threat_vehicles) >= MAX_TRACKED_VEHICLES:
+                return
             #print("NEW: ", state)
             # if not then add it
             self.threat_vehicles[id] = ADSBVehicle(id=id, state=state)
