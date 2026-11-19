@@ -16,11 +16,11 @@
 #   limitations under the License.
 
 import socket
-import httplib
-import StringIO
+import http.client as httplib
+import io
 
 class SSDPResponse(object):
-    class _FakeSocket(StringIO.StringIO):
+    class _FakeSocket(io.BytesIO):
         def makefile(self, *args, **kw):
             return self
     def __init__(self, response):
