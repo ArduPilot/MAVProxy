@@ -12,7 +12,7 @@ import sys
 import time
 import math
 import cv2
-import sc_config
+from . import sc_config
 
 class SmartCameraWebCam:
 
