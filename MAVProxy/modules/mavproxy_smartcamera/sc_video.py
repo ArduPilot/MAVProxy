@@ -14,7 +14,7 @@ import time
 import math
 from MAVProxy.modules.lib import multiproc
 import cv2
-import sc_config
+from . import sc_config
 
 class SmartCameraVideo:
 
