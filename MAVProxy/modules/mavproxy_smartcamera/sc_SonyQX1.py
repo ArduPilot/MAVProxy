@@ -25,17 +25,22 @@
 #****************************************************************************
 
 # System Header files and Module Headers
-import os, sys, time, math, cv2, struct, fcntl
+import os, sys, time, math, cv2, struct
+try:
+        import fcntl
+except ImportError:
+        # fcntl is Unix-only; without it camera discovery via ioctl is unavailable
+        fcntl = None
 from datetime import datetime
 
 # Module Dependent Headers
-import requests, json, socket, StringIO
+import requests, json, socket, io
 import xml.etree.ElementTree as ET
 import urllib
-from sc_ExifWriter import ExifWriter
+from .sc_ExifWriter import ExifWriter
 
 # Own Headers
-import ssdp
+from . import ssdp
 
 #****************************************************************************
 # Constants
@@ -443,7 +448,7 @@ class SmartCamera_SonyQX():
         print("Fetching DMS from %s" % sDMS_URL)
         xmlReq = requests.request('GET', sDMS_URL)
 
-        xmlTree = ET.ElementTree(file=StringIO.StringIO(xmlReq.content))
+        xmlTree = ET.ElementTree(file=io.BytesIO(xmlReq.content))
         for xmlElem in xmlTree.iter():
             if xmlElem.tag == '{urn:schemas-sony-com:av}X_ScalarWebAPI_ActionList_URL':
                 print("Found camera at %s" % xmlElem.text)
