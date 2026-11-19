@@ -9,7 +9,7 @@ other classes or files wishing to use this class should add
 """
 
 from os.path import expanduser
-import ConfigParser
+import configparser
 
 class SmartCameraConfig(object):
 
@@ -21,7 +21,7 @@ class SmartCameraConfig(object):
         print("config file: %s" % self.config_file)
 
         # create the global parser object
-        self.parser = ConfigParser.SafeConfigParser()
+        self.parser = configparser.ConfigParser()
 
         # read the config file into memory
         self.read()
@@ -37,7 +37,7 @@ class SmartCameraConfig(object):
     # save - saves the config to disk
     def save(self):
         try:
-            with open(self.config_file, 'wb') as configfile:
+            with open(self.config_file, 'w') as configfile:
                 self.parser.write(configfile)
         except IOError as e:
             print('Error {0} writing config file: {1}: '.format(e.errno, e.strerror))
@@ -53,7 +53,7 @@ class SmartCameraConfig(object):
     def get_boolean(self, section, option, default):
         try:
             return self.parser.getboolean(section, option)
-        except ConfigParser.Error:
+        except configparser.Error:
             return default
 
     # set_boolean - sets the boolean to the specified section/option
@@ -66,7 +66,7 @@ class SmartCameraConfig(object):
     def get_integer(self, section, option, default):
         try:
             return self.parser.getint(section, option)
-        except ConfigParser.Error:
+        except configparser.Error:
             return default
 
     # set_integer - sets the integer to the specified section/option
@@ -79,7 +79,7 @@ class SmartCameraConfig(object):
     def get_float(self, section, option, default):
         try:
             return self.parser.getfloat(section, option)
-        except ConfigParser.Error:
+        except configparser.Error:
             return default
 
     # set_float - sets the float to the specified section/option
@@ -92,7 +92,7 @@ class SmartCameraConfig(object):
     def get_string(self, section, option, default):
         try:
             return self.parser.get(section, option)
-        except ConfigParser.Error:
+        except configparser.Error:
             return default
 
     # set_string - sets the string to the specified section/option
