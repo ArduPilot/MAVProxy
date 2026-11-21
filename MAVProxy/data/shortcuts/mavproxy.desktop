@@ -6,4 +6,5 @@ Exec=bash -c 'cd ~/MAVProxy_data ;mavproxy.py --console --map'
 Name=MAVProxy
 Icon=mavproxy
 Comment=MAVProxy GCS
+StartupWMClass=mavproxy.py
 

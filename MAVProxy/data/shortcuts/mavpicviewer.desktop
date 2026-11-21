@@ -6,4 +6,4 @@ Exec=bash -c 'export PATH="$PATH:~/.local/bin"; mavpicviewer.py %F'
 Name=MAVPicViewer
 Icon=mavpicviewer
 Comment=Picture Review Tool
-
+StartupWMClass=mavpicviewer.py
