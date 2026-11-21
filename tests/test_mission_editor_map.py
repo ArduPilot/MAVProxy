@@ -33,6 +33,7 @@ def backend():
     editor.gui_event_queue = queue.Queue()
     editor.gui_event_queue_lock = threading.Lock()
     master = mock.Mock()
+    master.messages = {}
     wp = SimpleNamespace(wploader=mission(3), loading_waypoints=False,
                          cmd_wp=mock.Mock(), wp_ftp_download=mock.Mock())
     modules = {'wp': wp, 'misseditor': SimpleNamespace(me_main=editor)}
