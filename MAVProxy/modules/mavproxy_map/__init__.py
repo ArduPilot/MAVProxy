@@ -598,6 +598,9 @@ Usage: map circle <radius> <colour>
         '''draws circles in the PolyFence layer with colour colour'''
         for circle in circles:
             if circle.command == MAV_CMD_NAV_FENCE_HOME_CIRCLE_INCLUSION:
+                if not self.home_pos:
+                    # drawn when HOME_POSITION arrives and the fence is redisplayed
+                    continue
                 (lat, lng) = self.home_pos
             else:
                 lat = circle.x
