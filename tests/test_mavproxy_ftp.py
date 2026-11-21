@@ -91,7 +91,7 @@ class FakeMPState:
         self.console = FakeConsole()
         self._master = FakeMaster()
 
-    def master(self):
+    def master(self, target_sysid=-1):
         return self._master
 
 
