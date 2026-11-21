@@ -103,6 +103,7 @@ class MapModule(mp_module.MPModule):
             mpstate.map_functions = {'draw_lines' : self.draw_lines}
 
         self.map.add_callback(functools.partial(self.map_callback))
+        self.load_received_home_position()
         self.add_command(cmdname, self.cmd_map, "map control", ['icon',
                                                                 'set (MAPSETTING)',
                                                                 'vehicletype',
@@ -598,6 +599,9 @@ Usage: map circle <radius> <colour>
         '''draws circles in the PolyFence layer with colour colour'''
         for circle in circles:
             if circle.command == MAV_CMD_NAV_FENCE_HOME_CIRCLE_INCLUSION:
+                if not self.home_pos:
+                    # drawn when HOME_POSITION arrives and the fence is redisplayed
+                    continue
                 (lat, lng) = self.home_pos
             else:
                 lat = circle.x
@@ -1289,16 +1293,7 @@ Usage: map circle <radius> <colour>
                 self.map.set_follow_object('Pos' + vehicle, self.message_is_from_primary_vehicle(m))
 
         elif mtype == 'HOME_POSITION':
-            self.home_pos = (m.latitude*1.0e-7, m.longitude*1.0e-7)
-            icon = self.map.icon('home.png')
-            self.map.add_object(mp_slipmap.SlipIcon(
-                'HOME_POSITION',
-                self.home_pos,
-                icon,
-                layer=3,
-                rotation=0,
-                follow=False,
-            ))
+            self.handle_home_position(m)
 
         elif mtype == "NAV_CONTROLLER_OUTPUT":
             tlayer = 'Trajectory%u' % m.get_srcSystem()
@@ -1367,6 +1362,30 @@ Usage: map circle <radius> <colour>
 
             # this may have affected the landing lines from the rally points:
             self.rally_change_time = time.time()
+
+    def handle_home_position(self, m):
+        '''record home from a HOME_POSITION and draw its icon'''
+        from MAVProxy.modules.mavproxy_map import mp_slipmap
+        self.home_pos = (m.latitude*1.0e-7, m.longitude*1.0e-7)
+        icon = self.map.icon('home.png')
+        self.map.add_object(mp_slipmap.SlipIcon(
+            'HOME_POSITION',
+            self.home_pos,
+            icon,
+            layer=3,
+            rotation=0,
+            follow=False,
+        ))
+
+    def load_received_home_position(self):
+        '''use a HOME_POSITION received before the map was loaded; it
+        is not sent again unless home changes or something asks for it'''
+        master = self.master
+        if master is None:
+            return
+        home = master.messages.get('HOME_POSITION')
+        if home is not None:
+            self.handle_home_position(home)
 
     def check_redisplay_fencepoints(self):
         # if the fence has changed, redisplay
