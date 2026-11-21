@@ -6,6 +6,8 @@ AP_FLAKE8_CLEAN
 '''
 
 import math
+import random
+import time
 
 from pymavlink import mavutil
 
@@ -34,6 +36,16 @@ class CmdlongModule(mp_module.MPModule):
         self.add_command('engine', self.cmd_engine, "engine")
         self.add_command('pause', self.cmd_pause, "pause AUTO/GUIDED modes")
         self.add_command('resume', self.cmd_resume, "resume AUTO/GUIDED modes")
+
+        self.last_command_retry_ms = 0
+        # start from a random id so that ids sent before a restart are
+        # unlikely to be re-used while the vehicle may remember them
+        self.command_opaque_id_seq = random.randint(1, 0xFFFFFFFF)
+        self.command_queue = {}  # PendingCommand by command_opaque_id
+        # a command is only retried if its target system has sent a
+        # COMMAND_ACK with a non-zero command_opaque_id, i.e. it
+        # recognises a retry as a repeat rather than running it again:
+        self.command_retry_permitted_sysids = set()
 
     def cmd_long_commands(self):
         atts = dir(mavutil.mavlink)
@@ -359,7 +371,7 @@ class CmdlongModule(mp_module.MPModule):
 
     def cmd_pause(self, args):
         '''pause AUTO/GUIDED modes'''
-        self.master.mav.command_long_send(
+        c = mavutil.mavlink.MAVLink_command_long_message(
             self.settings.target_system,  # target_system
             self.settings.target_component,  # target_component
             mavutil.mavlink.MAV_CMD_DO_PAUSE_CONTINUE,  # command
@@ -371,10 +383,11 @@ class CmdlongModule(mp_module.MPModule):
             0,  # param5
             0,  # param6
             0)  # param7
+        self.run_COMMAND_INT_OR_LONG(c, retries=2)
 
     def cmd_resume(self, args):
         '''resume AUTO/GUIDED modes'''
-        self.master.mav.command_long_send(
+        c = mavutil.mavlink.MAVLink_command_long_message(
             self.settings.target_system,  # target_system
             self.settings.target_component,  # target_component
             mavutil.mavlink.MAV_CMD_DO_PAUSE_CONTINUE,  # command
@@ -386,6 +399,7 @@ class CmdlongModule(mp_module.MPModule):
             0,  # param5
             0,  # param6
             0)  # param7
+        self.run_COMMAND_INT_OR_LONG(c, retries=2)
 
     def cmd_long(self, args):
         '''execute supplied command long'''
@@ -488,6 +502,98 @@ class CmdlongModule(mp_module.MPModule):
                                          x,
                                          y,
                                          z)
+
+    class PendingCommand():
+        def __init__(self, command, retries=None, retry_interval=5):
+            self.command = command
+            self.retries = retries
+            self.send_count = 0
+            self.last_send_time = 0
+            self.retry_interval = retry_interval
+
+        def timeout_expired(self):
+            now = time.time()
+            return now - self.last_send_time > self.retry_interval
+
+        def send(self, mav):
+            mav.send(self.command)
+            self.send_count += 1
+            self.last_send_time = time.time()
+
+        def retries_exhausted(self):
+            if self.retries is None:
+                return True
+            return self.send_count > self.retries
+
+    def run_COMMAND_INT_OR_LONG(self, command, retries=None):
+        '''fills command.command_opaque_id in, sends it to
+        self.master.mav, adds it to the pending command list'''
+        if 'command_opaque_id' not in command.fieldnames:
+            # this pymavlink cannot send the field, so the command can
+            # be neither matched to its ACK nor safely retried
+            self.master.mav.send(command)
+            return
+        # a pending retry of an earlier instance of this command
+        # (e.g. resume when the operator now pauses) must not be sent
+        # after this one:
+        for opaque_id, pending_command in list(self.command_queue.items()):
+            if (pending_command.command.command == command.command and
+                    pending_command.command.target_system == command.target_system and
+                    pending_command.command.target_component == command.target_component):
+                del self.command_queue[opaque_id]
+        command.command_opaque_id = self.command_opaque_id_seq
+        self.command_opaque_id_seq = (self.command_opaque_id_seq + 1) & 0xFFFFFFFF
+        if self.command_opaque_id_seq == 0:
+            self.command_opaque_id_seq = 1
+        p = CmdlongModule.PendingCommand(command, retries)
+        self.command_queue[command.command_opaque_id] = p
+        p.send(self.master.mav)
+
+    def handle_COMMAND_ACK(self, m):
+        '''remove an acked command from the pending list'''
+        command_opaque_id = getattr(m, 'command_opaque_id', 0)
+        if command_opaque_id == 0:
+            # not supplied
+            return
+        self.command_retry_permitted_sysids.add(m.get_srcSystem())
+
+        pending_command = self.command_queue.get(command_opaque_id)
+        if pending_command is None:
+            return
+        if pending_command.command.command != m.command:
+            return
+        if pending_command.command.target_system not in (0, m.get_srcSystem()):
+            return
+
+        if m.result == mavutil.mavlink.MAV_RESULT_IN_PROGRESS:
+            return
+        del self.command_queue[command_opaque_id]
+
+    def retry_commands(self):
+        for opaque_id, pending_command in list(self.command_queue.items()):
+            if not pending_command.timeout_expired():
+                continue
+            target_system = pending_command.command.target_system
+            if (pending_command.retries_exhausted() or
+                    target_system not in self.command_retry_permitted_sysids):
+                del self.command_queue[opaque_id]
+                continue
+            pending_command.send(self.master.mav)
+
+    def idle_task(self):
+        if self.master is None:
+            return
+        now = time.time()
+        if now - self.last_command_retry_ms > 1:
+            self.retry_commands()
+            self.last_command_retry_ms = now
+
+    def mavlink_packet(self, m):
+        '''handle an incoming mavlink packet'''
+        mtype = m.get_type()
+
+        if mtype in ["COMMAND_ACK"]:
+            return self.handle_COMMAND_ACK(m)
 
 
 def init(mpstate):
