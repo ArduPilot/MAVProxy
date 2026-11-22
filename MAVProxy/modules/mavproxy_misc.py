@@ -137,12 +137,21 @@ class MiscModule(mp_module.MPModule):
         temp = ground_temp + 273.15
         return 153.8462 * temp * (1.0 - math.exp(0.190259 * math.log(scaling)))
 
+    def ground_temperature(self):
+        '''the ground temperature in degrees C the user gave the autopilot,
+        or 21.  BARO_GND_TEMP was GND_TEMP before, and 0 in either means the
+        autopilot measures it itself'''
+        for name in ['BARO_GND_TEMP', 'GND_TEMP']:
+            temp = self.get_mav_param(name, None)
+            if temp is not None:
+                return temp if temp != 0 else 21
+        return 21
+
     def qnh_estimate(self):
         '''estimate QNH pressure from GPS altitude and scaled pressure'''
         alt_gps = self.master.field('GPS_RAW_INT', 'alt', 0) * 0.001
         pressure2 = self.master.field('SCALED_PRESSURE', 'press_abs', 0)
-        ground_temp = self.get_mav_param('GND_TEMP', 21)
-        temp = ground_temp + 273.15
+        temp = self.ground_temperature() + 273.15
         pressure1 = pressure2 / math.exp(math.log(1.0 - (alt_gps / (153.8462 * temp))) / 0.190259)
         return pressure1
 
@@ -151,7 +160,7 @@ class MiscModule(mp_module.MPModule):
         print("Altitude:  %.1f" % self.status.altitude)
         qnh_pressure = self.get_mav_param('AFS_QNH_PRESSURE', None)
         if qnh_pressure is not None and qnh_pressure > 0:
-            ground_temp = self.get_mav_param('GND_TEMP', 21)
+            ground_temp = self.ground_temperature()
             pressure = self.master.field('SCALED_PRESSURE', 'press_abs', 0)
             qnh_alt = self.altitude_difference(qnh_pressure, pressure, ground_temp)
             print("QNH Alt: %u meters %u feet for QNH pressure %.1f" % (qnh_alt, qnh_alt*3.2808, qnh_pressure))
@@ -162,21 +171,27 @@ class MiscModule(mp_module.MPModule):
         print(run_command(args, shell=False, timeout=3))
 
     def cmd_up(self, args):
-        '''adjust TRIM_PITCH_CD up by 5 degrees'''
+        '''adjust the pitch trim up by 5 degrees'''
         if len(args) == 0:
             adjust = 5.0
         else:
             adjust = float(args[0])
-        old_trim = self.get_mav_param('TRIM_PITCH_CD', None)
-        if old_trim is None:
+        # Plane 4.5 replaced TRIM_PITCH_CD with PTCH_TRIM_DEG
+        for (name, scale) in [('PTCH_TRIM_DEG', 1), ('TRIM_PITCH_CD', 100)]:
+            old_trim = self.get_mav_param(name, None)
+            if old_trim is not None:
+                break
+        else:
             print("Existing trim value unknown!")
             return
-        new_trim = int(old_trim + (adjust*100))
-        if math.fabs(new_trim - old_trim) > 1000:
-            print("Adjustment by %d too large (from %d to %d)" % (adjust*100, old_trim, new_trim))
+        new_trim = old_trim + adjust * scale
+        if scale != 1:
+            new_trim = int(new_trim)
+        if math.fabs(new_trim - old_trim) > 10 * scale:
+            print("Adjustment by %g too large (from %g to %g)" % (adjust * scale, old_trim, new_trim))
             return
-        print("Adjusting TRIM_PITCH_CD from %d to %d" % (old_trim, new_trim))
-        self.param_set('TRIM_PITCH_CD', new_trim)
+        print("Adjusting %s from %g to %g" % (name, old_trim, new_trim))
+        self.param_set(name, new_trim)
 
     def cmd_reboot(self, args):
         '''reboot autopilot'''

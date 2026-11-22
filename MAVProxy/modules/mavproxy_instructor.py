@@ -29,6 +29,15 @@ class InstructorModule(mp_module.MPModule):
         '''unload module'''
         print('unloading') # self.mpstate.horizonIndicator.close()
 
+    def disable_gnss(self, disable):
+        '''turn the simulated GNSS off or back on; SITL replaced
+        SIM_GPS_DISABLE with SIM_GPS1_ENABLE after 4.6.  Until the parameters
+        are known, assume the new name'''
+        if self.get_mav_param('SIM_GPS1_ENABLE') is None and self.get_mav_param('SIM_GPS_DISABLE') is not None:
+            self.param_set('SIM_GPS_DISABLE', int(disable))
+        else:
+            self.param_set('SIM_GPS1_ENABLE', 0 if disable else 1)
+
     def mavlink_packet(self, msg):
         """handle an incoming mavlink packet"""
         if not isinstance(self.instructor, mp_instructor.InstructorUI):
@@ -55,8 +64,7 @@ class InstructorModule(mp_module.MPModule):
         if self.instructor.pipe_to_gui.poll():
             obj = self.instructor.pipe_to_gui.recv()
             if obj[0] == "dis_gnss":
-                # print(str(obj[1]))
-                self.param_set('SIM_GPS_DISABLE', int(obj[1]))
+                self.disable_gnss(obj[1])
 
             elif obj[0] == "setmode":
                 self.master.set_mode("RTL")
