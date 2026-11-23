@@ -16,6 +16,11 @@ from MAVProxy.modules.lib import mp_module
 from MAVProxy.modules.lib import param_help
 from MAVProxy.modules.lib import param_ftp
 
+# The packed parameter header has a 16-bit count. Each entry is at most
+# 2 header + 16 name + 4 value + 4 default + 3 padding bytes, so even
+# 65535 entries fit within 2 MiB.
+PARAM_FTP_MAX_SIZE = 2 * 1024 * 1024
+
 if mp_util.has_wxpython:
     from MAVProxy.modules.lib.mp_menu import MPMenuItem
     from MAVProxy.modules.lib.mp_menu import MPMenuSubMenu
@@ -340,6 +345,7 @@ class ParamState:
             callback=lambda fh: self.ftp_callback(fh, callback),
             callback_progress=self.ftp_callback_progress,
             target_system=self.sysid[0], target_component=self.sysid[1],
+            max_size=PARAM_FTP_MAX_SIZE,
         )
 
     def log_params(self, params):

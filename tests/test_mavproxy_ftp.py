@@ -10,6 +10,9 @@ import types
 import unittest
 from unittest import mock
 
+from pymavlink import mavparm
+from MAVProxy.modules.lib import mp_util
+
 
 # Some developer environments have a released MAVProxy imported by a pytest
 # plugin before collection begins.  Load the worktree file explicitly so the
@@ -20,6 +23,15 @@ FTP_SPEC = importlib.util.spec_from_file_location(
     'mavproxy_ftp_under_test', FTP_MODULE_PATH)
 mavproxy_ftp = importlib.util.module_from_spec(FTP_SPEC)
 FTP_SPEC.loader.exec_module(mavproxy_ftp)
+
+# MAVProxy assumes wx is present on Windows, although these offline tests do
+# not use the optional GUI.
+PARAM_MODULE_PATH = FTP_MODULE_PATH.with_name('mavproxy_param.py')
+PARAM_SPEC = importlib.util.spec_from_file_location(
+    'mavproxy_param_under_test', PARAM_MODULE_PATH)
+mavproxy_param = importlib.util.module_from_spec(PARAM_SPEC)
+with mock.patch.object(mp_util, 'has_wxpython', False):
+    PARAM_SPEC.loader.exec_module(mavproxy_param)
 
 
 class FakeMAV:
@@ -137,6 +149,70 @@ class TestConcurrentFTP(unittest.TestCase):
         self.mpstate = FakeMPState()
         self.ftp = mavproxy_ftp.FTPModule(self.mpstate)
         self.ftp.next_session = 0
+
+    def param_state(self):
+        self.mpstate.module = self.mpstate.public_modules.get
+        self.mpstate.logqueue = None
+        return mavproxy_param.ParamState(
+            mavparm.MAVParmDict(), None, None, None, self.mpstate, (1, 1))
+
+    def test_param_ftp_rejects_large_offset_before_allocating_gaps(self):
+        completed = []
+        params = self.param_state()
+        params.ftp_start(callback=completed.append)
+        worker = next(iter(self.ftp.workers.values()))
+        self.assertEqual(worker.max_download_size, mavproxy_param.PARAM_FTP_MAX_SIZE)
+        self.assertTrue(params.ftp_started)
+        self.ftp.mavlink_packet(reply(worker.session, mavproxy_ftp.OP_OpenFileRO,
+                                     payload=struct.pack('<I', 1)))
+        buffer = worker.fh
+
+        class RejectGaps(list):
+            def append(self, gap):
+                raise AssertionError('oversized reply allocated a gap')
+
+        worker.read_gaps = RejectGaps()
+        self.ftp.mavlink_packet(reply(worker.session, mavproxy_ftp.OP_BurstReadFile,
+                                     offset=20_000_000, payload=b'x'))
+        self.assertEqual(buffer.getbuffer().nbytes, 0)
+        self.assertEqual(completed, [None])
+        self.assertTrue(params.ftp_failed)
+        self.assertFalse(params.ftp_started)
+        self.assertFalse(self.ftp.workers)
+
+    def test_param_ftp_rejects_large_advertised_size(self):
+        completed = []
+        params = self.param_state()
+        params.ftp_start(callback=completed.append)
+        worker = next(iter(self.ftp.workers.values()))
+        self.assertTrue(params.ftp_started)
+        with mock.patch.object(mavproxy_ftp, 'SIO') as buffer:
+            self.ftp.mavlink_packet(reply(
+                worker.session, mavproxy_ftp.OP_OpenFileRO,
+                payload=struct.pack('<I', mavproxy_param.PARAM_FTP_MAX_SIZE + 1)))
+            buffer.assert_not_called()
+        self.assertEqual(completed, [None])
+        self.assertTrue(params.ftp_failed)
+        self.assertFalse(params.ftp_started)
+        self.assertFalse(self.ftp.workers)
+
+    def test_param_ftp_accepts_packed_parameters(self):
+        completed = []
+        params = self.param_state()
+        params.ftp_start(callback=completed.append)
+        worker = next(iter(self.ftp.workers.values()))
+        packed = (struct.pack('<HHHBB', 0x671c, 1, 1, 4, 0x30) +
+                  b'TEST' + struct.pack('<f', 1.5))
+        self.ftp.mavlink_packet(reply(worker.session, mavproxy_ftp.OP_OpenFileRO,
+                                     payload=struct.pack('<I', len(packed))))
+        worker.op_start -= 1  # Windows may measure this offline transfer as 0 seconds.
+        self.ftp.mavlink_packet(reply(worker.session, mavproxy_ftp.OP_BurstReadFile,
+                                     payload=packed, burst_complete=1))
+        self.assertEqual(params.mav_param['TEST'], 1.5)
+        self.assertEqual(params.default_params['TEST'], 1.5)
+        self.assertEqual(completed, [params.mav_param])
+        self.assertFalse(params.ftp_failed)
+        self.assertFalse(self.ftp.workers)
 
     def test_bad_filenames_do_not_exhaust_session_slots(self):
         completed = []
