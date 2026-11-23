@@ -1,9 +1,11 @@
 import importlib.util
 import contextlib
+import errno
 import io
 from pathlib import Path
 import struct
 import socket
+import sys
 import tempfile
 import time
 import types
@@ -20,6 +22,13 @@ FTP_SPEC = importlib.util.spec_from_file_location(
     'mavproxy_ftp_under_test', FTP_MODULE_PATH)
 mavproxy_ftp = importlib.util.module_from_spec(FTP_SPEC)
 FTP_SPEC.loader.exec_module(mavproxy_ftp)
+
+MOUNT_PATH = (Path(__file__).resolve().parents[1] /
+              'MAVProxy/modules/lib/ftp_mount.py')
+MOUNT_SPEC = importlib.util.spec_from_file_location(
+    'ftp_mount_under_test', MOUNT_PATH)
+ftp_mount = importlib.util.module_from_spec(MOUNT_SPEC)
+MOUNT_SPEC.loader.exec_module(ftp_mount)
 
 
 class FakeMAV:
@@ -920,6 +929,285 @@ class TestConcurrentFTP(unittest.TestCase):
             0, mavproxy_ftp.OP_ReadFile, payload=b'a' * 100,
             offset=0, seq=5))
         self.assertIn(0, self.ftp.workers)
+
+
+class TestFTPCallbacks(unittest.TestCase):
+    '''callback variants used by "ftp mount"'''
+
+    def setUp(self):
+        self.mpstate = FakeMPState()
+        self.ftp = mavproxy_ftp.FTPModule(self.mpstate)
+        self.ftp.next_session = 0
+
+    def test_parse_list_entry(self):
+        parse = mavproxy_ftp.parse_list_entry
+        self.assertEqual(parse('Dsub', False), ('sub', True, None, None))
+        self.assertEqual(parse('Dsub\t0\t99', True), ('sub', True, None, 99))
+        self.assertEqual(parse('Dsub', True), ('sub', True, None, None))
+        self.assertEqual(parse('Fa\tb\t12', False), ('a\tb', False, 12, None))
+        self.assertEqual(parse('Fa\t12\t99', True), ('a', False, 12, 99))
+        self.assertIsNone(parse('Fbad', False))
+        self.assertIsNone(parse('Fa\tnotanumber', False))
+        self.assertIsNone(parse('S', False))
+
+    def test_list_callback_collects_entries_silently(self):
+        results = []
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            self.ftp.cmd_list(['/APM'], callback=lambda e, err: results.append((e, err)))
+            self.ftp.mavlink_packet(reply(
+                0, mavproxy_ftp.OP_ListDirectoryWithTime,
+                payload=b'D.\x00D..\x00DLOGS\t0\t5\x00Fa.txt\t3\t7\x00'))
+            self.ftp.mavlink_packet(reply(
+                0, mavproxy_ftp.OP_ListDirectoryWithTime,
+                opcode=mavproxy_ftp.OP_Nack,
+                payload=bytes([mavproxy_ftp.ERR_EndOfFile]), seq=2))
+        self.assertEqual(output.getvalue(), '')
+        self.assertEqual(results, [([('LOGS', True, None, 5),
+                                     ('a.txt', False, 3, 7)], 0)])
+        self.assertEqual(self.ftp.workers, {})
+
+    def test_list_callback_entries_reset_on_time_fallback(self):
+        results = []
+        self.ftp.cmd_list(['/'], callback=lambda e, err: results.append((e, err)))
+        self.ftp.mavlink_packet(reply(
+            0, mavproxy_ftp.OP_ListDirectoryWithTime,
+            opcode=mavproxy_ftp.OP_Nack,
+            payload=bytes([mavproxy_ftp.ERR_UnknownCommand])))
+        self.ftp.mavlink_packet(reply(
+            0, mavproxy_ftp.OP_ListDirectory, payload=b'Fx\t1\x00', seq=2))
+        self.ftp.mavlink_packet(reply(
+            0, mavproxy_ftp.OP_ListDirectory, opcode=mavproxy_ftp.OP_Nack,
+            payload=bytes([mavproxy_ftp.ERR_EndOfFile]), seq=3))
+        self.assertEqual(results, [([('x', False, 1, None)], 0)])
+
+    def test_list_callback_reports_errno(self):
+        results = []
+        self.ftp.cmd_list(['/missing'], callback=lambda e, err: results.append((e, err)))
+        self.ftp.mavlink_packet(reply(
+            0, mavproxy_ftp.OP_ListDirectoryWithTime,
+            opcode=mavproxy_ftp.OP_Nack,
+            payload=bytes([mavproxy_ftp.ERR_FailErrno, errno.ENOENT])))
+        self.assertEqual(results, [(None, errno.ENOENT)])
+        self.assertEqual(self.ftp.workers, {})
+
+    def test_simple_op_callbacks(self):
+        results = []
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            self.ftp.cmd_rm(['/a'], callback=results.append)
+            self.ftp.cmd_mkdir(['/d'], callback=results.append)
+            self.ftp.cmd_rename(['/b', '/c'], callback=results.append)
+            self.ftp.cmd_rmdir(['/e'], callback=results.append)
+            self.ftp.mavlink_packet(reply(0, mavproxy_ftp.OP_RemoveFile))
+            self.ftp.mavlink_packet(reply(
+                1, mavproxy_ftp.OP_CreateDirectory, opcode=mavproxy_ftp.OP_Nack,
+                payload=bytes([mavproxy_ftp.ERR_FileExists])))
+            self.ftp.mavlink_packet(reply(
+                2, mavproxy_ftp.OP_Rename, opcode=mavproxy_ftp.OP_Nack,
+                payload=bytes([mavproxy_ftp.ERR_Fail])))
+        self.assertEqual(results, [0, errno.EEXIST, errno.EIO])
+        self.assertEqual(output.getvalue(), '')
+        # still waiting for the rmdir reply: a cancel must report failure
+        self.ftp.cmd_cancel()
+        self.assertEqual(results, [0, errno.EEXIST, errno.EIO, errno.EIO])
+
+    def test_bad_name_still_calls_back(self):
+        results = []
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.ftp.cmd_rename(['/a', 'x' * 300], callback=results.append)
+            self.ftp.cmd_list(['\u00e9'], callback=lambda e, err: results.append(err))
+        self.assertEqual(results, [errno.EIO, errno.EIO])
+        self.assertEqual(self.ftp.workers, {})
+
+    def test_vehicle_errno_translated_for_this_host(self):
+        vehicle_errno = mavproxy_ftp.vehicle_errno
+        self.assertEqual(vehicle_errno(2), errno.ENOENT)
+        # newlib, as on ArduPilot boards
+        self.assertEqual(vehicle_errno(90), errno.ENOTEMPTY)
+        self.assertEqual(vehicle_errno(91), errno.ENAMETOOLONG)
+        # Linux, as in SITL
+        self.assertEqual(vehicle_errno(39), errno.ENOTEMPTY)
+        self.assertEqual(vehicle_errno(200), errno.EIO)
+        results = []
+        self.ftp.cmd_rmdir(['/d'], callback=results.append)
+        self.ftp.mavlink_packet(reply(
+            0, mavproxy_ftp.OP_RemoveDirectory, opcode=mavproxy_ftp.OP_Nack,
+            payload=bytes([mavproxy_ftp.ERR_FailErrno, 90])))
+        self.assertEqual(results, [errno.ENOTEMPTY])
+
+    def test_cancel_tells_queued_callbacks_of_failure(self):
+        self.ftp.ftp_settings.max_sessions = 1
+        self.ftp.cmd_get(['/busy'], callback=lambda fh: None)
+        results = []
+
+        def broken(error):
+            raise RuntimeError('callback failed')
+
+        self.ftp.cmd_list(['/'], callback=lambda e, err: results.append(('list', e, err)))
+        self.ftp.cmd_rm(['/a'], callback=broken)
+        self.ftp.cmd_rm(['/b'], callback=lambda err: results.append(('rm', err)))
+        self.ftp.cmd_get(['/c'], callback=lambda fh: results.append(('get', fh)))
+        self.assertEqual(len(self.ftp.pending), 4)
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            self.ftp.cmd_cancel()
+        self.assertEqual(results, [('list', None, errno.EIO), ('rm', errno.EIO),
+                                   ('get', None)])
+        self.assertIn('callback failed', output.getvalue())
+        self.assertEqual(self.ftp.pending, [])
+        self.assertEqual(self.ftp.workers, {})
+
+    def test_cancel_owned_operations(self):
+        self.ftp.ftp_settings.max_sessions = 1
+        mine, other = object(), object()
+        results = []
+        self.ftp.cmd_get(['/busy'], callback=lambda fh: results.append(('busy', fh)),
+                         owner=mine)
+        self.ftp.cmd_rm(['/a'], callback=lambda err: results.append(('rm', err)),
+                        owner=mine)
+        self.ftp.cmd_put(['-', '/b'], fh=io.BytesIO(b'x'),
+                         callback=lambda n: results.append(('put', n)), owner=other)
+        self.ftp.cmd_list(['/'], callback=lambda e, err: results.append(('list', err)))
+        self.assertEqual(len(self.ftp.workers), 1)
+        self.assertEqual(len(self.ftp.pending), 3)
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.ftp.cancel_owned(lambda owner: owner is mine)
+        self.assertEqual(results, [('rm', errno.EIO), ('busy', None)])
+        # the others go on, the next taking the freed session
+        self.assertEqual([op['owner'] for op in self.ftp.pending], [None])
+        self.assertEqual([w.owner for w in self.ftp.workers.values()], [other])
+
+    def test_console_commands_refused_while_mounted(self):
+        self.ftp.mount = mock.Mock()
+        self.ftp.mount.checking = False
+        self.ftp.mount.description.return_value = '/ on /mnt'
+        for command in (['list'], ['get', '/a'], ['put', 'x', 'y'], ['rm', '/a'],
+                        ['rmdir', '/d'], ['rename', '/a', '/b'], ['mkdir', '/d'],
+                        ['crc', '/a'], ['crccmp', 'x'], ['crclocal', 'x'],
+                        ['cancel']):
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                self.ftp.cmd_ftp(command)
+            self.assertEqual(output.getvalue().strip(),
+                             'ftp mount in operation; command not available',
+                             command)
+        self.assertEqual(self.ftp.workers, {})
+        self.assertEqual(self.ftp.pending, [])
+        self.assertEqual(self.mpstate._master.mav.sent, [])
+
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            self.ftp.cmd_ftp(['status'])
+            self.ftp.cmd_ftp(['set', 'debug', '0'])
+            self.ftp.cmd_ftp(['umount'])
+        self.assertIn('FTP mount: / on /mnt', output.getvalue())
+        self.assertNotIn('not available', output.getvalue())
+        self.assertIsNone(self.ftp.mount)
+
+
+class TestFTPMountCommand(unittest.TestCase):
+    '''"ftp mount" lists REMOTEDIR on the vehicle before mounting'''
+
+    def setUp(self):
+        self.mpstate = FakeMPState()
+        self.ftp = mavproxy_ftp.FTPModule(self.mpstate)
+        self.ftp.next_session = 0
+        self.check_local = mock.Mock()
+        self.start = mock.Mock()
+        import MAVProxy.modules.lib
+        # cmd_mount imports ftp_mount itself; hand it the worktree copy
+        for patcher in (
+                mock.patch.dict(sys.modules, {
+                    'MAVProxy.modules.lib.ftp_mount': ftp_mount}),
+                mock.patch.object(MAVProxy.modules.lib, 'ftp_mount',
+                                  ftp_mount, create=True),
+                mock.patch.object(ftp_mount.FTPMount, 'check_local',
+                                  self.check_local),
+                mock.patch.object(ftp_mount.FTPMount, 'start', self.start)):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def run_command(self, args):
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            self.ftp.cmd_ftp(args)
+        return output.getvalue()
+
+    def list_reply(self, opcode=mavproxy_ftp.OP_Ack, payload=b'Fa\t1\x00',
+                   seq=1):
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            self.ftp.mavlink_packet(reply(
+                0, mavproxy_ftp.OP_ListDirectoryWithTime, opcode=opcode,
+                payload=payload, seq=seq))
+        return output.getvalue()
+
+    def end_of_list(self):
+        return self.list_reply(opcode=mavproxy_ftp.OP_Nack,
+                               payload=bytes([mavproxy_ftp.ERR_EndOfFile]),
+                               seq=2)
+
+    def test_mounts_after_remote_directory_listed(self):
+        output = self.run_command(['mount', '/mnt/veh', 'APM/'])
+        self.assertEqual(output.strip(), 'FTP: checking /APM')
+        self.check_local.assert_called_once_with()
+        self.assertEqual(len(self.mpstate._master.mav.sent), 1)
+        self.assertEqual(request_opcode(self.mpstate._master.mav.sent[0]),
+                         mavproxy_ftp.OP_ListDirectoryWithTime)
+        self.assertIn(b'/APM', self.mpstate._master.mav.sent[0])
+        self.start.assert_not_called()
+
+        # pending: console commands refused, a second mount rejected
+        self.assertIn('not available', self.run_command(['list']))
+        self.assertIn('already mounted', self.run_command(['mount', '/x']))
+        self.assertIn('checking remote directory', self.run_command(['status']))
+
+        self.list_reply()
+        output = self.end_of_list()
+        self.start.assert_called_once_with()
+        self.assertFalse(self.ftp.mount.checking)
+        self.assertEqual(output.strip(),
+                         'FTP: mounted /APM on /mnt/veh (vehicle 1:1)')
+
+    def test_missing_remote_directory_not_mounted(self):
+        self.run_command(['mount', '/mnt/veh', '/nope'])
+        output = self.list_reply(
+            opcode=mavproxy_ftp.OP_Nack,
+            payload=bytes([mavproxy_ftp.ERR_FileNotFound]))
+        self.assertEqual(output.strip(),
+                         'ftp mount: /nope: No such file or directory')
+        self.assertIsNone(self.ftp.mount)
+        self.start.assert_not_called()
+        self.assertNotIn('not available', self.run_command(['list', '/']))
+
+    def test_umount_while_checking(self):
+        self.run_command(['mount', '/mnt/veh'])
+        self.assertEqual(self.run_command(['umount']).strip(),
+                         'FTP: mount of /mnt/veh abandoned')
+        self.assertIsNone(self.ftp.mount)
+        self.list_reply()
+        self.end_of_list()
+        self.start.assert_not_called()
+        self.assertIsNone(self.ftp.mount)
+
+    def test_local_problem_reported_before_asking_vehicle(self):
+        self.check_local.side_effect = ImportError('no mfusepy')
+        self.assertEqual(self.run_command(['mount', '/mnt/veh']).strip(),
+                         'ftp mount requires mfusepy: pip install mfusepy')
+        self.check_local.side_effect = ValueError('/mnt/veh is not empty')
+        self.assertEqual(self.run_command(['mount', '/mnt/veh']).strip(),
+                         'ftp mount: /mnt/veh is not empty')
+        self.assertIsNone(self.ftp.mount)
+        self.assertEqual(self.mpstate._master.mav.sent, [])
+
+    def test_start_failure_after_check(self):
+        self.start.side_effect = ValueError('mount failed: boom')
+        self.run_command(['mount', '/mnt/veh'])
+        self.list_reply()
+        self.assertEqual(self.end_of_list().strip(),
+                         'ftp mount: mount failed: boom')
+        self.assertIsNone(self.ftp.mount)
 
 
 if __name__ == '__main__':

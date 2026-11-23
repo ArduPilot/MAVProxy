@@ -143,11 +143,14 @@ on how to use MAVProxy.''',
         'map3d': map3d_requirements,
         # restserver module
         'server': ['flask'],
+        # "ftp mount", mounting the vehicle filesystem with FUSE
+        'ftpmount': ['mfusepy'],
         'recommended': ['flask', 'PyYAML', 'lxml', 'wxpython',
                         'pymonocypher', 'openai', 'paho-mqtt',
                         'piexif', 'pynmea2', 'Pygame', 'Pillow',
                         # PyAV: raw thermal viewing and video telemetry
-                        'av']
+                        'av',
+                        'mfusepy']
       },
       scripts=['MAVProxy/mavproxy.py',
                'MAVProxy/tools/mavflightview.py',
