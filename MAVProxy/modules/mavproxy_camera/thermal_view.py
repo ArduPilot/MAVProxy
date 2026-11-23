@@ -6,7 +6,7 @@ import time
 
 import cv2
 import numpy as np
-from MAVProxy.modules.lib.mp_image import MPImage
+from MAVProxy.modules.lib.mp_image import MPImage, MPImageOSD_Text
 from MAVProxy.modules.lib.mp_menu import MPMenuItem, MPMenuSubMenu
 from MAVProxy.modules.lib import camera_projection
 from MAVProxy.modules.mavproxy_camera.thermal_stream import ThermalReader, projection_pose
@@ -91,10 +91,33 @@ class ThermalView:
         (directory / (stem + '.json')).write_text(json.dumps(metadata, indent=2) + '\n')
         print('Raw thermal frame saved: %s' % (directory / stem))
 
+    def _count(self, x, y):
+        pixels, m = self.shown
+        sx, sy = (639-x, 511-y) if m['rotation_deg'] == 180 else (x, y)
+        return int(pixels[sy, sx])
+
+    def _temperature_conversion(self):
+        m = self.shown[1]
+        if m.get('temperature_scale_k') is not None:
+            return m['temperature_scale_k'], m['temperature_offset_k']
+        information = getattr(self.camera, 'information', None)
+        model = getattr(information, 'model_name', '')
+        if not isinstance(model, str):
+            model = bytes(model).decode('utf-8', errors='replace')
+        # ZT30 uses the MT11 Kelvin*64 conversion by operator assumption.
+        # Keep the source metadata unchanged when saving native frames.
+        if model.rstrip('\x00') == 'ZT30' and m.get('temperature_calibration') == 'unverified_sensor_counts':
+            return 1.0 / 64, 0
+        return None
+
     def _temperature(self, x, y):
         pixels, m = self.shown
         sx, sy = (639-x, 511-y) if m['rotation_deg'] == 180 else (x, y)
-        return int(pixels[sy, sx])*m['temperature_scale_k'] + m['temperature_offset_k'] - 273.15
+        conversion = self._temperature_conversion()
+        if conversion is None:
+            return None
+        scale, offset = conversion
+        return int(pixels[sy, sx])*scale + offset - 273.15
 
     def _update_readout(self):
         if self.shown is None:
@@ -107,15 +130,31 @@ class ThermalView:
         if title != self.last_title:
             self.image.set_title(title)
             self.last_title = title
-        text = 'Min: %.2f C    Max: %.2f C\n' % (m['minimum_c'], m['maximum_c'])
+        conversion = self._temperature_conversion()
+        counts_only = conversion is None
+        if counts_only:
+            pixels = self.shown[0]
+            text = 'Min: %u counts    Max: %u counts\nTemperature conversion unverified\n' % (int(pixels.min()), int(pixels.max()))
+        else:
+            scale, offset = conversion
+            pixels = self.shown[0]
+            text = 'Min: %.2f C    Max: %.2f C\n' % (
+                int(pixels.min())*scale + offset - 273.15,
+                int(pixels.max())*scale + offset - 273.15)
         if self.cursor is None:
-            text += 'Hover over the image for pixel temperature'
+            text += 'Hover over the image for pixel ' + ('sensor counts' if counts_only else 'temperature')
         else:
             x, y = self.cursor
-            text += 'Pixel (%u, %u): %.2f C' % (x, y, self._temperature(x, y))
-        if text != self.last_readout:
-            self.image.set_status_text(text)
-            self.last_readout = text
+            if counts_only:
+                text += 'Pixel (%u, %u): %u counts' % (x, y, self._count(x, y))
+            else:
+                text += 'Pixel (%u, %u): %.2f C' % (x, y, self._temperature(x, y))
+        colour = (0, 0, 255) if self.palette == 'Greyscale' else None
+        readout = text, colour
+        if readout != self.last_readout:
+            self.image.add_OSD(MPImageOSD_Text('thermal-readout', text, colour=colour))
+            self.last_readout = readout
+            self.last_key = None  # redraw the OSD when hovering over a paused frame
 
     def _pixel(self, x, y):
         if self.shown is None:
@@ -160,9 +199,11 @@ class ThermalView:
                     if palette in self.PALETTES:
                         self.palette = palette
             elif getattr(event, 'ClassName', '') == 'wxMouseEvent':
-                temperature = self._pixel(event.x, event.y)
+                # MPImage maps X/Y through zoom and pan; lowercase x/y still
+                # contain the original window coordinates copied from wx.
+                temperature = self._pixel(event.X, event.Y)
                 if getattr(event, 'leftIsDown', False):
-                    self._project(event.x, event.y, temperature)
+                    self._project(event.X, event.Y, temperature)
         with self.lock:
             latest, error = self.latest, self.error
         if error:
@@ -176,7 +217,7 @@ class ThermalView:
         if key == self.last_key:
             self._update_readout()
             return
-        self.last_key, self.shown = key, latest
+        self.shown = latest
         lo, hi = int(pixels.min()), int(pixels.max())
         display = ((pixels.astype(np.float32)-lo)*(255.0/max(1, hi-lo))).astype(np.uint8)
         colormap = self.PALETTES[self.palette]
@@ -184,5 +225,6 @@ class ThermalView:
                    else cv2.applyColorMap(display, colormap))
         if m['rotation_deg'] == 180:
             display = display[::-1, ::-1].copy()
-        self.image.set_image(display, bgr=True)
         self._update_readout()
+        self.image.set_image(display, bgr=True)
+        self.last_key = key

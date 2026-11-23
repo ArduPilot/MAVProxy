@@ -435,7 +435,7 @@ class MissionFlight(object):
         own is flown where the aircraft is, and one with no altitude at the
         one it has'''
         (command, lat, lon, amsl, params) = item
-        if lat == 0 and lon == 0:
+        if not has_position(item):
             point = self.position
         else:
             point = self.local(lat, lon)
@@ -995,6 +995,11 @@ class MissionFlight(object):
                 return self.fly_rtl(index)
             if command in WAYPOINT_COMMANDS or command in LOITER_COMMANDS:
                 location = self.location(self.items[index])
+            elif not has_position(self.items[index]):
+                # one this cannot fly, with nowhere of its own to go: drawn
+                # as the straight leg from the waypoint before to the next
+                index = self.next_nav_index(index, take=True, passed=passed)
+                continue
             else:
                 return None
             self.set_next_wp(location)
@@ -1251,6 +1256,14 @@ def is_navigation_command(command):
             command in LATE_NAV_COMMANDS)
 
 
+def has_position(item):
+    '''whether a mission item has a location of its own, rather than x/y
+    being empty or used for something else'''
+    (command, lat, lon, amsl, params) = item
+    return (not (lat == 0 and lon == 0) and
+            mp_util.mission_cmd_has_location(command))
+
+
 def positionless_amsl(alt, frame, home_amsl):
     '''the AMSL altitude an item with no position of its own is flown at,
     or None for the altitude the aircraft is at.  Location::sanitize() puts
@@ -1348,7 +1361,7 @@ def least_flight_time(home, items, params, start=None):
         (command, item_lat, item_lon, amsl, item_params) = walk.items[index]
         if command == mavlink.MAV_CMD_NAV_LOITER_TIME:
             seconds += max(item_params[0] or 0.0, 0.0)
-        if not (item_lat == 0 and item_lon == 0):
+        if has_position(walk.items[index]):
             seconds += mp_util.gps_distance(lat, lon, item_lat, item_lon) / speed
             (lat, lon) = (item_lat, item_lon)
         if command in (mavlink.MAV_CMD_NAV_LAND, mavlink.MAV_CMD_NAV_VTOL_LAND,
@@ -1401,9 +1414,10 @@ def mission_track(home, items, params, heading=None, start=None, rally=None,
     times it is flown, and one repeated for ever ends the flight the second
     time it is reached.  A mission which runs out is complete, and the
     aircraft returns to launch.  A navigation command this does not know how to fly
-    -- NAV_DELAY, CONTINUE_AND_CHANGE_ALT and the like -- ends the attempt,
-    as does an item the aircraft never finishes, and a flight longer than
-    MAX_FLIGHT_TIME
+    -- NAV_DELAY, NAV_SCRIPT_TIME and the like -- is passed straight over
+    where it has no location, so the leg runs from the waypoint before it to
+    the next.  One with a location ends the attempt, as does an item the
+    aircraft never finishes, and a flight longer than MAX_FLIGHT_TIME
     '''
     if home is None or (home[0] == 0 and home[1] == 0) or home[2] is None:
         return None

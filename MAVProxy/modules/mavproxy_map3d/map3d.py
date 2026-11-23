@@ -31,6 +31,12 @@ MissionItem = collections.namedtuple(
 # item which circles
 MISSION_STYLES = ('flown', 'geometry', 'plain')
 
+# seconds of vehicle trail drawn by default, 0 for all of it
+TRAIL_LENGTH = 240.0
+
+# full ribbon wingspan in metres
+RIBBON_WIDTH = 3.0
+
 # how big a mission item's label is drawn, in points on the screen, and the
 # sizes worth asking for: too small to read through to filling the view
 MISSION_LABEL_SIZE = 14
@@ -177,6 +183,14 @@ class Map3D:
 
     def set_fpv_fov(self, fov):
         self._put(('fpvfov', float(fov)))
+
+    def set_trail_length(self, seconds):
+        '''seconds of vehicle trail to draw, 0 for all of it'''
+        self._put(('trail_length', float(seconds)))
+
+    def set_trail_ribbon(self, enable, width=RIBBON_WIDTH):
+        '''draw the trail as an attitude ribbon, width metres across'''
+        self._put(('trail_ribbon', bool(enable), float(width)))
 
     def set_render_settings(self, brightness, shading, wireframe):
         self._put(('render_settings', float(brightness), bool(shading),

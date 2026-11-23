@@ -14,9 +14,11 @@ import re
 from math import cos, sin, tan, atan2, sqrt, radians, degrees, pi, log, fmod
 
 # MAVLink commands newer than some pymavlink releases know about -- 2.4.49
-# has neither -- so they are named here rather than looked up in the dialect
+# has neither of the first two, and DO_RETURN_PATH_START arrived in 2.4.43
+# -- so they are named here rather than looked up in the dialect
 MAV_CMD_DO_ORBIT = 34
 MAV_CMD_NAV_ARC_WAYPOINT = 36
+MAV_CMD_DO_RETURN_PATH_START = 188
 
 # Some platforms (CYGWIN and others) many not have the wx library
 # use imp to see if wx is on the path
@@ -205,6 +207,7 @@ TAKEOFF_COMMANDS = (22, 84)      # NAV_TAKEOFF, NAV_VTOL_TAKEOFF
 MISSION_LABEL_SUFFIXES = {
     22: "TOff",                       # NAV_TAKEOFF
     189: "DLS",                       # DO_LAND_START
+    MAV_CMD_DO_RETURN_PATH_START: "DRPS",
     82: "SW",                         # NAV_SPLINE_WAYPOINT
     MAV_CMD_NAV_ARC_WAYPOINT: "AW",
     17: "LU",                         # NAV_LOITER_UNLIM
@@ -223,6 +226,17 @@ def mission_item_label(seq, command):
     if suffix is None:
         return str(seq)
     return "%s(%s)" % (seq, suffix)
+
+
+def mission_cmd_has_location(command):
+    """whether a MAV_CMD's x/y are a latitude/longitude, from hasLocation in
+    the XML. Others, such as NAV_SCRIPT_TIME, use them for other values"""
+    from pymavlink import mavutil
+    cmd_enum = mavutil.mavlink.enums['MAV_CMD'].get(command)
+    if cmd_enum is None:
+        return False
+    # older pymavlink does not have the attribute
+    return getattr(cmd_enum, 'has_location', True)
 
 
 # vehicles which hold position at a loiter point rather than flying a circle

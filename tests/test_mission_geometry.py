@@ -579,6 +579,16 @@ class TestLogMissionItems(object):
         out = self.module().mission_items_from_cmds({1: takeoff})
         assert out == []
 
+    def test_an_item_whose_xy_are_not_a_position_is_left_out(self):
+        from pymavlink import mavutil
+        home = (HERE[0], HERE[1], 584.0, 0,
+                mavutil.mavlink.MAV_CMD_NAV_WAYPOINT, 0, (0, 0, 0, 0))
+        # NAV_SCRIPT_TIME carries script arguments in x/y
+        script = (13.0, 17.0, 0.0, 0, mavutil.mavlink.MAV_CMD_NAV_SCRIPT_TIME,
+                  1, (72, 0, 300, 1))
+        out = self.module().mission_items_from_cmds({0: home, 1: script})
+        assert [i[5] for i in out] == [0]
+
     def test_a_mission_uploaded_before_home_was_known(self):
         from pymavlink import mavutil
         # the autopilot keeps its own home in item 0, so a mission uploaded
@@ -759,6 +769,20 @@ class TestLiveMissionTurns(object):
         assert items[1].circle_turns == 3
         # circling until its time is up is not a number of turns
         assert items[2].circle_turns is None
+
+    def test_an_item_whose_xy_are_not_a_position_is_not_drawn(self):
+        from pymavlink import mavutil
+        m = mavutil.mavlink
+        at = [mp_util.gps_newpos(HERE[0], HERE[1], 90, 400 * i)
+              for i in range(2)]
+        # the sohw mission: NAV_SCRIPT_TIME carries script arguments in x/y
+        items = live_mission_items([
+            waypoint(0, m.MAV_CMD_NAV_WAYPOINT, at[0][0], at[0][1], 100.0),
+            waypoint(1, m.MAV_CMD_NAV_SCRIPT_TIME, 13.0, 17.0, 0.0, frame=0,
+                     params=(72, 0, 300, 1)),
+            waypoint(2, m.MAV_CMD_NAV_WAYPOINT, at[1][0], at[1][1], 100.0),
+        ])
+        assert [i.seq for i in items] == [0, 2]
 
 
 class TestLiveMissionAltitudes(object):

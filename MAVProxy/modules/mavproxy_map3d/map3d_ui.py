@@ -17,11 +17,15 @@ from MAVProxy.modules.mavproxy_map3d.terrain import (
     TerrainManager, R, TILE_DOWNLOAD_THREADS, wrap_longitude)
 from MAVProxy.modules.mavproxy_map3d.elements import ElementManager
 from MAVProxy.modules.mavproxy_map3d.map3d import (
-    MISSION_LABEL_SIZE, MISSION_STYLES)
+    MISSION_LABEL_SIZE, MISSION_STYLES, TRAIL_LENGTH, RIBBON_WIDTH)
 
 import vtk
 
 KML_REFRESH_DELAY = 0.5
+# while the camera moves, terrain results get this many seconds of each timer
+# tick, until this long after the last wheel event
+INTERACTION_BUDGET = 0.008
+INTERACTION_HOLD = 0.3
 
 
 class RenderSettingsDialog(wx.Dialog):
@@ -89,6 +93,8 @@ class Map3DFrame(wx.Frame):
         self.terrain = None
         self.elements = None
         self.tc = None
+        self.wheel_steps = 0.0
+        self.last_wheel_time = 0.0
         self.mt = None
         self.follow = bool(state.follow)
         self.last_vehicle = None
@@ -106,6 +112,9 @@ class Map3DFrame(wx.Frame):
         self.mission_labelled = False
         self.mission_label_size = MISSION_LABEL_SIZE
         self.mission_style = MISSION_STYLES[0]
+        self.trail_length = TRAIL_LENGTH
+        self.trail_ribbon = False
+        self.ribbon_width = RIBBON_WIDTH
         self.terrain_brightness = min(
             2.0, max(0.25, float(state.terrain_brightness)))
         self.terrain_shading = bool(state.terrain_shading)
@@ -114,6 +123,9 @@ class Map3DFrame(wx.Frame):
 
         self.widget = wxVTKRenderWindowInteractor(self, -1)
         self.widget.Enable(1)
+        # replaces the stock handler, bound earlier, which zooms a full step
+        # per event whatever its size
+        self.widget.Bind(wx.EVT_MOUSEWHEEL, self.on_mouse_wheel)
         self.ren = vtk.vtkRenderer()
         self.ren.SetBackground(0.45, 0.62, 0.85)
         self.widget.GetRenderWindow().AddRenderer(self.ren)
@@ -170,6 +182,43 @@ class Map3DFrame(wx.Frame):
         self.Bind(wx.EVT_TIMER, self.on_timer, self.timer)
         self.timer.Start(100)
         self.Bind(wx.EVT_CLOSE, self.on_close)
+        # frame-wide so zoom works without the mouse giving the canvas focus
+        self.Bind(wx.EVT_CHAR_HOOK, self.on_char_hook)
+
+    def on_char_hook(self, event):
+        key = event.GetKeyCode()
+        if (self.tc is None or event.AltDown() or
+                isinstance(self.FindFocus(), wx.TextEntry)):
+            event.Skip()
+            return
+        # key down codes are unshifted, so '+' arrives as '=' on many layouts
+        if key in (ord('+'), ord('='), wx.WXK_ADD, wx.WXK_NUMPAD_ADD):
+            self.style.zoom_step(True)
+        elif key in (ord('-'), ord('_'), wx.WXK_SUBTRACT,
+                     wx.WXK_NUMPAD_SUBTRACT):
+            self.style.zoom_step(False)
+        else:
+            event.Skip()
+
+    def on_mouse_wheel(self, event):
+        # a trackpad sends a stream of small wheel events where a mouse sends
+        # one per notch, so zoom by the amount scrolled. Horizontal swipes
+        # and zero deltas are ignored rather than read as zoom out
+        rotation = event.GetWheelRotation()
+        if (self.tc is None or rotation == 0 or
+                event.GetWheelAxis() != wx.MOUSE_WHEEL_VERTICAL):
+            return
+        # events already queued are summed into one zoom and one render, so
+        # a burst does not back up behind a terrain update and render each
+        if self.wheel_steps == 0.0:
+            wx.CallAfter(self.apply_wheel_zoom)
+        self.wheel_steps += rotation / float(event.GetWheelDelta())
+
+    def apply_wheel_zoom(self):
+        steps, self.wheel_steps = self.wheel_steps, 0.0
+        self.last_wheel_time = time.monotonic()
+        if steps:
+            self.style.zoom_step(steps > 0, abs(steps))
 
     # ----------------------------------------------------------------- scene
     def init_scene(self, lat0, lon0, amsl_ref):
@@ -187,6 +236,8 @@ class Map3DFrame(wx.Frame):
         self.elements.set_mission_label_size(self.mission_label_size)
         self.elements.set_mission_labels(self.mission_labelled)
         self.elements.set_mission_style(self.mission_style)
+        self.elements.set_trail_length(self.trail_length)
+        self.elements.set_trail_ribbon(self.trail_ribbon, self.ribbon_width)
         if self.vehicle_type is not None:
             self.elements.set_vehicle_type(self.vehicle_type)
         self.elements.set_terrain_height(self.terrain.height_at)
@@ -431,6 +482,19 @@ class Map3DFrame(wx.Frame):
         if kind == 'mission_style':
             self.set_mission_style(msg[1])
             return
+        if kind == 'trail_length':
+            self.trail_length = msg[1]
+            if self.elements is not None:
+                self.elements.set_trail_length(self.trail_length)
+                self.render()
+            return
+        if kind == 'trail_ribbon':
+            self.trail_ribbon, self.ribbon_width = msg[1:]
+            if self.elements is not None:
+                self.elements.set_trail_ribbon(self.trail_ribbon,
+                                              self.ribbon_width)
+                self.render()
+            return
         if kind == 'kml':
             self.kml_features = list(msg[1])
             if self.elements is not None:
@@ -448,7 +512,8 @@ class Map3DFrame(wx.Frame):
         elif kind == 'vehicle':
             (_, lat, lon, amsl, roll, pitch, yaw) = msg
             enu = self.elements.set_vehicle(lat, lon, amsl, roll, pitch, yaw)
-            self.elements.add_trail_point(lat, lon, amsl)
+            self.elements.add_trail_point(lat, lon, amsl,
+                                          attitude=(roll, pitch, yaw))
             self.last_vehicle = (lat, lon, amsl)
             self.last_vehicle_pose = (lat, lon, amsl, roll, pitch, yaw)
             if self.fpv_enabled:
@@ -486,7 +551,13 @@ class Map3DFrame(wx.Frame):
             drained = True
         # drain terrain worker results
         if self.terrain is not None:
-            terrain_changed = self.terrain.process(self.tc)
+            # tile builds held the main thread for ~100ms a tick, and macOS
+            # delivers the scroll saved up meanwhile as one large jump
+            interacting = (
+                time.monotonic() - self.last_wheel_time < INTERACTION_HOLD or
+                self.style.active_button is not None)
+            terrain_changed = self.terrain.process(
+                self.tc, budget=INTERACTION_BUDGET if interacting else None)
             if self.terrain.mesh_revision != self.overlay_mesh_revision:
                 self.overlay_mesh_revision = self.terrain.mesh_revision
                 self.elements.refresh_fence(self.terrain.height_at)

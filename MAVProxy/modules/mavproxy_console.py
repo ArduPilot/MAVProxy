@@ -57,6 +57,7 @@ class ConsoleModule(mp_module.MPModule):
         self.max_link_num = 0
         self.last_sys_status_health = 0
         self.last_sys_status_errors_announce = 0
+        self.last_ekf_status_report = {}  # (sysid, compid) -> time EKF_STATUS_REPORT was last received
         self.user_added = {}
         self.safety_on = False
         self.unload_check_interval = 5 # seconds
@@ -607,16 +608,13 @@ class ConsoleModule(mp_module.MPModule):
     def handle_wind(self, msg):
             self.console.set_status('Wind', 'Wind %u/%s' % (msg.direction, self.speed_string(msg.speed)))
 
-    def handle_ekf_status_report(self, msg):
+    def set_ekf_status(self, msg, fields):
+            '''colour the EKF status from the innovation test ratios in fields'''
             highest = 0.0
-            vars = ['velocity_variance',
-                    'pos_horiz_variance',
-                    'pos_vert_variance',
-                    'compass_variance',
-                    'terrain_alt_variance']
-            for var in vars:
-                v = getattr(msg, var, 0)
-                highest = max(v, highest)
+            for field in fields:
+                v = getattr(msg, field, 0)
+                if not math.isnan(v):
+                    highest = max(v, highest)
             if highest >= 1.0:
                 fg = 'red'
             elif highest >= 0.5:
@@ -624,6 +622,26 @@ class ConsoleModule(mp_module.MPModule):
             else:
                 fg = green
             self.console.set_status('EKF', 'EKF', fg=fg)
+
+    def handle_ekf_status_report(self, msg):
+            self.last_ekf_status_report[(msg.get_srcSystem(), msg.get_srcComponent())] = time.time()
+            self.set_ekf_status(msg, ['velocity_variance',
+                                      'pos_horiz_variance',
+                                      'pos_vert_variance',
+                                      'compass_variance',
+                                      'terrain_alt_variance'])
+
+    def handle_estimator_status(self, msg):
+            # both carry the same ratios; prefer EKF_STATUS_REPORT if
+            # the vehicle sends both
+            last = self.last_ekf_status_report.get((msg.get_srcSystem(), msg.get_srcComponent()), 0)
+            if time.time() - last < 5:
+                return
+            self.set_ekf_status(msg, ['vel_ratio',
+                                      'pos_horiz_ratio',
+                                      'pos_vert_ratio',
+                                      'mag_ratio',
+                                      'hagl_ratio'])
 
     def handle_power_status(self, msg):
             if msg.Vcc >= 4600 and msg.Vcc <= 5300:
@@ -931,6 +949,9 @@ class ConsoleModule(mp_module.MPModule):
 
         elif type == 'EKF_STATUS_REPORT':
             self.handle_ekf_status_report(msg)
+
+        elif type == 'ESTIMATOR_STATUS':
+            self.handle_estimator_status(msg)
 
         elif type == 'POWER_STATUS':
             self.handle_power_status(msg)

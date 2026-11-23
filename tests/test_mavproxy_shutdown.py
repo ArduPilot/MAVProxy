@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""MAVProxy must shut down cleanly on a fatal signal.
+"""SIGTERM shuts down cleanly; terminal interrupts exit immediately.
 
 The end-to-end tests run a real mavproxy.py on a pseudo-terminal, since
 the input loop only blocks on readline when stdin is a tty.  The rest
@@ -94,8 +94,9 @@ class ShutdownTest(unittest.TestCase):
     wchan_path = '/proc/%d/wchan'
 
     def start(self, slow_complete=0, slow_unload=0, stuck_complete=False,
-              no_forwarder=False):
+              no_forwarder=False, custom_terminal=False, background_terminal=False):
         import pty
+        import termios
         tmp = tempfile.TemporaryDirectory(prefix='mavproxy-shutdown-')
         self.addCleanup(tmp.cleanup)
         self.tmp = tmp.name
@@ -116,18 +117,58 @@ class ShutdownTest(unittest.TestCase):
                    STUCK_COMPLETE='1' if stuck_complete else '')
         (self.pty, child) = pty.openpty()
         self.addCleanup(os.close, self.pty)
-        self.process = subprocess.Popen(
-            [sys.executable, os.path.join(REPO, 'MAVProxy', 'mavproxy.py'),
+        self.terminal_attributes = termios.tcgetattr(child)
+        if custom_terminal:
+            self.terminal_attributes[0] ^= termios.IXON
+            self.terminal_attributes[6][termios.VERASE] = b'\x08'
+            termios.tcsetattr(child, termios.TCSANOW, self.terminal_attributes)
+        command = [sys.executable, os.path.join(REPO, 'MAVProxy', 'mavproxy.py'),
              '--master=udpin:127.0.0.1:0',
              '--state-basedir=' + self.tmp,
              '--default-modules=' + MODULES,
-             '--load-module=slowmodule'],
+             '--load-module=slowmodule']
+        if background_terminal:
+            # Keep a session leader alive so the child's background group is
+            # not orphaned. SIGUSR1 moves it behind the terminal's foreground
+            # group and interrupts it while readline owns the tty settings.
+            launcher = os.path.join(self.tmp, 'terminal_launcher.py')
+            with open(launcher, 'w') as f:
+                f.write(textwrap.dedent('''
+                    import fcntl, os, signal, subprocess, sys, termios
+                    fcntl.ioctl(0, termios.TIOCSCTTY, 0)
+                    signal.signal(signal.SIGTTOU, signal.SIG_IGN)
+                    def reset_job_signals():
+                        os.setpgid(0, 0)
+                        signal.signal(signal.SIGTTOU, signal.SIG_DFL)
+                    child = subprocess.Popen(sys.argv[1:], preexec_fn=reset_job_signals)
+                    with open(os.path.join(os.environ['SLOW_MARKERS'], 'child-pid'), 'w') as marker:
+                        marker.write(str(child.pid))
+                    os.tcsetpgrp(0, child.pid)
+                    child.send_signal(signal.SIGCONT)
+                    def interrupt_background(signum, frame):
+                        os.tcsetpgrp(0, os.getpgrp())
+                        child.send_signal(signal.SIGINT)
+                    signal.signal(signal.SIGUSR1, interrupt_background)
+                    sys.exit(child.wait())
+                '''))
+            command = [sys.executable, launcher] + command
+        self.process = subprocess.Popen(
+            command,
             stdin=child, stdout=child, stderr=child,
             cwd=self.tmp, env=env, start_new_session=True)
         os.close(child)
         self.addCleanup(self.kill)
         self.output = b''
         self.wait_for(lambda: b'MAV>' in self.output, 30, 'the prompt')
+        if background_terminal:
+            with open(os.path.join(self.markers, 'child-pid')) as marker:
+                child_pid = int(marker.read())
+            def kill_child():
+                try:
+                    os.kill(child_pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+            self.addCleanup(kill_child)
 
     def kill(self):
         if self.process.poll() is None:
@@ -168,6 +209,19 @@ class ShutdownTest(unittest.TestCase):
         self.assertIn('slowmodule unloaded', output)
         return output
 
+    def assert_immediate_exit(self, sig):
+        import termios
+        self.wait_for(lambda: self.process.poll() is not None, 2,
+                      'MAVProxy to exit immediately')
+        self.read(0.05)
+        output = self.output.decode(errors='replace')
+        self.assertEqual(self.process.returncode, 128 + sig, output)
+        self.assertNotIn('Shutdown in progress', output)
+        self.assertNotIn('slowmodule unloaded', output)
+        self.assertEqual(termios.tcgetattr(self.pty), self.terminal_attributes,
+                         'terminal settings were not restored before exit')
+        return output
+
     def test_sigterm_at_the_prompt(self):
         self.start()
         self.process.send_signal(signal.SIGTERM)
@@ -176,16 +230,25 @@ class ShutdownTest(unittest.TestCase):
     def test_sigquit_at_the_prompt(self):
         self.start()
         self.process.send_signal(signal.SIGQUIT)
-        self.assert_clean_exit()
+        self.assert_immediate_exit(signal.SIGQUIT)
 
     def test_sigint_at_the_prompt(self):
-        # not a fatal signal when interactive, but Ctrl-C should still
-        # unload the modules
         self.start()
         self.process.send_signal(signal.SIGINT)
-        self.assert_clean_exit()
+        self.assert_immediate_exit(signal.SIGINT)
 
-    def test_sigint_reaps_unresponsive_console(self):
+    def test_sigint_restores_custom_terminal_settings(self):
+        self.start(custom_terminal=True)
+        self.process.send_signal(signal.SIGINT)
+        self.assert_immediate_exit(signal.SIGINT)
+
+    @unittest.skipUnless(sys.platform.startswith('linux'), 'needs terminal job control')
+    def test_sigint_restores_background_terminal(self):
+        self.start(background_terminal=True, custom_terminal=True)
+        self.process.send_signal(signal.SIGUSR1)
+        self.assert_immediate_exit(signal.SIGINT)
+
+    def test_sigint_kills_unresponsive_console(self):
         self.start()
         with open(os.path.join(self.tmp, 'stuckconsole.py'), 'w') as f:
             f.write(textwrap.dedent('''
@@ -198,7 +261,8 @@ class ShutdownTest(unittest.TestCase):
                     def child_task(self):
                         signal.signal(signal.SIGINT, signal.SIG_IGN)
                         signal.signal(signal.SIGTERM, signal.SIG_IGN)
-                        open(os.path.join(os.environ['SLOW_MARKERS'], 'console-ready'), 'w').close()
+                        with open(os.path.join(os.environ['SLOW_MARKERS'], 'console-ready'), 'w') as marker:
+                            marker.write(str(os.getpid()))
                         time.sleep(60)
 
                 class ConsoleModule(mp_module.MPModule):
@@ -214,37 +278,40 @@ class ShutdownTest(unittest.TestCase):
             '''))
         os.write(self.pty, b'module load stuckconsole\n')
         self.wait_for(lambda: self.marked('console-ready'), 10, 'console child')
+        with open(os.path.join(self.markers, 'console-ready')) as marker:
+            child_pid = int(marker.read())
+        def kill_child():
+            try:
+                os.kill(child_pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        self.addCleanup(kill_child)
         self.process.send_signal(signal.SIGINT)
-        output = self.assert_clean_exit()
-        self.assertIn('Unloading module stuckconsole', output)
+        self.assert_immediate_exit(signal.SIGINT)
+        if sys.platform.startswith('linux'):
+            def child_stopped():
+                try:
+                    with open('/proc/%u/stat' % child_pid) as status:
+                        return status.read().rsplit(')', 1)[1].split()[0] == 'Z'
+                except FileNotFoundError:
+                    return True
+            self.wait_for(child_stopped, 2, 'console child to stop')
 
     def test_sigint_during_tab_completion(self):
-        self.start(slow_complete=1)
+        self.start(stuck_complete=True)
         os.write(self.pty, b'slowcomplete \t')
         self.wait_for(lambda: self.marked('completing'), 10, 'the completer')
         self.process.send_signal(signal.SIGINT)
-        self.assert_clean_exit()
+        self.assert_immediate_exit(signal.SIGINT)
 
-    def test_sigint_with_requireexit_keeps_running(self):
+    def test_sigint_with_requireexit_still_exits_immediately(self):
         self.start()
         os.write(self.pty, b'set requireexit true\n')
         os.write(self.pty, b'set requireexit\n')
         self.wait_for(lambda: re.search(rb'requireexit +True', self.output), 10,
                       'the setting')
-        for n in range(3):
-            before = self.output.count(b'Interrupt caught')
-            self.process.send_signal(signal.SIGINT)
-            self.wait_for(
-                lambda: self.output.count(b'Interrupt caught') > before, 10,
-                'the interrupt to be reported')
-        # still reading commands
-        os.write(self.pty, b'set requireexit false\n')
-        os.write(self.pty, b'set requireexit\n')
-        self.wait_for(lambda: re.search(rb'requireexit +False', self.output), 10,
-                      'the setting')
-        self.assertIsNone(self.process.poll())
-        self.process.send_signal(signal.SIGTERM)
-        self.assert_clean_exit()
+        self.process.send_signal(signal.SIGINT)
+        self.assert_immediate_exit(signal.SIGINT)
 
     @unittest.skipUnless(sys.platform.startswith('linux'), 'needs tgkill')
     def test_sigterm_taken_by_another_thread(self):
@@ -317,7 +384,7 @@ class ShutdownTest(unittest.TestCase):
     def test_sigint_without_forwarder(self):
         self.start(no_forwarder=True)
         self.tgkill_main(signal.SIGINT)
-        self.assert_clean_exit()
+        self.assert_immediate_exit(signal.SIGINT)
 
     @unittest.skipUnless(sys.platform.startswith('linux'), 'needs tgkill')
     def test_sigint_with_requireexit_without_forwarder(self):
@@ -327,11 +394,7 @@ class ShutdownTest(unittest.TestCase):
         self.wait_for(lambda: re.search(rb'requireexit +True', self.output), 10,
                       'the setting')
         self.tgkill_main(signal.SIGINT)
-        self.wait_for(lambda: b'Interrupt caught' in self.output, 10,
-                      'the interrupt to be reported')
-        self.assertIsNone(self.process.poll())
-        self.tgkill_main(signal.SIGTERM)
-        self.assert_clean_exit()
+        self.assert_immediate_exit(signal.SIGINT)
 
     def test_sigterm_during_tab_completion(self):
         # CPython discards an exception raised in the completer, so the
@@ -350,13 +413,26 @@ class ShutdownTest(unittest.TestCase):
         output = self.assert_clean_exit()
         self.assertIn('Shutdown in progress', output)
 
-    def test_impatient_ctrl_c_does_not_cut_cleanup_short(self):
-        self.start(slow_unload=1)
-        self.process.send_signal(signal.SIGINT)
+    def test_ctrl_c_immediately_aborts_stuck_cleanup(self):
+        self.start(slow_unload=60)
+        self.process.send_signal(signal.SIGTERM)
         self.wait_for(lambda: self.marked('unloading'), 10, 'unloading')
         self.process.send_signal(signal.SIGINT)
-        output = self.assert_clean_exit()
-        self.assertIn('Shutdown in progress', output)
+        self.assert_immediate_exit(signal.SIGINT)
+
+    def test_ctrl_backslash_immediately_aborts_stuck_cleanup(self):
+        self.start(slow_unload=60)
+        self.process.send_signal(signal.SIGTERM)
+        self.wait_for(lambda: self.marked('unloading'), 10, 'unloading')
+        self.process.send_signal(signal.SIGQUIT)
+        self.assert_immediate_exit(signal.SIGQUIT)
+
+    def test_sigquit_during_stuck_tab_completion(self):
+        self.start(stuck_complete=True)
+        os.write(self.pty, b'slowcomplete \t')
+        self.wait_for(lambda: self.marked('completing'), 10, 'the completer')
+        self.process.send_signal(signal.SIGQUIT)
+        self.assert_immediate_exit(signal.SIGQUIT)
 
     def test_signal_after_the_grace_forces_an_exit_from_input(self):
         # the escape hatch has to work however stuck we are.  Nothing

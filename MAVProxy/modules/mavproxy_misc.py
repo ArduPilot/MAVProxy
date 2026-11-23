@@ -127,6 +127,9 @@ class MiscModule(mp_module.MPModule):
 
         # support for changing altitude via command rather than mission item:
         self.accepts_DO_CMD_CHANGE_ALTITUDE = {}  # keyed by (sysid, compid)
+        # the (sysid, compid) of a "gethome" request awaiting its
+        # MAV_CMD_REQUEST_MESSAGE ACK
+        self.gethome_pending = None
 
     def altitude_difference(self, pressure1, pressure2, ground_temp):
         '''calculate barometric altitude'''
@@ -416,6 +419,22 @@ class MiscModule(mp_module.MPModule):
 
     def cmd_gethome(self, args):
         '''get home position'''
+        autopilot = (self.settings.target_system, mavutil.mavlink.MAV_COMP_ID_AUTOPILOT1)
+        self.gethome_pending = autopilot
+        # MAV_CMD_GET_HOME_POSITION also gets GPS_GLOBAL_ORIGIN from
+        # ArduPilot, so ask for that too
+        for msg_id in (mavutil.mavlink.MAVLINK_MSG_ID_HOME_POSITION,
+                       mavutil.mavlink.MAVLINK_MSG_ID_GPS_GLOBAL_ORIGIN):
+            self.master.mav.command_long_send(autopilot[0],
+                                              autopilot[1],
+                                              mavutil.mavlink.MAV_CMD_REQUEST_MESSAGE,
+                                              0,
+                                              msg_id, 0, 0, 0, 0, 0, 0)
+
+    def gethome_fallback(self):
+        '''get home position with MAV_CMD_GET_HOME_POSITION, which is
+        superseded by MAV_CMD_REQUEST_MESSAGE but is all ArduPilot
+        before 4.0 understands'''
         self.master.mav.command_long_send(self.settings.target_system,
                                           0,
                                           mavutil.mavlink.MAV_CMD_GET_HOME_POSITION,
@@ -752,6 +771,12 @@ Alt: gear <extend|retract> [ID]'''
                     self.accepts_DO_CMD_CHANGE_ALTITUDE[key] = False
                 elif m.result in [mavutil.mavlink.MAV_RESULT_ACCEPTED]:
                     self.accepts_DO_CMD_CHANGE_ALTITUDE[key] = True
+            elif (m.command == mavutil.mavlink.MAV_CMD_REQUEST_MESSAGE and
+                  self.gethome_pending == (m.get_srcSystem(), m.get_srcComponent())):
+                self.gethome_pending = None
+                if m.result == mavutil.mavlink.MAV_RESULT_UNSUPPORTED:
+                    # the vehicle doesn't know MAV_CMD_REQUEST_MESSAGE
+                    self.gethome_fallback()
 
     def idle_task(self):
         '''called on idle'''

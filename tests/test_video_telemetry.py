@@ -9,7 +9,7 @@ import tempfile
 import unittest
 
 from MAVProxy.modules.lib.video_telemetry import (
-    UUID, FlatElevation, Sample, VideoIndex, ViewProjection, attitude, camera_pose,
+    UUID, FlatElevation, Sample, TelemetryAlignment, VideoIndex, ViewProjection, attitude, camera_pose,
     image_pixel, image_rect, packet_nals, position, sei_records, unhex)
 
 
@@ -35,6 +35,113 @@ def sei(value, codec='h264', suffix=False):
         escaped.append(byte)
         zeros = zeros + 1 if byte == 0 else 0
     return (b'\x06' if codec == 'h264' else bytes([(40 if suffix else 39) << 1, 1])) + escaped
+
+
+
+class AlignmentTests(unittest.TestCase):
+    def timeline(self, utc_values=(100, 101, 102), video_times=(0, .1, .2)):
+        from types import SimpleNamespace
+        samples = []
+        for n, (utc, pts) in enumerate(zip(utc_values, video_times)):
+            rec = record()
+            rec['utc_us'] = round(utc * 1e6) if utc is not None else None
+            rec['position']['lat_e7'] += n * 100
+            samples.append(Sample(pts, .1, rec, n * 10, 'test'))
+        index = SimpleNamespace(samples=samples, times=list(video_times))
+        return index, TelemetryAlignment(index)
+
+    def test_offset_uses_utc_seconds_and_interpolates_wrapped_angles(self):
+        index, alignment = self.timeline()
+        index.samples[0].record['heading_rad'] = math.radians(350)
+        index.samples[1].record['heading_rad'] = math.radians(10)
+        index.samples[0].record['gimbal_attitude']['yaw_rad'] = math.radians(350)
+        index.samples[1].record['gimbal_attitude']['yaw_rad'] = math.radians(10)
+        original = copy.deepcopy([s.record for s in index.samples])
+        sample, basis = alignment.at(0, .5)
+        self.assertEqual(basis, 'UTC')
+        self.assertEqual(sample.record['utc_us'], 100500000)
+        self.assertEqual(sample.record['position']['lat_e7'], original[0]['position']['lat_e7'] + 50)
+        self.assertAlmostEqual(sample.time, .05)  # not +0.5 playback seconds
+        self.assertAlmostEqual(math.sin(sample.record['heading_rad']), 0)
+        self.assertAlmostEqual(math.cos(sample.record['gimbal_attitude']['yaw_rad']), 1)
+        self.assertAlmostEqual(sample.speed, 5)
+        self.assertEqual(sample.record['position']['age_ms'], 500)
+        self.assertEqual([s.record for s in index.samples], original)
+        earlier, basis = alignment.at(2, -1)
+        self.assertIs(earlier, index.samples[1])
+
+    def test_zero_keeps_missing_frame_telemetry_and_image_metadata(self):
+        index, alignment = self.timeline()
+        index.samples[1].record = None
+        sample, _ = alignment.at(1, 0)
+        self.assertIs(sample, index.samples[1])
+        self.assertIsNone(sample.record)
+        self.assertIs(alignment.at(0, 0)[0], index.samples[0])
+
+    def test_outside_coverage_and_large_utc_gap_have_no_pose(self):
+        index, alignment = self.timeline((100, 120, 121))
+        self.assertIsNone(alignment.at(0, -1)[0])
+        self.assertIsNone(alignment.at(2, 1)[0])
+        self.assertIsNone(alignment.at(0, 10)[0])
+        self.assertIs(alignment.at(0, 20)[0], index.samples[1])
+        with self.assertRaises(ValueError):
+            alignment.at(0, math.nan)
+
+    def test_interpolates_missing_seconds_in_vendor_rgb_utc(self):
+        index, alignment = self.timeline((1787886130, 1787886135, 1787886136))
+        shifted, basis = alignment.at(0, 3)
+        self.assertEqual(basis, 'UTC')
+        self.assertEqual(shifted.record['utc_us'], 1787886133000000)
+        self.assertAlmostEqual(shifted.record['position']['lat_e7'], index.samples[0].record['position']['lat_e7'] + 60)
+
+    def test_missing_or_regressing_utc_uses_video_time(self):
+        for timestamps in ((None, None, None), (100, 99, 101)):
+            index, alignment = self.timeline(timestamps, (0, 1, 2))
+            sample, basis = alignment.at(1, .5)
+            self.assertEqual(basis, 'video time')
+            self.assertEqual(sample.record['position']['lat_e7'], index.samples[1].record['position']['lat_e7'] + 50)
+
+    def test_appended_background_samples_make_offset_available(self):
+        index, alignment = self.timeline((100,), (0,))
+        self.assertIsNone(alignment.at(0, 1)[0])
+        rec = record()
+        rec['utc_us'] = 101000000
+        index.samples.append(Sample(1, .1, rec))
+        index.times.append(1)
+        self.assertIs(alignment.at(0, 1)[0], index.samples[1])
+
+    def test_late_background_metadata_invalidates_cached_alignment(self):
+        index, alignment = self.timeline()
+        index.indexing, index.telemetry_count = True, 2
+        late = index.samples[1].record
+        index.samples[1].record = None
+        self.assertIsNot(alignment.at(0, 1)[0], index.samples[1])
+        index.samples[1].record = late
+        index.telemetry_count += 1
+        self.assertIs(alignment.at(0, 1)[0], index.samples[1])
+        shifted, basis = alignment.at(0, .5)
+        self.assertEqual(basis, 'UTC')
+        self.assertAlmostEqual(shifted.speed, 5)
+
+    def test_finished_index_refreshes_interpolated_speed(self):
+        index, alignment = self.timeline()
+        index.indexing = True
+        self.assertAlmostEqual(alignment.at(0, .5)[0].speed, 5)
+        index.samples[1].speed = 20
+        index.indexing = False
+        self.assertAlmostEqual(alignment.at(0, .5)[0].speed, 10)
+
+    def test_longitude_interpolates_across_date_line(self):
+        index, alignment = self.timeline()
+        index.samples[0].record['position']['lon_e7'] = 1799999900
+        index.samples[1].record['position']['lon_e7'] = -1799999900
+        shifted, _ = alignment.at(0, .5)
+        self.assertAlmostEqual(abs(position(shifted.record)[1]), 180)
+
+    def test_repeated_utc_keeps_current_sample_at_small_offset(self):
+        index, alignment = self.timeline((100, 100, 101), (0, .1, .2))
+        shifted, _ = alignment.at(1, .1)
+        self.assertAlmostEqual(shifted.record['position']['lat_e7'], index.samples[1].record['position']['lat_e7'] + 10)
 
 
 class TelemetryTests(unittest.TestCase):
@@ -180,6 +287,15 @@ class ThermalMetadataTests(unittest.TestCase):
         meta = dict(schema='apcg.thermal.v1', hfov_deg=24.2, telemetry=dict(record(), hfov_deg=42.0))
         self.assertEqual(self.parse(meta)['hfov_deg'], 42.0)
 
+    def test_preserves_radiometric_scale_without_assuming_calibration(self):
+        meta = dict(schema='apcg.thermal.v1', telemetry=record(),
+                    temperature_scale_k=1/64, temperature_offset_k=2,
+                    minimum_c=-10, maximum_c=30)
+        self.assertEqual(self.parse(meta)['thermal'], {key: meta[key] for key in (
+            'temperature_scale_k', 'temperature_offset_k', 'minimum_c', 'maximum_c')})
+        meta['temperature_scale_k'] = None
+        self.assertIsNone(self.parse(meta)['thermal']['temperature_scale_k'])
+
     def test_rejects_unusable_metadata(self):
         for meta in (dict(schema='other', telemetry=record()),
                      dict(schema='apcg.thermal.v1', telemetry=None),
@@ -214,6 +330,48 @@ class RecordingTests(unittest.TestCase):
             # escaped JSON payload cannot be injected
             raise unittest.SkipTest('ffmpeg cannot inject the SEI bitstream filter (exit %d); '
                                     'ffmpeg 5.0 or later is required' % error.returncode)
+
+    def test_sei_only_mpegts_bframe_seeks_use_decode_timestamps(self):
+        try:
+            import av
+        except ImportError:
+            self.skipTest('PyAV required for MPEG-TS playback')
+        from MAVProxy.modules.lib.mavvidplay import FrameReader
+        source_path = str(Path(self.temp.name)/'source-bframes.ts')
+        video = str(Path(self.temp.name)/'sei-bframes.ts')
+        subprocess.run(['ffmpeg', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=160x120:rate=10',
+                        '-t', '2', '-c:v', 'libx264', '-bf', '2', '-g', '5', source_path], check=True)
+        with av.open(source_path) as source, av.open(video, 'w', format='mpegts') as output:
+            stream = output.add_stream_from_template(source.streams.video[0])
+            first = True
+            for packet in source.demux(video=0):
+                if not packet.size:
+                    continue
+                if first:
+                    nals = list(packet_nals(bytes(packet), 0))
+                    nals.insert(1 if nals[0][0]&31 == 9 else 0, sei(dict(record(), hfov_deg=60)))
+                    data = av.Packet(b''.join(b'\0\0\0\1'+nal for nal in nals))
+                    data.pts, data.dts, data.duration, data.time_base = packet.pts, packet.dts, packet.duration, packet.time_base
+                    packet, first = data, False
+                packet.stream = stream
+                output.mux(packet)
+        index = VideoIndex(video)
+        self.assertEqual(len(index.samples), 20)
+        self.assertGreater(index.telemetry_count, 0)
+        self.assertTrue(any(index.keyframe_dts[pts] != pts for pts in index.keyframe_pts))
+        with av.open(video) as source:
+            reference = [frame.to_ndarray(format='bgr24') for frame in source.decode(video=0)]
+        reader = FrameReader(index)
+        try:
+            for generation, target in enumerate((0, 12, 3, 19, 1)):
+                reader.request(target, generation)
+                number, gen, image, error = reader.results.get(timeout=10)
+                self.assertIsNone(error)
+                self.assertEqual((number, gen), (target, generation))
+                self.assertTrue((image == reference[target]).all())
+        finally:
+            reader.stop()
+            index.close()
 
     def test_index_and_decoder_seeking(self):
         import cv2

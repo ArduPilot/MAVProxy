@@ -729,6 +729,7 @@ class FTPWorker(mp_module.MPModule):
         '''put file'''
         if len(args) == 0:
             print("Usage: put FILENAME <REMOTENAME>")
+            print("       put WILDCARD <DESTDIR>")
             return
         if self.transfer_active:
             # fh and write_list are both still None while a get waits for its
@@ -1769,6 +1770,30 @@ class FTPModule(mp_module.MPModule):
 
     def cmd_put(self, args, fh=None, callback=None, progress_callback=None,
                 target_system=None, target_component=None):
+        '''Upload a file, or wildcard matches into a remote directory.'''
+        if fh is None and args and glob.has_magic(args[0]):
+            pattern = args[0]
+            if len(args) > 1 and not args[1]:
+                print("put: empty DESTDIR, use / for the vehicle's root")
+                return
+            files = sorted(f for f in glob.glob(pattern) if os.path.isfile(f))
+            if not files:
+                print("put: no files matching %s" % pattern)
+                return
+            # Flatten local paths into the destination directory. Reject
+            # duplicate basenames before starting any conflicting uploads.
+            names = [os.path.basename(f) for f in files]
+            if len(set(names)) != len(names):
+                print("put: duplicate names, narrow the wildcard")
+                return
+            dest = args[1].rstrip('/') + '/' if len(args) > 1 else ''
+            for fname, name in zip(files, names):
+                self._submit('put', 'cmd_put', [fname, dest + name],
+                             callback=callback,
+                             progress_callback=progress_callback,
+                             target_system=target_system,
+                             target_component=target_component)
+            return
         return self._submit('put', 'cmd_put', args, fh=fh,
                             callback=callback,
                             progress_callback=progress_callback,

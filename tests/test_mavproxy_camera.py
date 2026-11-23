@@ -102,6 +102,9 @@ class FakeMap:
         self.removed.append(name)
         self.objects.pop(name, None)
 
+    def icon(self, name):
+        return name
+
 
 class Message:
     def __init__(self, message_type, system_id=1, component_id=100, **fields):
@@ -231,6 +234,74 @@ class CameraModuleTest(unittest.TestCase):
         for component in (100, 101):
             self.assertTrue(any(c[:2] == (1, component) and c[4] ==
                                 mavutil.mavlink.MAVLINK_MSG_ID_CAMERA_SETTINGS for c in requests))
+
+    def test_all_camera_controls_skip_proxy_and_preserve_selection(self):
+        self.module.mavlink_packet(camera_information(component_id=1))
+        self.module.mavlink_packet(camera_information())
+        self.module.mavlink_packet(camera_information(component_id=101))
+        self.module.mavlink_packet(camera_information(system_id=42))
+        self.module.cmd_camera(["select", "1:101"])
+        self.module.camera_settings.camera_component = 101
+        settings = self.module.camera_settings
+        keys = [(1, 100), (1, 101), (42, 100)]
+        for command in (["photo"], ["stopphotos"], ["record", "toggle"],
+                        ["focus", "auto"], ["zoom", "30"], ["mode", "video"],
+                        ["source", "rgb"], ["stream", "start"]):
+            with self.subTest(command=command):
+                self.state._master.mav.commands.clear()
+                self.module.cmd_camera(["all"] + command)
+                self.assertEqual([c[:2] for c in self.commands()], keys)
+                self.assertEqual(self.module.selected_camera, (1, 101))
+                self.assertIsNone(self.module.command_camera)
+                self.assertIs(self.module.camera_settings, settings)
+        self.assertIsNone(self.module.cameras[(1, 1)].recording)
+        self.assertTrue(all(self.module.cameras[key].recording for key in keys))
+        self.module.cmd_camera(["all", "set", "rtsp_host", "192.168.1.2"])
+        for key in keys:
+            self.assertEqual(self.module.cameras[key].control_overrides["rtsp_host"],
+                             "192.168.1.2")
+        self.assertEqual(settings.rtsp_host, "")
+
+    def test_all_mount_uses_each_camera_mapping_and_continues_after_error(self):
+        for system, component, gimbal in ((1, 100, 1), (1, 101, 2), (42, 100, 1)):
+            self.module.mavlink_packet(camera_information(
+                system_id=system, component_id=component, gimbal_device_id=gimbal))
+        second = self.module.cameras[(1, 101)]
+        second.control_overrides.update(manager_component=2, manager_gimbal_id=3)
+        settings = self.module.camera_settings
+        self.state._master.mav.commands.clear()
+        self.module.cmd_camera(["all", "mount", "angle", "0", "-90"])
+        commands = self.commands(mavutil.mavlink.MAV_CMD_DO_GIMBAL_MANAGER_PITCHYAW)
+        self.assertEqual([c[:2] for c in commands], [(1, 1), (1, 2), (42, 1)])
+        self.assertEqual([c[4:6] for c in commands], [(0, -90)] * 3)
+        self.assertEqual([c[10] for c in commands], [1, 3, 1])
+        # A failure for the first camera must not prevent later cameras running.
+        self.state._master.mav.commands.clear()
+        with mock.patch.object(self.module, "_mount_command", side_effect=[
+                ValueError("first camera unavailable"), None, None]) as mount:
+            with contextlib.redirect_stdout(io.StringIO()) as output:
+                self.module.cmd_camera(["all", "mount", "angle", "0", "-90"])
+            self.assertIn("first camera unavailable", output.getvalue())
+            self.assertEqual(mount.call_count, 3)
+        self.assertIsNone(self.module.command_camera)
+        self.assertIs(self.module.camera_settings, settings)
+        self.assertEqual(self.module.selected_camera, (1, 100))
+
+    def test_all_requires_cameras_and_rejects_nested_targeting(self):
+        with contextlib.redirect_stdout(io.StringIO()) as output:
+            self.module.cmd_camera(["all", "photo"])
+        self.assertIn("no MAVLink cameras discovered", output.getvalue())
+        self.module.mavlink_packet(camera_information())
+        for args in (["all"], ["all", "all", "photo"],
+                     ["all", "for", "1:100", "photo"],
+                     ["all", "select", "42:101"],
+                     ["for", "1:100", "all", "photo"]):
+            with self.subTest(args=args):
+                with contextlib.redirect_stdout(io.StringIO()) as output:
+                    self.module.cmd_camera(args)
+                self.assertIn("usage:", output.getvalue())
+                self.assertEqual(self.module.selected_camera, (1, 100))
+                self.assertEqual(list(self.module.cameras), [(1, 100)])
 
     def setup_camera_roi(self):
         self.roi_now = 100.0
@@ -661,6 +732,8 @@ class CameraModuleTest(unittest.TestCase):
         view.module = self.module
         view.camera = self.module.cameras[(1, 101)]
         view.image = mock.Mock()
+        view.title = "Test"
+        view.shown_mode = None
         for action in ("Photo", "Record", "Autofocus"):
             view.image.events.return_value = [MPMenuItem(action, returnkey="Camera:" + action)]
             view.check_events()
@@ -1096,6 +1169,146 @@ class CameraModuleTest(unittest.TestCase):
         return Message("GLOBAL_POSITION_INT", system_id=system, component_id=component,
                        lat=lat, lon=1491652370, alt=684000, relative_alt=100000)
 
+    def setup_nadir_view(self):
+        """one camera looking straight down from 100m over flat ground at
+        584m AMSL, and a view of its 1920x1080 stream with no window"""
+        from MAVProxy.modules.mavproxy_camera.video_view import VideoView
+        self.state.map = FakeMap()
+        self.module.mavlink_packet(camera_information())
+        self.module.mavlink_packet(stream_information(1))
+        self.state._master.messages["ATTITUDE"] = Message(
+            "ATTITUDE", component_id=1, roll=0.0, pitch=0.0, yaw=0.0,
+            yawspeed=0.0, _timestamp=time.time())
+        self.module.mavlink_packet(Message(
+            "GIMBAL_DEVICE_ATTITUDE_STATUS", component_id=1,
+            q=[math.sqrt(0.5), 0.0, -math.sqrt(0.5), 0.0],
+            angular_velocity_x=0.0, angular_velocity_y=0.0,
+            angular_velocity_z=0.0,
+            flags=mavutil.mavlink.GIMBAL_DEVICE_FLAGS_YAW_IN_VEHICLE_FRAME,
+            gimbal_device_id=1, _timestamp=time.time()))
+        self.module.mavlink_packet(self.projection_position())
+        view = VideoView.__new__(VideoView)
+        view.module = self.module
+        view.camera = self.module.cameras[(1, 100)]
+        view.stream = view.camera.streams[1]
+        view.image = mock.Mock()
+        view.title = "Test"
+        view.shown_mode = None
+        view.drag_start = None
+        self.state._master.mav.commands.clear()
+        return view
+
+    def mouse(self, view, x, y, pressed=False, released=False, down=None):
+        view.image.events.return_value = [SimpleNamespace(
+            ClassName="wxMouseEvent", X=x, Y=y, shape=(1080, 1920, 3),
+            leftPressed=pressed, leftReleased=released,
+            leftIsDown=pressed if down is None else down)]
+        view.check_events()
+
+    def test_video_click_projects_and_moves_one_flag(self):
+        view = self.setup_nadir_view()
+        self.mouse(view, 960, 540, pressed=True)
+        flag = self.state.map.objects["CameraClick"]
+        self.assertAlmostEqual(flag.latlon[0], -35.363262, places=5)
+        self.assertAlmostEqual(flag.latlon[1], 149.165237, places=5)
+        self.assertEqual(self.state.click_location, flag.latlon)
+        # dragging with the button held does not keep clicking
+        self.mouse(view, 1500, 540, down=True)
+        self.assertIs(self.state.map.objects["CameraClick"], flag)
+        self.mouse(view, 1500, 540, pressed=True)
+        moved = self.state.map.objects["CameraClick"]
+        self.assertGreater(moved.latlon[1], flag.latlon[1])
+        clicks = [key for key in self.state.map.objects if key.startswith("CameraClick")]
+        self.assertEqual(clicks, ["CameraClick"])
+        location = self.module.project_pixel(view.camera, view.stream,
+                                             960, 540, 1920, 1080)
+        self.assertAlmostEqual(location[2], 584.0, places=1)
+
+    def test_video_click_that_misses_the_ground_does_nothing(self):
+        view = self.setup_nadir_view()
+        self.module.vehicle_messages.clear()
+        self.state._master.messages.pop("GLOBAL_POSITION_INT", None)
+        with contextlib.redirect_stdout(io.StringIO()) as output:
+            self.mouse(view, 960, 540, pressed=True)
+        self.assertNotIn("CameraClick", self.state.map.objects)
+        self.assertIn("can't project", output.getvalue())
+
+    def test_video_click_marker_mode_logs_markers(self):
+        view = self.setup_nadir_view()
+        map_module = mock.Mock()
+        self.state.modules["map"] = map_module
+        self.module.camera_settings.click_mode = "marker"
+        self.mouse(view, 960, 540, pressed=True)
+        self.mouse(view, 100, 100, pressed=True)
+        self.assertEqual(map_module.cmd_map_marker.call_count, 2)
+        args, kwargs = map_module.cmd_map_marker.call_args_list[0]
+        self.assertEqual(args, (["blueflag"],))
+        self.assertAlmostEqual(kwargs["latlon"][0], -35.363262, places=5)
+        self.assertNotIn("CameraClick", self.state.map.objects)
+
+    def test_video_click_roi_mode_points_the_gimbal(self):
+        view = self.setup_nadir_view()
+        self.module.camera_settings.click_mode = "roi"
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.mouse(view, 960, 540, pressed=True)
+        roi = [c for c in self.state._master.mav.int_commands
+               if c[3] == mavutil.mavlink.MAV_CMD_DO_SET_ROI_LOCATION]
+        self.assertEqual(len(roi), 1)
+        self.assertEqual(roi[0][:2], (1, 1))
+        self.assertAlmostEqual(roi[0][10] * 1e-7, -35.363262, places=5)
+        self.assertAlmostEqual(roi[0][12], 584.0, places=1)
+        self.assertIn("CameraClick", self.state.map.objects)
+
+    def test_video_track_point_and_rectangle_go_to_the_flight_controller(self):
+        from MAVProxy.modules.lib.mp_image import MPImageOSD_Rect, MPImageOSD_None
+        view = self.setup_nadir_view()
+        self.module.camera_settings.click_mode = "track"
+        self.mouse(view, 192, 108, pressed=True)
+        self.mouse(view, 194, 108, released=True)
+        point = self.commands(mavutil.mavlink.MAV_CMD_CAMERA_TRACK_POINT)
+        self.assertEqual(len(point), 1)
+        self.assertEqual(point[0][:2], (1, 1))
+        self.assertEqual(point[0][4:8], (0.1, 0.1, 0.05, 0))
+        # dragged up and left: the rectangle is drawn, then sent ordered
+        self.mouse(view, 1440, 810, pressed=True)
+        self.mouse(view, 480, 270, down=True)
+        drawn = view.image.add_OSD.call_args.args[0]
+        self.assertIsInstance(drawn, MPImageOSD_Rect)
+        self.mouse(view, 480, 270, released=True)
+        self.assertIsInstance(view.image.add_OSD.call_args.args[0], MPImageOSD_None)
+        rect = self.commands(mavutil.mavlink.MAV_CMD_CAMERA_TRACK_RECTANGLE)
+        self.assertEqual(rect[0][:2], (1, 1))
+        self.assertEqual(rect[0][4:9], (0.25, 0.25, 0.75, 0.75, 0))
+        # with the camera's AP_Camera instance known, that is selected
+        self.module.mavlink_packet(Message(
+            "HEARTBEAT", component_id=1, type=mavutil.mavlink.MAV_TYPE_FIXED_WING,
+            autopilot=mavutil.mavlink.MAV_AUTOPILOT_ARDUPILOTMEGA))
+        self.state.mav_param_by_sysid = {(1, 1): {"CAM2_TYPE": 6, "CAM2_COMPID": 100}}
+        self.mouse(view, 1440, 810, pressed=True)
+        self.mouse(view, 1440, 810, released=True)
+        point = self.commands(mavutil.mavlink.MAV_CMD_CAMERA_TRACK_POINT)
+        self.assertEqual(point[-1][:2], (1, 1))
+        self.assertEqual(point[-1][7], 2)
+        self.module.camera_settings.track_radius = 0.2
+        self.mouse(view, 0, 0, pressed=True)
+        self.mouse(view, 1920, 1080, released=True)
+        rect = self.commands(mavutil.mavlink.MAV_CMD_CAMERA_TRACK_RECTANGLE)
+        self.assertEqual(rect[-1][4:9], (0.0, 0.0, 1.0, 1.0, 2))
+
+    def test_video_menu_sets_click_mode_and_stops_tracking(self):
+        from MAVProxy.modules.lib.mp_menu import MPMenuItem
+        view = self.setup_nadir_view()
+        view.image.events.return_value = [
+            MPMenuItem("Camera track", returnkey="ClickMode:track")]
+        view.check_events()
+        self.assertEqual(self.module.camera_settings.click_mode, "track")
+        self.assertIn("Camera track", view.image.set_title.call_args.args[0])
+        view.image.events.return_value = [
+            MPMenuItem("Stop tracking", returnkey="Camera:StopTracking")]
+        view.check_events()
+        stop = self.commands(mavutil.mavlink.MAV_CMD_CAMERA_STOP_TRACKING)
+        self.assertEqual(stop[0][:2], (1, 1))
+
     def test_independent_camera_polygons_colours_and_menu_toggles(self):
         self.state.map = FakeMap()
         self.module.camera_settings.fov_update_interval = 0
@@ -1233,7 +1446,7 @@ class CameraModuleTest(unittest.TestCase):
         image = image_class.return_value
         image.get_popup_menu.return_value = mock.Mock()
         stream = stream_information(1)
-        camera = SimpleNamespace(label=lambda: "Test camera")
+        camera = SimpleNamespace(label=lambda: "Test camera", control_overrides={})
         uri = "rtsp://127.0.0.1:8554/video1"
         VideoView(self.module, camera, stream, uri, 100)
         image.set_video.assert_called_once_with(uri, reconnect=True)
@@ -1250,16 +1463,100 @@ class CameraModuleTest(unittest.TestCase):
         image.get_popup_menu.return_value = mock.Mock()
         stream = stream_information(2, thermal=True)
         stream.encoding = mavutil.mavlink.VIDEO_STREAM_ENCODING_H265
-        camera = SimpleNamespace(label=lambda: "Test camera")
+        camera = SimpleNamespace(label=lambda: "Test camera", control_overrides={})
         uri = "rtsp://127.0.0.1:8554/video2"
         VideoView(self.module, camera, stream, uri, 75)
         pipeline = image.set_gstreamer.call_args.args[0]
         self.assertTrue(image.set_gstreamer.call_args.kwargs['reconnect'])
-        self.assertIn("rtspsrc location=" + uri, pipeline)
+        self.assertIn('rtspsrc location="' + uri + '"', pipeline)
         self.assertIn("latency=75 protocols=tcp", pipeline)
         self.assertIn("rtph265depay", pipeline)
         self.assertIn("h265parse ! avdec_h265", pipeline)
         image.set_video.assert_not_called()
+
+    def test_misb_transport_pipeline_uses_ts_depayloader_and_video_pad(self):
+        from MAVProxy.modules.mavproxy_camera.video_view import video_pipeline
+        for encoding, codec in ((1, 'h264'), (2, 'h265')):
+            stream = stream_information(4)
+            stream.encoding = encoding
+            pipeline = video_pipeline(stream, 'rtsp://camera/video1.misb?session=abc', 75)
+            self.assertIn('rtpmp2tdepay ! tsdemux ! video/x-'+codec, pipeline)
+            self.assertIn(codec+'parse ! avdec_'+codec, pipeline)
+            self.assertNotIn('rtp'+codec+'depay', pipeline)
+            stream.type = mavutil.mavlink.VIDEO_STREAM_TYPE_MPEG_TS
+            pipeline = video_pipeline(stream, 'http://camera/live', 0)
+            self.assertIn('souphttpsrc', pipeline)
+            self.assertIn('tsdemux ! video/x-'+codec, pipeline)
+
+    def test_format_change_removes_stale_streams_but_retains_preview_viewers(self):
+        self.module.mavlink_packet(camera_information())
+        regular = stream_information(1)
+        regular.count = 5
+        self.module.mavlink_packet(regular)
+        variant = stream_information(4, uri='rtsp://camera/video1.misb')
+        variant.count = 5
+        self.module.mavlink_packet(variant)
+        preview, misb = mock.Mock(), mock.Mock()
+        self.module.views[(1, 100, 1)] = preview
+        self.module.views[(1, 100, 4)] = misb
+        regular.count = 3
+        self.module.mavlink_packet(regular)
+        self.assertNotIn(4, self.module.cameras[(1, 100)].streams)
+        self.assertNotIn((1, 100, 4), self.module.views)
+        misb.close.assert_called_once()
+        preview.close.assert_not_called()
+        self.assertIs(self.module.views[(1, 100, 1)], preview)
+
+    @mock.patch("MAVProxy.modules.mavproxy_camera.video_view.VideoView")
+    def test_selected_format_primary_stream_and_restart_cleanup(self, viewer):
+        with mock.patch("MAVProxy.modules.lib.mp_util.has_wxpython", True):
+            self.module.mavlink_packet(camera_information())
+            primary = stream_information(1, uri='rtsp://camera/video1.misb')
+            primary.count = 5
+            primary.name = 'Visible MISB KLV'
+            compatibility = stream_information(4, uri='rtsp://camera/video1')
+            compatibility.count = 5
+            compatibility.name = 'Visible APCG JSON'
+            self.module.mavlink_packet(primary)
+            self.module.mavlink_packet(compatibility)
+            self.module.cmd_camera(['view', 'rgb'])
+            self.assertEqual(viewer.call_args.args[2].stream_id, 1)
+            self.assertTrue(viewer.call_args.args[3].endswith('.misb'))
+            primary_view, compatibility_view = mock.Mock(), mock.Mock()
+            self.module.views[(1, 100, 1)] = primary_view
+            self.module.views[(1, 100, 4)] = compatibility_view
+            replacement = stream_information(1, uri='rtsp://camera/video1')
+            replacement.count = 3
+            self.module.mavlink_packet(replacement)
+            self.assertNotIn(4, self.module.cameras[(1, 100)].streams)
+            self.assertNotIn((1, 100, 4), self.module.views)
+            compatibility_view.close.assert_called_once()
+            primary_view.close.assert_called_once()
+            self.module.cmd_camera(['view', 'rgb'])
+            self.assertEqual(viewer.call_args.args[3], replacement.uri)
+
+    @mock.patch("MAVProxy.modules.mavproxy_camera.video_view.VideoView")
+    def test_misb_stream_discovery_menu_and_selection(self, viewer):
+        with mock.patch("MAVProxy.modules.lib.mp_util.has_wxpython", True):
+            self.module.mavlink_packet(camera_information())
+            regular = stream_information(1)
+            regular.count = 5
+            self.module.mavlink_packet(regular)
+            requested = [row[5] for row in self.state._master.mav.commands
+                         if row[2] == mavutil.mavlink.MAV_CMD_REQUEST_MESSAGE and
+                         row[4] == mavutil.mavlink.MAVLINK_MSG_ID_VIDEO_STREAM_INFORMATION]
+            self.assertTrue(set((2, 3, 4, 5)).issubset(requested))
+            stream = stream_information(4, uri='rtsp://192.168.144.25:8554/video1.misb')
+            stream.count = 5
+            stream.name = 'Visible MISB KLV'
+            self.module.mavlink_packet(stream)
+            self.module._sync_menus()
+            video = next(item for item in self.module.menus[0].items if item.name == 'Video')
+            self.assertIn(('Visible MISB KLV 1920x1080', '# camera for 1:100 view 4'),
+                          [(item.name, item.returnkey) for item in video.items])
+            self.module.cmd_camera(['view', '4'])
+            self.assertEqual(viewer.call_args.args[2].stream_id, 4)
+            self.assertTrue(viewer.call_args.args[3].endswith('/video1.misb'))
 
     def test_roi_and_mount_never_modify_target_rate_or_bypass_manager(self):
         self.setup_camera_roi()

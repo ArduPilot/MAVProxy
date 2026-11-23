@@ -24,6 +24,9 @@ class WPModule(mission_item_protocol.MissionItemProtocolModule):
         super().__init__(mpstate, "wp", "waypoint handling", public=True)
         # support for setting mission waypoint via command
         self.accepts_DO_SET_MISSION_CURRENT = {}  # keyed by (sysid/compid)
+        # home is fetched from the autopilot with MAV_CMD_REQUEST_MESSAGE
+        # unless it refuses that command; keyed by (sysid, compid)
+        self.accepts_REQUEST_MESSAGE = {}
         self.draw_frame = None  # None follows the current automatic default
 
     def gui_menu_items(self):
@@ -113,6 +116,15 @@ class WPModule(mission_item_protocol.MissionItemProtocolModule):
                     self.accepts_DO_SET_MISSION_CURRENT[key] = False
                 elif m.result in [mavutil.mavlink.MAV_RESULT_ACCEPTED]:
                     self.accepts_DO_SET_MISSION_CURRENT[key] = True
+            elif m.command == mavutil.mavlink.MAV_CMD_REQUEST_MESSAGE:
+                # vehicles which don't know MAV_CMD_REQUEST_MESSAGE
+                # (e.g. ArduPilot before 4.0) refuse it as unsupported;
+                # fetch home from those with MAV_CMD_GET_HOME_POSITION
+                key = (m.get_srcSystem(), m.get_srcComponent())
+                if m.result == mavutil.mavlink.MAV_RESULT_UNSUPPORTED:
+                    self.accepts_REQUEST_MESSAGE[key] = False
+                elif m.result == mavutil.mavlink.MAV_RESULT_ACCEPTED:
+                    self.accepts_REQUEST_MESSAGE[key] = True
 
         super().mavlink_packet(m)
 
@@ -120,11 +132,26 @@ class WPModule(mission_item_protocol.MissionItemProtocolModule):
         if (self.master is not None and
                 'HOME_POSITION' not in self.master.messages and
                 time.time() - self.last_get_home > 2):
-            self.master.mav.command_long_send(
-                self.settings.target_system,
-                0,
-                mavutil.mavlink.MAV_CMD_GET_HOME_POSITION,
-                0, 0, 0, 0, 0, 0, 0, 0)
+            autopilot = (self.settings.target_system, mavutil.mavlink.MAV_COMP_ID_AUTOPILOT1)
+            if self.accepts_REQUEST_MESSAGE.get(autopilot, True):
+                # MAV_CMD_GET_HOME_POSITION also gets GPS_GLOBAL_ORIGIN
+                # from ArduPilot, so ask for that too
+                for msg_id in (mavutil.mavlink.MAVLINK_MSG_ID_HOME_POSITION,
+                               mavutil.mavlink.MAVLINK_MSG_ID_GPS_GLOBAL_ORIGIN):
+                    self.master.mav.command_long_send(
+                        autopilot[0],
+                        autopilot[1],
+                        mavutil.mavlink.MAV_CMD_REQUEST_MESSAGE,
+                        0,
+                        msg_id, 0, 0, 0, 0, 0, 0)
+            else:
+                # MAV_CMD_GET_HOME_POSITION is superseded by
+                # MAV_CMD_REQUEST_MESSAGE; ArduPilot before 4.0 needs it
+                self.master.mav.command_long_send(
+                    self.settings.target_system,
+                    0,
+                    mavutil.mavlink.MAV_CMD_GET_HOME_POSITION,
+                    0, 0, 0, 0, 0, 0, 0, 0)
             self.last_get_home = time.time()
 
         super().idle_task()

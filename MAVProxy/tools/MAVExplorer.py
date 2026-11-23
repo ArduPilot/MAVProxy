@@ -119,6 +119,7 @@ class MEState(object):
               MPSetting('legend2', str, 'upper right', 'legend2 position'),
               MPSetting('axis_mode', str, 'auto', 'y-axis layout mode',
                         choice=['auto', 'dual', 'multi']),
+              MPSetting('unit_axes', bool, True, 'label y axes with units and give each unit its own y axis'),
               MPSetting('title', str, None, 'Graph title'),
               MPSetting('debug', int, 0, 'debug level'),
               MPSetting('paramdocs', bool, True, 'show param docs'),
@@ -901,6 +902,8 @@ def mission_items_from_cmds(items, started_at=None, flown_from=None):
     mission = []
     for seq in sorted(items):
         item = items[seq]
+        if not mp_util.mission_cmd_has_location(item[4]):
+            continue
         if item[0] == 0 and item[1] == 0:
             if item[4] not in mp_util.TAKEOFF_COMMANDS:
                 continue

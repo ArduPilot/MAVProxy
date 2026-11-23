@@ -132,6 +132,7 @@ on how to use MAVProxy.''',
                 'MAVProxy.modules.lib.ANUGA',
                 'MAVProxy.modules.lib.MacOS',
                 'MAVProxy.modules.lib.optparse_gui'],
+      python_requires='>=3.10',
       install_requires=requirements,
       extras_require={
         'cesium': ['tornado'],

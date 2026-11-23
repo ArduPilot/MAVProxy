@@ -564,10 +564,22 @@ class TestMissionFlight(object):
         radius = mp_util.gps_distance(last[0], last[1], lat, lon)
         assert 120 < radius < 220
 
-    def test_what_it_cannot_fly_is_not_drawn(self):
+    def test_an_item_with_no_location_it_cannot_fly_is_passed_over(self):
+        # x/y of NAV_SCRIPT_TIME are script arguments, not a position
+        script = (mavlink.MAV_CMD_NAV_SCRIPT_TIME, 13.0, 17.0, None,
+                  (72, 0, 300, 1))
         delay = (mavlink.MAV_CMD_NAV_DELAY, 0, 0, None, (10, 0, 0, 0))
+        legs = [waypoint(3000, 0), waypoint(3000, 3000)]
+        straight = fly(legs)
+        for item in (script, delay):
+            assert fly([legs[0], item, legs[1]]) == straight
+
+    def test_what_it_cannot_fly_is_not_drawn(self):
+        (lat, lon, amsl) = offset(3000, 1500)
+        place = (mavlink.MAV_CMD_NAV_PAYLOAD_PLACE, lat, lon, amsl,
+                 (0, 0, 0, 0))
         assert plane_track.mission_track(
-            HOME, [waypoint(3000, 0), delay, waypoint(3000, 3000)], PARAMS) is None
+            HOME, [waypoint(3000, 0), place, waypoint(3000, 3000)], PARAMS) is None
         assert plane_track.mission_track(
             (0, 0, 0), [waypoint(3000, 0)], PARAMS) is None
 
@@ -3571,24 +3583,19 @@ class TestMissionStyles(object):
 
     def test_the_live_map_setting(self):
         from types import SimpleNamespace
-        from MAVProxy.modules.lib import mp_settings
-        from MAVProxy.modules.mavproxy_map3d.map3d import MISSION_STYLES
+        from MAVProxy.modules import mavproxy_map3d
         module = TestDrawnTrack().live_module('plane')
         styles = []
         sends = []
-        # settings of the kind the module makes, to see the choice enforced
-        module.map3d_settings = mp_settings.MPSettings([
-            ('fpvfov', float, 90.0), ('terrainbrightness', float, 1.25),
-            ('terrainshading', bool, True), ('terrainwireframe', bool, False),
-            ('showdirection', bool, True), ('showlabels', bool, False),
-            ('labelsize', int, 14),
-            mp_settings.MPSetting('missionpath', str, MISSION_STYLES[0],
-                                  choice=MISSION_STYLES)])
+        # Use the module's settings to exercise the mission style choice.
+        module.map3d_settings = mavproxy_map3d.make_settings()
         module.map = SimpleNamespace(
             is_alive=lambda: True, set_fpv_fov=lambda fov: None,
             set_mission_arrows=lambda enable: None,
             set_mission_labels=lambda enable: None,
             set_mission_label_size=lambda size: None,
+            set_trail_ribbon=lambda enable, width: None,
+            set_trail_length=lambda seconds: None,
             set_render_settings=lambda *args: None,
             set_mission_style=styles.append,
             set_mission=lambda items, track=None: sends.append(track))
@@ -3726,13 +3733,15 @@ class TestMissionStyles(object):
         assert view.mission_to_fly is None
 
     def unflyable(self, module):
-        '''give the live module's mission a NAV_DELAY, which cannot be flown
-        through'''
+        '''give the live module's mission a NAV_PAYLOAD_PLACE, which cannot
+        be flown through'''
         from types import SimpleNamespace
         loader = module.mpstate.module('wp').wploader
+        last = loader.wpoints[-1]
         loader.wpoints.append(SimpleNamespace(
-            seq=len(loader.wpoints), command=mavlink.MAV_CMD_NAV_DELAY,
-            x=0, y=0, z=0, frame=3, param1=10, param2=0, param3=0, param4=0))
+            seq=len(loader.wpoints), command=mavlink.MAV_CMD_NAV_PAYLOAD_PLACE,
+            x=last.x + 0.01, y=last.y, z=0, frame=3, param1=10, param2=0,
+            param3=0, param4=0))
 
     def test_the_live_map_says_when_a_mission_has_no_path_flown(self, capsys):
         module = self.live_module('flown')
@@ -3769,6 +3778,8 @@ class TestMissionStyles(object):
             set_mission_arrows=lambda enable: None,
             set_mission_labels=lambda enable: None,
             set_mission_label_size=lambda size: None,
+            set_trail_ribbon=lambda enable, width: None,
+            set_trail_length=lambda seconds: None,
             set_mission_style=styles.append,
             set_render_settings=lambda *args: None,
             set_mission=lambda items, track=None: module.sent.append(track))

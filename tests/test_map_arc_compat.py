@@ -25,7 +25,8 @@ def test_map_loads_and_labels_arc_waypoints(arc_dialect):
         multi_instance={}, instance_count={}, public_modules={},
         command_map={}, completions={}, completion_functions={},
         settings=SimpleNamespace(guidedalt=100, flytoframe='AboveHome'),
-        module=lambda name: None)
+        module=lambda name: None,
+        master=lambda: None)
     with mock.patch.object(mp_slipmap, 'MPSlipMap'):
         module = mavproxy_map.init(state)
     assert state.public_modules['map'] is module
