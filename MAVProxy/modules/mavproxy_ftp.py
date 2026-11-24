@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 '''mavlink file transfer support'''
 
+import errno
 import glob
 import os
 import sys
@@ -74,6 +75,96 @@ SESSION_REUSE_DELAY = 30.0
 # the server null terminates the last byte of its name buffer, so a name
 # filling the payload exactly would be silently truncated
 MAX_FTP_NAME = MAX_Payload - 1
+
+
+# errno values a vehicle's FailErrno reply may carry, by name, so they mean
+# the same on this host.  ArduPilot boards report newlib's values, SITL its
+# host's; 1-34 are the same in newlib and Linux, and the larger ones listed
+# do not collide among the values a filesystem returns.  Anything else is EIO.
+VEHICLE_ERRNO_NAMES = {
+    1: 'EPERM', 2: 'ENOENT', 5: 'EIO', 9: 'EBADF', 11: 'EAGAIN',
+    12: 'ENOMEM', 13: 'EACCES', 16: 'EBUSY', 17: 'EEXIST', 18: 'EXDEV',
+    19: 'ENODEV', 20: 'ENOTDIR', 21: 'EISDIR', 22: 'EINVAL', 23: 'ENFILE',
+    24: 'EMFILE', 26: 'ETXTBSY', 27: 'EFBIG', 28: 'ENOSPC', 30: 'EROFS',
+    31: 'EMLINK',
+    # newlib
+    88: 'ENOSYS', 90: 'ENOTEMPTY', 91: 'ENAMETOOLONG', 95: 'EOPNOTSUPP',
+    134: 'ENOTSUP',
+    # Linux
+    36: 'ENAMETOOLONG', 38: 'ENOSYS', 39: 'ENOTEMPTY',
+}
+
+
+def vehicle_errno(code):
+    """This host's errno for an errno value reported by the vehicle."""
+    name = VEHICLE_ERRNO_NAMES.get(code)
+    if name is None:
+        return errno.EIO
+    return getattr(errno, name, errno.EIO)
+
+
+def ftp_errno(op):
+    """Map an FTP reply to an errno value, 0 for an Ack."""
+    if op.opcode == OP_Ack:
+        return 0
+    payload = op.payload if op.payload is not None else b''
+    if len(payload) < 1:
+        return errno.EIO
+    code = payload[0]
+    if code == ERR_FileNotFound:
+        return errno.ENOENT
+    if code == ERR_FileExists:
+        return errno.EEXIST
+    if code == ERR_FileProtected:
+        return errno.EACCES
+    if code == ERR_FailErrno and len(payload) >= 2 and payload[1] != 0:
+        return vehicle_errno(payload[1])
+    return errno.EIO
+
+
+def parse_list_entry(d, with_time):
+    """Parse one directory listing entry.
+
+    Returns (name, is_dir, size, mtime), or None for an entry that isn't a
+    file or directory (e.g. 'S' skip entries) or that can't be parsed.  size
+    is None for a directory.  mtime is None when the entry carries no time
+    field, and 0 when the server sent one but doesn't know the time.
+    """
+    if len(d) == 0:
+        return None
+    if d[0] == 'D':
+        # A listing with times gives a directory the same trailing fields as
+        # a file, "D<name>\t<size>\t<mtime>", though not every autopilot
+        # sends them. A plain listing gives just the name, where a tab would
+        # be part of it.
+        fields = d[1:].split('\t')
+        if with_time and len(fields) >= 3:
+            try:
+                mtime = int(fields[-1])
+            except ValueError:
+                mtime = 0
+            return ('\t'.join(fields[:-2]), True, None, mtime)
+        return (d[1:], True, None, None)
+    if d[0] == 'F':
+        # Names can contain tabs. Size and optional mtime are the fields at
+        # the end of an entry, so parse from that end.
+        fields = d[1:].split('\t')
+        trailing = 2 if with_time else 1
+        if len(fields) < trailing + 1:
+            return None
+        name = '\t'.join(fields[:-trailing])
+        try:
+            size = int(fields[-trailing])
+        except ValueError:
+            return None
+        mtime = None
+        if with_time:
+            try:
+                mtime = int(fields[-1])
+            except ValueError:
+                mtime = 0
+        return (name, False, size, mtime)
+    return None
 
 
 def encode_filename(name):
@@ -181,6 +272,14 @@ class FTPWorker(mp_module.MPModule):
         self.dir_offset = 0
         self.list_dname = None
         self.list_with_time = False
+        # callback(entries, error) for a listing made on behalf of code
+        # rather than the console; entries is a list of parse_list_entry
+        # tuples, or None with an errno value on failure
+        self.list_callback = None
+        self.list_entries = []
+        # callback(error) for rm/rmdir/mkdir/rename made on behalf of code;
+        # error is 0 on success or an errno value
+        self.op_callback = None
         self.last_op_time = time.time()
         self.rtt = 0.5
         self.rttvar = 0.25
@@ -326,6 +425,14 @@ class FTPWorker(mp_module.MPModule):
         if self.put_callback_progress is not None:
             self.put_callback_progress(None)
             self.put_callback_progress = None
+        if self.list_callback is not None:
+            callback = self.list_callback
+            self.list_callback = None
+            callback(None, errno.EIO)
+        if self.op_callback is not None:
+            callback = self.op_callback
+            self.op_callback = None
+            callback(errno.EIO)
         self.read_gaps = []
         self.read_total = 0
         self.read_gap_times = {}
@@ -338,14 +445,20 @@ class FTPWorker(mp_module.MPModule):
             print("Terminated session")
         self.manager.worker_done(self)
 
-    def cmd_list(self, args):
-        '''list files'''
+    def cmd_list(self, args, callback=None):
+        '''list files.  With a callback the entries are passed to
+        callback(entries, error) rather than printed'''
         if len(args) > 0:
             dname = args[0]
         else:
             dname = '/'
-        print("Listing %s" % dname)
-        enc_dname = bytearray(dname, 'ascii')
+        # set first, so a bad name still reports through the callback when
+        # the launch failure terminates the session
+        self.list_callback = callback
+        self.list_entries = []
+        if callback is None:
+            print("Listing %s" % dname)
+        enc_dname = encode_filename(dname)
         self.total_size = 0
         self.dir_offset = 0
         self.list_dname = enc_dname
@@ -373,6 +486,7 @@ class FTPWorker(mp_module.MPModule):
         self.list_with_time = False
         self.dir_offset = 0
         self.total_size = 0
+        self.list_entries = []
         self.send_list_request()
 
     def list_mtime_str(self, mtime):
@@ -406,51 +520,36 @@ class FTPWorker(mp_module.MPModule):
                         d = str(d)
                 except Exception:
                     continue
-                if d[0] == 'D':
-                    # A listing with times gives a directory the same trailing
-                    # fields as a file, "D<name>\t<size>\t<mtime>", though not
-                    # every autopilot sends them. A plain listing gives just
-                    # the name, where a tab would be part of it.
-                    fields = d[1:].split('\t')
-                    if with_time and len(fields) >= 3:
-                        try:
-                            mtime = int(fields[-1])
-                        except ValueError:
-                            mtime = 0
-                        print(" D %s\t%s" % ('\t'.join(fields[:-2]),
-                                             self.list_mtime_str(mtime)))
-                    else:
-                        print(" D %s" % d[1:])
-                elif d[0] == 'F':
-                    # Names can contain tabs. Size and optional mtime are the
-                    # fields at the end of an entry, so parse from that end.
-                    fields = d[1:].split('\t')
-                    trailing = 2 if with_time else 1
-                    if len(fields) < trailing + 1:
-                        print(d)
-                        continue
-                    name = '\t'.join(fields[:-trailing])
-                    try:
-                        size = int(fields[-trailing])
-                    except ValueError:
-                        print(d)
-                        continue
-                    self.total_size += size
-                    if with_time:
-                        try:
-                            mtime = int(fields[-1])
-                        except ValueError:
-                            mtime = 0
-                        print("   %s\t%u\t%s" % (
-                            name, size, self.list_mtime_str(mtime)))
-                    else:
-                        print("   %s\t%u" % (name, size))
-                else:
+                entry = parse_list_entry(d, with_time)
+                if entry is not None and not entry[1]:
+                    self.total_size += entry[2]
+                if self.list_callback is not None:
+                    if entry is not None and entry[0] not in ('.', '..'):
+                        self.list_entries.append(entry)
+                    continue
+                if entry is None:
                     print(d)
+                    continue
+                (name, is_dir, size, mtime) = entry
+                if is_dir:
+                    if mtime is not None:
+                        print(" D %s\t%s" % (name, self.list_mtime_str(mtime)))
+                    else:
+                        print(" D %s" % name)
+                elif mtime is not None:
+                    print("   %s\t%u\t%s" % (
+                        name, size, self.list_mtime_str(mtime)))
+                else:
+                    print("   %s\t%u" % (name, size))
             # ask for more
             self.send_list_request()
         elif op.opcode == OP_Nack and len(op.payload) == 1 and op.payload[0] == ERR_EndOfFile:
-            print("Total size %.2f kByte" % (self.total_size / 1024.0))
+            if self.list_callback is not None:
+                callback = self.list_callback
+                self.list_callback = None
+                callback(self.list_entries, 0)
+            else:
+                print("Total size %.2f kByte" % (self.total_size / 1024.0))
             self.total_size = 0
             self.terminate_session()
         elif (with_time and self.dir_offset == 0 and
@@ -459,7 +558,12 @@ class FTPWorker(mp_module.MPModule):
             self.manager.list_time_supported[self.list_target_key()] = False
             self.list_without_time()
         else:
-            print('LIST: %s' % op)
+            if self.list_callback is not None:
+                callback = self.list_callback
+                self.list_callback = None
+                callback(None, ftp_errno(op))
+            else:
+                print('LIST: %s' % op)
             self.terminate_session()
 
     def cmd_get(self, args, callback=None, callback_progress=None, max_size=None):
@@ -830,7 +934,8 @@ class FTPWorker(mp_module.MPModule):
             self.write_open = True
             self.send_more_writes()
         else:
-            print("Create failed")
+            if self.put_callback is None:
+                print("Create failed")
             self.terminate_session()
 
     def send_more_writes(self):
@@ -922,68 +1027,91 @@ class FTPWorker(mp_module.MPModule):
         finally:
             self.terminate_session(send_termination=False)
 
-    def cmd_rm(self, args):
+    def cmd_rm(self, args, callback=None):
         '''remove file'''
         if len(args) == 0:
             print("Usage: rm FILENAME")
             return
         fname = args[0]
-        print("Removing %s" % fname)
-        enc_fname = bytearray(fname, 'ascii')
+        self.op_callback = callback
+        if callback is None:
+            print("Removing %s" % fname)
+        enc_fname = encode_filename(fname)
         op = FTP_OP(self.seq, self.session, OP_RemoveFile, len(enc_fname), 0, 0, 0, enc_fname)
         self.send(op)
 
-    def cmd_rmdir(self, args):
+    def cmd_rmdir(self, args, callback=None):
         '''remove directory'''
         if len(args) == 0:
             print("Usage: rmdir FILENAME")
             return
         dname = args[0]
-        print("Removing %s" % dname)
-        enc_dname = bytearray(dname, 'ascii')
+        self.op_callback = callback
+        if callback is None:
+            print("Removing %s" % dname)
+        enc_dname = encode_filename(dname)
         op = FTP_OP(self.seq, self.session, OP_RemoveDirectory, len(enc_dname), 0, 0, 0, enc_dname)
         self.send(op)
 
+    def finish_op_callback(self, op):
+        '''report the result of rm/rmdir/mkdir/rename to a code caller.
+        Returns False when there was no callback, so the console should be
+        told instead'''
+        callback = self.op_callback
+        if callback is None:
+            return False
+        self.op_callback = None
+        callback(ftp_errno(op))
+        return True
+
     def handle_remove_reply(self, op, m):
         '''handle remove reply'''
-        if op.opcode != OP_Ack:
+        if not self.finish_op_callback(op) and op.opcode != OP_Ack:
             print("Remove failed %s" % op)
         self.terminate_session()
 
-    def cmd_rename(self, args):
+    def cmd_rename(self, args, callback=None):
         '''rename file'''
         if len(args) < 2:
             print("Usage: rename OLDNAME NEWNAME")
             return
         name1 = args[0]
         name2 = args[1]
-        print("Renaming %s to %s" % (name1, name2))
-        enc_name1 = bytearray(name1, 'ascii')
-        enc_name2 = bytearray(name2, 'ascii')
+        # set first, so a bad name still reports through the callback when
+        # the launch failure terminates the session
+        self.op_callback = callback
+        enc_name1 = encode_filename(name1)
+        enc_name2 = encode_filename(name2)
         enc_both = enc_name1 + b'\x00' + enc_name2
+        if len(enc_both) > MAX_FTP_NAME:
+            raise ValueError('FTP rename names are too long')
+        if callback is None:
+            print("Renaming %s to %s" % (name1, name2))
         op = FTP_OP(self.seq, self.session, OP_Rename, len(enc_both), 0, 0, 0, enc_both)
         self.send(op)
 
     def handle_rename_reply(self, op, m):
         '''handle rename reply'''
-        if op.opcode != OP_Ack:
+        if not self.finish_op_callback(op) and op.opcode != OP_Ack:
             print("Rename failed %s" % op)
         self.terminate_session()
 
-    def cmd_mkdir(self, args):
+    def cmd_mkdir(self, args, callback=None):
         '''make directory'''
         if len(args) < 1:
             print("Usage: mkdir NAME")
             return
         name = args[0]
-        print("Creating directory %s" % name)
-        enc_name = bytearray(name, 'ascii')
+        self.op_callback = callback
+        if callback is None:
+            print("Creating directory %s" % name)
+        enc_name = encode_filename(name)
         op = FTP_OP(self.seq, self.session, OP_CreateDirectory, len(enc_name), 0, 0, 0, enc_name)
         self.send(op)
 
     def handle_mkdir_reply(self, op, m):
         '''handle mkdir reply'''
-        if op.opcode != OP_Ack:
+        if not self.finish_op_callback(op) and op.opcode != OP_Ack:
             print("Create directory failed %s" % op)
         self.terminate_session()
 
@@ -1443,11 +1571,12 @@ class FTPModule(mp_module.MPModule):
     def __init__(self, mpstate):
         super().__init__(mpstate, "ftp", public=True)
         self.add_command('ftp', self.cmd_ftp, "file transfer",
-                         ["<list|get|rm|rmdir|rename|mkdir|crc|cancel|status>",
+                         ["<list|get|rm|rmdir|rename|mkdir|crc|cancel|status|umount>",
                           "set (FTPSETTING)",
                           "put (FILENAME) (FILENAME)",
                           "crclocal (FILENAME)",
-                          "crccmp (FILENAME)"])
+                          "crccmp (FILENAME)",
+                          "mount (FILENAME)"])
         self.ftp_settings = mp_settings.MPSettings(
             [('debug', int, 0),
              ('pkt_loss_tx', int, 0),
@@ -1468,7 +1597,11 @@ class FTPModule(mp_module.MPModule):
              ('list_retries', int, 3),
              # ArduPilot currently has five GCS_FTP server sessions.  Keeping
              # the cap configurable also supports smaller/custom servers.
-             ('max_sessions', int, 5)])
+             ('max_sessions', int, 5),
+             # "ftp mount": how long directory listings are trusted, and how
+             # long a filesystem request may go without progress
+             ('mount_cache_time', float, 5.0),
+             ('mount_timeout', float, 30.0)])
         self.add_completion_function('(FTPSETTING)',
                                      self.ftp_settings.completion)
         self.workers = {}
@@ -1488,6 +1621,8 @@ class FTPModule(mp_module.MPModule):
         self.last_tx_deadline = 0.0
         self.last_rx_deadline = 0.0
         self.retired_sessions = {}
+        # active "ftp mount", an ftp_mount.FTPMount
+        self.mount = None
 
     def packet_lost(self, direction):
         '''Return true when the configured link simulator drops a packet.'''
@@ -1633,13 +1768,23 @@ class FTPModule(mp_module.MPModule):
             return None
         return worker
 
+    # console subcommands which still work while "ftp mount" is active
+    MOUNT_ALLOWED_COMMANDS = ('mount', 'umount', 'status', 'set')
+
     def cmd_ftp(self, args):
         '''FTP operations'''
-        usage = "Usage: ftp <list|get|put|rm|rmdir|rename|mkdir|crc|crclocal|crccmp>"
+        usage = "Usage: ftp <list|get|put|rm|rmdir|rename|mkdir|crc|crclocal|crccmp|mount|umount>"
         if len(args) < 1:
             print(usage)
             return
         command = args[0]
+        if self.mount is not None and \
+           command not in self.MOUNT_ALLOWED_COMMANDS:
+            # Refuse at once rather than queueing behind the mount's
+            # traffic.  This also stops a command reading a path inside the
+            # mountpoint from blocking the thread which services the mount.
+            print("ftp mount in operation; command not available")
+            return
         if command == 'set':
             self.ftp_settings.command(args[1:])
         elif command == 'status':
@@ -1648,6 +1793,10 @@ class FTPModule(mp_module.MPModule):
             self.cmd_cancel()
         elif command == 'crclocal':
             self.cmd_crclocal(args[1:])
+        elif command == 'mount':
+            self.cmd_mount(args[1:])
+        elif command == 'umount':
+            self.cmd_umount()
         else:
             method = getattr(self, 'cmd_' + command, None)
             if method is None:
@@ -1681,6 +1830,7 @@ class FTPModule(mp_module.MPModule):
             target_system=operation['target_system'],
             target_component=operation['target_component'])
         worker.operation_name = operation['name']
+        worker.owner = operation['owner']
         self.workers[session] = worker
         try:
             method = getattr(worker, operation['method'])
@@ -1702,12 +1852,14 @@ class FTPModule(mp_module.MPModule):
         return worker
 
     def _submit(self, name, method, *args, target_system=None,
-                target_component=None, **kwargs):
+                target_component=None, owner=None, **kwargs):
         operation = {
             'name': name,
             'method': method,
             'args': args,
             'kwargs': kwargs,
+            # anything cancel_owned() can recognise the operation by
+            'owner': owner,
             'target_system': self.target_system if target_system is None else target_system,
             'target_component': self.target_component if target_component is None else target_component,
         }
@@ -1756,20 +1908,26 @@ class FTPModule(mp_module.MPModule):
         # queuing remain well defined even with an accidental oversized setting.
         return min(255, max(1, int(self.ftp_settings.max_sessions)))
 
-    def cmd_list(self, args):
-        return self._submit('list', 'cmd_list', args)
+    def cmd_list(self, args, callback=None, target_system=None,
+                 target_component=None, owner=None):
+        return self._submit('list', 'cmd_list', args, callback=callback,
+                            target_system=target_system,
+                            target_component=target_component,
+                            owner=owner)
 
     def cmd_get(self, args, callback=None, callback_progress=None,
-                target_system=None, target_component=None, max_size=None):
+                target_system=None, target_component=None, max_size=None,
+                owner=None):
         return self._submit('get', 'cmd_get', args,
                             callback=callback,
                             callback_progress=callback_progress,
                             max_size=max_size,
                             target_system=target_system,
-                            target_component=target_component)
+                            target_component=target_component,
+                            owner=owner)
 
     def cmd_put(self, args, fh=None, callback=None, progress_callback=None,
-                target_system=None, target_component=None):
+                target_system=None, target_component=None, owner=None):
         '''Upload a file, or wildcard matches into a remote directory.'''
         if fh is None and args and glob.has_magic(args[0]):
             pattern = args[0]
@@ -1792,25 +1950,119 @@ class FTPModule(mp_module.MPModule):
                              callback=callback,
                              progress_callback=progress_callback,
                              target_system=target_system,
-                             target_component=target_component)
+                             target_component=target_component,
+                             owner=owner)
             return
         return self._submit('put', 'cmd_put', args, fh=fh,
                             callback=callback,
                             progress_callback=progress_callback,
                             target_system=target_system,
-                            target_component=target_component)
+                            target_component=target_component,
+                            owner=owner)
 
-    def cmd_rm(self, args):
-        return self._submit('rm', 'cmd_rm', args)
+    def cmd_rm(self, args, callback=None, target_system=None,
+               target_component=None, owner=None):
+        return self._submit('rm', 'cmd_rm', args, callback=callback,
+                            target_system=target_system,
+                            target_component=target_component,
+                            owner=owner)
 
-    def cmd_rmdir(self, args):
-        return self._submit('rmdir', 'cmd_rmdir', args)
+    def cmd_rmdir(self, args, callback=None, target_system=None,
+                  target_component=None, owner=None):
+        return self._submit('rmdir', 'cmd_rmdir', args, callback=callback,
+                            target_system=target_system,
+                            target_component=target_component,
+                            owner=owner)
 
-    def cmd_rename(self, args):
-        return self._submit('rename', 'cmd_rename', args)
+    def cmd_rename(self, args, callback=None, target_system=None,
+                   target_component=None, owner=None):
+        return self._submit('rename', 'cmd_rename', args, callback=callback,
+                            target_system=target_system,
+                            target_component=target_component,
+                            owner=owner)
 
-    def cmd_mkdir(self, args):
-        return self._submit('mkdir', 'cmd_mkdir', args)
+    def cmd_mkdir(self, args, callback=None, target_system=None,
+                  target_component=None, owner=None):
+        return self._submit('mkdir', 'cmd_mkdir', args, callback=callback,
+                            target_system=target_system,
+                            target_component=target_component,
+                            owner=owner)
+
+    def cmd_mount(self, args):
+        '''mount the vehicle filesystem on a local directory'''
+        if len(args) < 1 or len(args) > 2:
+            print("Usage: ftp mount LOCALDIR [REMOTEDIR]")
+            return
+        if self.mount is not None:
+            print("FTP: %s already mounted; use ftp umount first" %
+                  self.mount.description())
+            return
+        from MAVProxy.modules.lib import ftp_mount
+        remote_root = args[1] if len(args) > 1 else '/'
+        mount = ftp_mount.FTPMount(
+            self, os.path.expanduser(args[0]), remote_root,
+            target_system=self.target_system,
+            target_component=self.target_component)
+        if not self.mount_step(mount, mount.check_local):
+            return
+        # List the remote directory first, so a mistyped REMOTEDIR fails here
+        # rather than mounting something where every path is missing.  The
+        # mount counts as in operation meanwhile, so console commands are
+        # refused and a second mount is rejected.
+        mount.checking = True
+        self.mount = mount
+        print("FTP: checking %s" % mount.remote_root)
+        self.cmd_list([mount.remote_root],
+                      callback=lambda entries, error:
+                      self.mount_checked(mount, error),
+                      target_system=mount.target_system,
+                      target_component=mount.target_component)
+
+    def mount_step(self, mount, fn):
+        '''call fn, printing why on failure.  Returns True on success'''
+        try:
+            fn()
+        except ImportError:
+            print("ftp mount requires mfusepy: pip install mfusepy")
+            return False
+        except Exception as error:
+            # mfusepy raises OSError when libfuse itself is missing
+            print("ftp mount: %s" % error)
+            return False
+        return True
+
+    def mount_checked(self, mount, error):
+        '''the remote directory listing for a pending mount finished'''
+        if self.mount is not mount:
+            # unmounted while checking
+            return
+        mount.checking = False
+        if error:
+            self.mount = None
+            print("ftp mount: %s: %s" % (mount.remote_root, os.strerror(error)))
+            return
+        if not self.mount_step(mount, mount.start):
+            self.mount = None
+            return
+        print("FTP: mounted %s" % mount.description())
+
+    def cmd_umount(self):
+        '''unmount the vehicle filesystem'''
+        if self.mount is None:
+            print("FTP: nothing mounted")
+            return
+        mount = self.mount
+        if mount.checking:
+            # nothing mounted yet; mount_checked ignores the listing reply
+            self.mount = None
+            print("FTP: mount of %s abandoned" % mount.mountpoint)
+            return
+        description = mount.description()
+        try:
+            mount.stop()
+        finally:
+            self.mount = None
+        print("FTP: unmounted %s" % description)
 
     def cmd_crc(self, args):
         return self._submit('crc', 'cmd_crc', args)
@@ -1827,16 +2079,51 @@ class FTPModule(mp_module.MPModule):
         pending = self.pending
         self.pending = []
         for operation in pending:
-            callback = operation['kwargs'].get('callback')
-            if callback is not None:
-                callback(None)
-            progress = operation['kwargs'].get('progress_callback')
-            if progress is not None:
-                progress(None)
+            # one callback raising must not stop the others being told
+            try:
+                self._cancel_callbacks(operation)
+            except Exception as error:
+                print("FTP: cancel of %s: %s" % (operation['name'], error))
         for worker in list(self.workers.values()):
             worker.terminate_session("cancelled")
 
+    def cancel_owned(self, predicate):
+        '''cancel queued and active operations whose owner satisfies
+        predicate, telling their callbacks they failed'''
+        keep = []
+        for operation in self.pending:
+            if operation['owner'] is not None and predicate(operation['owner']):
+                try:
+                    self._cancel_callbacks(operation)
+                except Exception as error:
+                    print("FTP: cancel of %s: %s" % (operation['name'], error))
+            else:
+                keep.append(operation)
+        self.pending = keep
+        for worker in list(self.workers.values()):
+            owner = getattr(worker, 'owner', None)
+            if owner is not None and predicate(owner):
+                worker.terminate_session("cancelled")
+
+    @staticmethod
+    def _cancel_callbacks(operation):
+        '''tell a queued operation's callbacks that it failed'''
+        callback = operation['kwargs'].get('callback')
+        if callback is not None:
+            # the same failure the worker reports for each kind of operation
+            if operation['name'] == 'list':
+                callback(None, errno.EIO)
+            elif operation['name'] in ('rm', 'rmdir', 'mkdir', 'rename'):
+                callback(errno.EIO)
+            else:
+                callback(None)
+        progress = operation['kwargs'].get('progress_callback')
+        if progress is not None:
+            progress(None)
+
     def cmd_status(self):
+        if self.mount is not None:
+            print("FTP mount: %s" % self.mount.description())
         if not self.workers and not self.pending:
             # Keep the longstanding wording used by scripts and autotests.
             print("No transfer in progress")
@@ -1892,8 +2179,12 @@ class FTPModule(mp_module.MPModule):
         for worker in list(self.workers.values()):
             worker.idle_task()
         self._start_pending()
+        if self.mount is not None:
+            self.mount.process_requests()
 
     def unload(self):
+        if self.mount is not None:
+            self.cmd_umount()
         self.cmd_cancel()
         super().unload()
 
