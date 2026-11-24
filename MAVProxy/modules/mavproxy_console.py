@@ -111,6 +111,8 @@ class ConsoleModule(mp_module.MPModule):
         self.component_model = {}
         self.last_param_sysid_timestamp = None
         self.flight_information = {}
+        self.gnss = {}
+        self.gnss_fields = set()
 
         # create the main menu
         if mp_util.has_wxpython:
@@ -422,46 +424,96 @@ class ConsoleModule(mp_module.MPModule):
                 fg = 'black'
             self.console.set_status('Radio', 'Radio %u/%u %u/%u' % (msg.rssi, msg.noise, msg.remrssi, msg.remnoise), fg=fg)
 
-    def handle_gps_raw(self, msg):
-            master = self.master
-            type = msg.get_type()
-            if type == 'GPS_RAW_INT':
-                field = 'GPS'
-                prefix = 'GPS:'
-            else:
-                field = 'GPS2'
-                prefix = 'GPS2'
-            nsats = msg.satellites_visible
-            fix_type = msg.fix_type
-            yaw = msg.yaw
-            if fix_type >= 3:
-                gnss_heading_status = ''
-                if yaw > 0 and yaw < 65535:
-                    # GNSS heading
-                    gnss_heading_status = ' H'
-                elif yaw == 65535:
-                    # GNSS heading but no valid data
-                    gnss_heading_status = ' h'
-                self.console.set_status(field, '%s OK%s (%u)%s' % (prefix, fix_type, nsats, gnss_heading_status), fg=green)
-            else:
-                self.console.set_status(field, '%s %u (%u)' % (prefix, fix_type, nsats), fg='red')
-            if type == 'GPS_RAW_INT':
-                vfr_hud_heading = master.field('VFR_HUD', 'heading', None)
-                if vfr_hud_heading is None:
-                    # try to fill it in from GLOBAL_POSITION_INT instead:
-                    vfr_hud_heading = master.field('GLOBAL_POSITION_INT', 'hdg', None)
-                    if vfr_hud_heading is not None:
-                        if vfr_hud_heading == 65535:  # mavlink magic "unknown" value
-                            vfr_hud_heading = None
-                        else:
-                            vfr_hud_heading /= 100
-                gps_heading = int(msg.cog * 0.01)
-                if vfr_hud_heading is None:
-                    vfr_hud_heading = '---'
+    def draw_gps_heading_element(self, gps_heading):
+        '''draw the "Heading" element in console; gps_heading is in
+        degrees, or None if unknown'''
+        master = self.master
+        vfr_hud_heading = master.field('VFR_HUD', 'heading', None)
+        if vfr_hud_heading is None:
+            # try to fill it in from GLOBAL_POSITION_INT instead:
+            vfr_hud_heading = master.field('GLOBAL_POSITION_INT', 'hdg', None)
+            if vfr_hud_heading is not None:
+                if vfr_hud_heading == 65535:  # mavlink magic "unknown" value
+                    vfr_hud_heading = None
                 else:
-                    vfr_hud_heading = '%3u' % vfr_hud_heading
-                self.console.set_status('Heading', 'Hdg %s/%3u' %
-                                        (vfr_hud_heading, gps_heading))
+                    vfr_hud_heading /= 100
+        if vfr_hud_heading is None:
+            vfr_hud_heading = '---'
+        else:
+            vfr_hud_heading = '%3u' % vfr_hud_heading
+        if gps_heading is None:
+            gps_heading = '---'
+        else:
+            gps_heading = '%3u' % gps_heading
+        self.console.set_status('Heading', 'Hdg %s/%s' %
+                                (vfr_hud_heading, gps_heading))
+
+    def draw_gps_element(self, field, fix_type, nsats, gnss_heading_status=''):
+        '''draw a GPS element (GPS, GPS2, GPS3...) in console; nsats is
+        None if unknown'''
+        if field == 'GPS':
+            prefix = 'GPS:'
+        else:
+            prefix = field
+        if nsats is None:
+            nsats = '?'
+        else:
+            nsats = '%u' % nsats
+        if fix_type >= 3:
+            self.console.set_status(field, '%s OK%s (%s)%s' % (prefix, fix_type, nsats, gnss_heading_status), fg=green)
+        else:
+            self.console.set_status(field, '%s %u (%s)' % (prefix, fix_type, nsats), fg='red')
+
+    # console row for the GNSS receivers after the first two, which
+    # have their own row so that any number of them fit; the first two
+    # are on row 0, as for GPS_RAW_INT and GPS2_RAW
+    gnss_row = 5
+
+    def gnss_field(self, gnss_id):
+        '''return the console status field for GNSS receiver gnss_id.
+        Fields for receivers after the first two are created on the GNSS
+        row, along with any missing lower-numbered fields so the
+        receivers stay in order'''
+        if gnss_id == 0:
+            return 'GPS'
+        for i in range(2, gnss_id+1):
+            field = 'GPS%u' % (i+1)
+            if field not in self.gnss_fields:
+                self.console.set_status(field, '', fg='red', row=self.gnss_row)
+                self.gnss_fields.add(field)
+        return 'GPS%u' % (gnss_id+1)
+
+    def gnss_recently_seen(self, sysid):
+        '''return True if GNSS messages are being received from sysid'''
+        gnss = self.gnss.get(sysid, None)
+        return gnss is not None and time.time() - gnss.last_seen < 5
+
+    def handle_gps_raw(self, msg):
+        if self.gnss_recently_seen(msg.get_srcSystem()):
+            # GNSS carries the same information for every GPS
+            return
+        type = msg.get_type()
+        if type == 'GPS_RAW_INT':
+            field = 'GPS'
+        else:
+            field = 'GPS2'
+        yaw = msg.yaw
+        gnss_heading_status = ''
+        if yaw > 0 and yaw < 65535:
+            # GNSS heading
+            gnss_heading_status = ' H'
+        elif yaw == 65535:
+            # GNSS heading but no valid data
+            gnss_heading_status = ' h'
+        nsats = msg.satellites_visible
+        if nsats == 255:
+            nsats = None
+        self.draw_gps_element(field, msg.fix_type, nsats, gnss_heading_status)
+        if type == 'GPS_RAW_INT':
+            gps_heading = None
+            if msg.cog != 65535:
+                gps_heading = int(msg.cog * 0.01)
+            self.draw_gps_heading_element(gps_heading)
 
     def handle_vfr_hud(self, msg):
             master = self.master
@@ -854,6 +906,33 @@ class ConsoleModule(mp_module.MPModule):
         total_time = (msg.time_boot_ms - msg.takeoff_time_utc*0.001) * 0.001
         self.console.set_status('FlightTime', 'FlightTime %u:%02u' % (int(total_time)/60, int(total_time)%60))
 
+    def handle_gnss(self, msg):
+        sysid = msg.get_srcSystem()
+        if sysid not in self.gnss:
+            self.gnss[sysid] = ConsoleModule.GNSS(sysid)
+        self.gnss[sysid].last_seen = time.time()
+
+        field = self.gnss_field(msg.id)
+
+        gnss_heading_status = ''
+        if msg.yaw < 36000:
+            # GNSS heading
+            gnss_heading_status = ' H'
+        elif msg.yaw == 65534:
+            # GNSS heading but no valid data
+            gnss_heading_status = ' h'
+        nsats = msg.satellites_used
+        if nsats == 255:
+            nsats = None
+        self.draw_gps_element(field, msg.fix_type, nsats, gnss_heading_status)
+
+        if msg.id == 0:
+            # also update the GPS "Heading" in the console
+            gps_heading = None
+            if msg.cog != 65535:
+                gps_heading = int(msg.cog * 0.01)
+            self.draw_gps_heading_element(gps_heading)
+
     def handle_command_ack(self, msg):
         sysid = msg.get_srcSystem()
 
@@ -935,6 +1014,9 @@ class ConsoleModule(mp_module.MPModule):
         if type in [ 'GPS_RAW_INT', 'GPS2_RAW' ]:
             self.handle_gps_raw(msg)
 
+        elif type == 'GNSS':
+            self.handle_gnss(msg)
+
         elif type == 'VFR_HUD':
             self.handle_vfr_hud(msg)
 
@@ -984,12 +1066,18 @@ class ConsoleModule(mp_module.MPModule):
         # FLIGHT_INFORMATION support:
         self.probe_for_flight_information(msg.get_srcSystem(), msg.get_srcComponent())
 
-    class FlightInformation():
+    class MAVLinkMsgInfo():
         def __init__(self, sysid):
             self.sysid = sysid
             self.supported = None  # don't know
-            self.last_seen = None  # last time we saw FLIGHT_INFORMATION
+            self.last_seen = None  # last time we saw this message
             self.last_set_message_interval_sent = None  # last time we sent set-interval
+
+    class FlightInformation(MAVLinkMsgInfo):
+        pass
+
+    class GNSS(MAVLinkMsgInfo):
+        pass
 
     def probe_for_flight_information(self, sysid, compid):
         '''if we don't know if this vehicle supports flight information,
