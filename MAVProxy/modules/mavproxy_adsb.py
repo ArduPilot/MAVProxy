@@ -234,12 +234,6 @@ class ADSBModule(mp_module.MPModule):
                 mp.map.remove_object(vehicle_id)
                 mp.map.remove_object(vehicle_id + ":circle")
 
-        if expired_ids and hasattr(self, 'active_threat_ids'):
-            self.active_threat_ids = [
-                vehicle_id for vehicle_id in self.active_threat_ids
-                if vehicle_id not in expired_ids
-            ]
-
 
     def add_vehicle(self, state):
         '''handle an incoming vehicle packet'''

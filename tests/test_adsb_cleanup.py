@@ -1,25 +1,23 @@
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
-from MAVProxy.modules.mavproxy_adsb import (
-    ADSBModule,
-    ADSBVehicle,
-)
+from MAVProxy.modules.mavproxy_adsb import ADSBModule, ADSBVehicle
 
 
 @pytest.fixture
 def adsb_module():
-    # Создаём объект без полного запуска MAVProxy
+    # Create the module without initializing the full MAVProxy state
     module = ADSBModule.__new__(ADSBModule)
 
     module.threat_vehicles = {}
     module.ADSB_settings = SimpleNamespace(timeout=5)
 
-    # Фиксируем виртуальное время
+    # Use a fixed time for deterministic tests
     module.get_time = lambda: 10.0
 
-    # Не используем настоящую карту
+    # Disable real map integration
     module.module_matching = lambda pattern: []
 
     return module
@@ -28,34 +26,29 @@ def adsb_module():
 def add_record(module, icao, updated_at):
     key = f"ADSB-{icao}"
 
-    vehicle = ADSBVehicle(
-        id=key,
-        state={}
-    )
+    vehicle = ADSBVehicle(id=key, state={})
     vehicle.update_time = updated_at
 
     module.threat_vehicles[key] = vehicle
 
 
 def test_cleanup_removes_all_expired_records(adsb_module):
-    # Сreate 5 outdated objests
+    # Create five expired vehicles
     for icao in range(5):
         add_record(adsb_module, icao, updated_at=1.0)
 
     adsb_module.check_threat_timeout()
 
-    # All 5 should be removed
     assert len(adsb_module.threat_vehicles) == 0
 
 
 def test_cleanup_preserves_fresh_records(adsb_module):
-    # Сreate 5 fresh objects
+    # Create five fresh vehicles
     for icao in range(5):
         add_record(adsb_module, icao, updated_at=8.0)
 
     adsb_module.check_threat_timeout()
 
-    # All 5 should be present
     assert len(adsb_module.threat_vehicles) == 5
 
 
@@ -77,8 +70,6 @@ def test_cleanup_mixed_records(adsb_module):
 
 
 def test_cleanup_removes_map_objects(adsb_module):
-    from unittest.mock import Mock
-
     fake_map = Mock()
     fake_map_module = SimpleNamespace(map=fake_map)
     adsb_module.module_matching = lambda pattern: [fake_map_module]
@@ -89,7 +80,6 @@ def test_cleanup_removes_map_objects(adsb_module):
     adsb_module.check_threat_timeout()
 
     assert len(adsb_module.threat_vehicles) == 0
-
     assert fake_map.remove_object.call_count == 4
 
     for icao in (101, 102):
