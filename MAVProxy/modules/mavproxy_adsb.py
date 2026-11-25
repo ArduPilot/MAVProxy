@@ -214,22 +214,32 @@ class ADSBModule(mp_module.MPModule):
         return alt2 - alt1
 
     def check_threat_timeout(self):
-        '''check and handle threat time out'''
-        for id in self.threat_vehicles.keys():
-            if self.threat_vehicles[id].update_time == 0:
-                self.threat_vehicles[id].update_time = self.get_time()
-            dt = self.get_time() - self.threat_vehicles[id].update_time
-            if dt > self.ADSB_settings.timeout:
-                # if the threat has timed out...
-                del self.threat_vehicles[id]  # remove the threat from the dict
-                for mp in self.module_matching('map*'):
-                    # remove the threat from the map
-                    mp.map.remove_object(id)
-                    mp.map.remove_object(id+":circle")
-                # we've modified the dict we're iterating over, so
-                # we'll get any more timed-out threats next time we're
-                # called:
-                return
+        """Remove all expired ADS-B threats."""
+        now = self.get_time()
+        expired_ids = []
+
+        # Step 1: collect expired vehicle IDs
+        for vehicle_id, vehicle in self.threat_vehicles.items():
+            if vehicle.update_time == 0:
+                vehicle.update_time = now
+
+            if now - vehicle.update_time > self.ADSB_settings.timeout:
+                expired_ids.append(vehicle_id)
+
+        # Step 2: delete expired vehicles
+        for vehicle_id in expired_ids:
+            del self.threat_vehicles[vehicle_id]
+
+            for mp in self.module_matching('map*'):
+                mp.map.remove_object(vehicle_id)
+                mp.map.remove_object(vehicle_id + ":circle")
+
+        if expired_ids and hasattr(self, 'active_threat_ids'):
+            self.active_threat_ids = [
+                vehicle_id for vehicle_id in self.active_threat_ids
+                if vehicle_id not in expired_ids
+            ]
+
 
     def add_vehicle(self, state):
         '''handle an incoming vehicle packet'''
