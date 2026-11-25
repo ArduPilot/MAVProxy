@@ -234,7 +234,6 @@ class ADSBModule(mp_module.MPModule):
                 mp.map.remove_object(vehicle_id)
                 mp.map.remove_object(vehicle_id + ":circle")
 
-
     def add_vehicle(self, state):
         '''handle an incoming vehicle packet'''
         id = 'ADSB-' + str(state['ICAO_address'])

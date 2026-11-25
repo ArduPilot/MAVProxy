@@ -85,3 +85,21 @@ def test_cleanup_removes_map_objects(adsb_module):
     for icao in (101, 102):
         fake_map.remove_object.assert_any_call(f"ADSB-{icao}")
         fake_map.remove_object.assert_any_call(f"ADSB-{icao}:circle")
+
+
+
+def test_cleanup_keeps_vehicle_at_timeout_boundary(adsb_module):
+    add_record(adsb_module, 101, updated_at=5.0)
+
+    adsb_module.check_threat_timeout()
+
+    assert "ADSB-101" in adsb_module.threat_vehicles
+
+
+def test_cleanup_initializes_zero_update_time(adsb_module):
+    add_record(adsb_module, 101, updated_at=0)
+
+    adsb_module.check_threat_timeout()
+
+    vehicle = adsb_module.threat_vehicles["ADSB-101"]
+    assert vehicle.update_time == 10.0
