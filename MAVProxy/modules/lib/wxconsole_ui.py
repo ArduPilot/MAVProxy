@@ -32,6 +32,8 @@ class ConsoleFrame(wx.Frame):
         self.menu = None
         self.menu_callback = None
         self.menu_open = False
+        self.menu_generation = 0
+        self.menu_actions = 0
         self.pending_menu = None
         self.last_layout_send = time.time()
 
@@ -65,28 +67,58 @@ class ConsoleFrame(wx.Frame):
         ret = self.menu.find_selected(event)
         if ret is None:
             return
-        ret.call_handler()
-        state.child_pipe_send.send(ret)
+        self.menu_actions += 1
+        try:
+            ret.call_handler()
+            state.child_pipe_send.send(ret)
+        finally:
+            self.menu_actions -= 1
+            if self.pending_menu is not None:
+                wx.CallAfter(self.apply_pending_menu)
 
     def on_menu_open(self, event):
         '''prevent an asynchronous menu update replacing an open popup'''
+        self.menu_generation += 1
         self.menu_open = True
         event.Skip()
 
     def on_menu_close(self, event):
         '''apply the newest deferred menu after the native popup is gone'''
-        self.menu_open = False
         event.Skip()
-        if self.pending_menu is not None:
-            wx.CallAfter(self.apply_pending_menu)
+        menu = event.GetMenu()
+        if menu is not None and not self.is_top_menu(menu):
+            # Closing a submenu leaves its parent popup active on GTK.
+            return
+        # Keep timer-driven updates deferred until native cleanup has returned.
+        wx.CallAfter(self.finish_menu_close, self.menu_generation)
+
+    def is_top_menu(self, menu):
+        parent = menu.GetParent()
+        if parent is not None and 'wxMac' in wx.PlatformInfo:
+            # macOS hangs menubar menus off a hidden root menu
+            parent = parent.GetParent()
+        return parent is None
+
+    def finish_menu_close(self, generation):
+        if not self or self.IsBeingDeleted() or generation != self.menu_generation:
+            return
+        # Opening another menu before this callback ran starts a new session.
+        self.menu_open = False
+        self.apply_pending_menu()
 
     def apply_pending_menu(self):
         '''install the newest menu description when no popup is active'''
-        if self.menu_open or self.pending_menu is None:
+        if (not self or self.IsBeingDeleted() or self.menu_open or
+                self.menu_actions or self.pending_menu is None):
             return
+        menubar = self.pending_menu.wx_menu()
+        previous = self.GetMenuBar()
+        self.SetMenuBar(menubar)
         self.menu = self.pending_menu
         self.pending_menu = None
-        self.SetMenuBar(self.menu.wx_menu())
+        if previous is not None:
+            # SetMenuBar detaches the previous bar without deleting it.
+            previous.Destroy()
         self.Refresh()
         self.Update()
 
