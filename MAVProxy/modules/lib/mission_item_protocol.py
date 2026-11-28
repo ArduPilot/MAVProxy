@@ -15,6 +15,7 @@ import time
 
 from pymavlink import mavutil
 from MAVProxy.modules.lib import mp_module
+from MAVProxy.modules.lib import mp_settings
 from MAVProxy.modules.lib import mp_util
 if mp_util.has_wxpython:
     from MAVProxy.modules.lib.mp_menu import MPMenuCallFileDialog
@@ -51,6 +52,33 @@ class MissionItemProtocolModule(mp_module.MPModule):
         self.upload_start = None
         self.last_get_home = time.time()
         self.ftp_count = None
+        self.mip_settings = mp_settings.MPSettings([
+            ('autorefresh', int, 1),
+        ])
+
+        class OpaqueInformation():
+            '''class to keep track of what sysid/compid pair has what'''
+            def __init__(self):
+                self.have_id = -100  # meaning "we don't know"
+                self.autopilot_id = -100
+                self.mission_stale = False
+                self.mission_stale_warn_time = 0
+                self.expected_opaque_id = None
+
+            def set_autopilot_id(self, value):
+                self.autopilot_id = value
+
+            def set_have_id(self, value):
+                self.have_id = value
+
+            def set_expected(self, value):
+                '''value we are expecting to have after a transfer'''
+                self.expected_opaque_id = value
+
+            def transfer_complete(self):
+                self.have_id = self.expected_opaque_id
+
+        self.opaque = OpaqueInformation()
 
         if self.continue_mode and self.logdir is not None:
             waytxt = os.path.join(mpstate.status.logdir, self.save_filename())
@@ -251,10 +279,7 @@ on'''
         if mtype in ['MISSION_COUNT']:
             if getattr(m, 'mission_type', 0) != self.mav_mission_type():
                 return
-            if self.wp_op is None:
-                if self.wploader.expected_count != m.count:
-                    self.console.writeln("Mission is stale")
-            else:
+            if self.wp_op is not None:
                 self.wploader.clear()
                 self.console.writeln("Requesting %u %s t=%s now=%s" % (
                     m.count,
@@ -262,8 +287,26 @@ on'''
                     time.asctime(time.localtime(m._timestamp)),
                     time.asctime()))
                 self.wploader.expected_count = m.count
+                self.opaque.set_expected(getattr(m, 'opaque_id', 0))
+                if m.count == 0:
+                    # nothing to request, so no item will complete the download
+                    self.download_complete(m.get_srcSystem())
+                    return
                 self.send_wp_requests()
 
+        elif mtype in ['MISSION_CURRENT']:
+            self.opaque.set_autopilot_id(getattr(m, self.MISSION_CURRENT_opaque_id_attribute(), 0))
+        elif mtype in ['MISSION_ACK']:
+            # the vehicle accepted our upload (or clear) and returns the
+            # opaque ID of the items it now has, which are ours.  This
+            # arrives before MISSION_CURRENT reports the new ID.
+            if (getattr(m, 'mission_type', 0) == self.mav_mission_type() and
+                    m.type == mavutil.mavlink.MAV_MISSION_ACCEPTED and
+                    m.target_system == self.settings.source_system and
+                    m.target_component == self.settings.source_component):
+                opaque_id = getattr(m, 'opaque_id', 0)
+                self.opaque.set_have_id(opaque_id)
+                self.opaque.set_autopilot_id(opaque_id)
         elif mtype in ['MISSION_ITEM', 'MISSION_ITEM_INT'] and self.wp_op is not None:
             if m.get_type() == 'MISSION_ITEM_INT':
                 if getattr(m, 'mission_type', 0) != self.mav_mission_type():
@@ -286,17 +329,22 @@ on'''
                 # print("m.seq=%u expected_count=%u" % (m.seq, self.wploader.expected_count))
                 self.send_wp_requests()
                 return
-            if self.wp_op == 'list':
-                self.show_and_save(m.get_srcSystem())
-                self.loading_waypoints = False
-            elif self.wp_op == "save":
-                self.save_waypoints(self.wp_save_filename)
-            self.wp_op = None
-            self.wp_requested = {}
-            self.wp_received = {}
+            self.download_complete(m.get_srcSystem())
 
         elif mtype in frozenset(["MISSION_REQUEST", "MISSION_REQUEST_INT"]):
             self.process_waypoint_request(m, self.master)
+
+    def download_complete(self, source_system):
+        '''we hold every item the vehicle told us it has'''
+        if self.wp_op == 'list':
+            self.show_and_save(source_system)
+            self.loading_waypoints = False
+        elif self.wp_op == "save":
+            self.save_waypoints(self.wp_save_filename)
+        self.wp_op = None
+        self.wp_requested = {}
+        self.wp_received = {}
+        self.opaque.transfer_complete()
 
     def idle_task(self):
         '''handle missing waypoints'''
@@ -310,6 +358,7 @@ on'''
                 self.send_wp_requests(wps)
 
         self.idle_task_add_menu_items()
+        self.idle_task_check_opaque_id()
 
     def idle_task_add_menu_items(self):
         '''check for load of other modules, add our items as required'''
@@ -332,7 +381,39 @@ on'''
         else:
             self.menu_added_map = False
 
+    def idle_task_check_opaque_id(self):
+        '''the vehicle may return an identifier for its onboard mission.
+        Check it against what we think is on the vehicle, emit stale
+        message if we detect a mismatch'''
+        if self.opaque.autopilot_id == 0 and self.opaque.have_id in (0, -100):
+            # 0 means either "no items" or "opaque IDs not supported".
+            # Only a vehicle which supports them can have given us a
+            # non-zero ID, so if we hold one the vehicle's items have
+            # been cleared
+            return
+        hold_off = 10 if self.loading_waypoints else 3
+        if time.time() - self.loading_waypoint_lasttime < hold_off:
+            # our own upload or clear is under way; until the vehicle
+            # ACKs it, the ID the vehicle reports (0 for ArduPilot) is
+            # not one we can hold
+            return
+        if self.opaque.have_id == self.opaque.autopilot_id:
+            # reset so we work on things straight away:
+            self.opaque.mission_stale_warn_time = 0
+            return
+        now = time.time()
+        if now - self.opaque.mission_stale_warn_time < 30:
+            return
+        self.opaque.mission_stale_warn_time = now
+        if self.mip_settings.autorefresh:
+            self.say(f"Refreshing {self.itemstype()}")
+            self.cmd_list([])
+            return
+        self.opaque.mission_stale_warn_time = now
+        self.say(f"{self.itemstype()} mismatch vehicle vs MAVProxy")
+
     def has_location(self, cmd_id):
+
         '''return True if a WP command has a location'''
         if cmd_id in mavutil.mavlink.enums['MAV_CMD'].keys():
             cmd_enum = mavutil.mavlink.enums['MAV_CMD'][cmd_id]
@@ -911,11 +992,15 @@ on'''
             "savelocal": self.cmd_savelocal,
             "show": (self.cmd_show, ["(FILENAME)"]),
             "status": self.cmd_status,
+            "setting": self.setting,
         }
 
     def usage(self):
         subcommands = "|".join(sorted(self.commands().keys()))
         return "usage: %s <%s>" % (self.command_name(), subcommands)
+
+    def setting(self, args):
+        self.settings.command(args[1:])
 
     def cmd_wp(self, args):
         '''waypoint commands'''
