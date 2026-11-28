@@ -385,8 +385,17 @@ on'''
         '''the vehicle may return an identifier for its onboard mission.
         Check it against what we think is on the vehicle, emit stale
         message if we detect a mismatch'''
-        if self.opaque.autopilot_id == 0:
-            # no opaque ID available from autopilot
+        if self.opaque.autopilot_id == 0 and self.opaque.have_id in (0, -100):
+            # 0 means either "no items" or "opaque IDs not supported".
+            # Only a vehicle which supports them can have given us a
+            # non-zero ID, so if we hold one the vehicle's items have
+            # been cleared
+            return
+        hold_off = 10 if self.loading_waypoints else 3
+        if time.time() - self.loading_waypoint_lasttime < hold_off:
+            # our own upload or clear is under way; until the vehicle
+            # ACKs it, the ID the vehicle reports (0 for ArduPilot) is
+            # not one we can hold
             return
         if self.opaque.have_id == self.opaque.autopilot_id:
             # reset so we work on things straight away:
