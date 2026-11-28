@@ -266,6 +266,41 @@ is the total pack voltage, without `siyi.scr`'s aircraft-specific six-cell divis
 SIYI's controller demand/error, encoder, motor-voltage and threshold
 graphs have no equivalent telemetry in AP_CameraGimbal and are not included.
 
+## Hotspot map markers
+
+`camera hotspot 60` enables flame markers for the selected camera whenever a
+`CAMERA_THERMAL_RANGE` report has a maximum temperature strictly above 60 °C.
+The threshold defaults to zero (disabled); `camera hotspot 0` stops new markers
+without removing existing ones. `camera hotspot` shows the current threshold.
+Use `camera for SYSID:COMPID hotspot 60` to set another camera's threshold, or
+`camera all hotspot 60` to enable all discovered cameras.
+
+The hottest point is projected using its report's stream ID, normalized image
+coordinates, and the same live vehicle/gimbal pose, stream FOV and terrain
+model as a video click. No video viewer needs to be open. Missing coordinates,
+stream geometry or ground intersections, or a vehicle position or attitude
+more than five seconds old, produce no marker. Reports for
+non-MAVLink cameras attached to autopilots (`camera_device_id` other than zero)
+are ignored because their stream/mount mapping is not available.
+
+Detections from one camera within 50 m of an existing marker are grouped with
+it. The flame sits at the centroid of the group, and its label gives the
+hottest temperature seen and the number of detections, for example
+`79 C (32)`. A yellow circle around a group reaches its furthest detection,
+showing the scatter of its newest 10,000 projected positions. Markers are
+redrawn at most once a second and are drawn above the survey coverage overlay.
+
+The 4,000 most recently updated markers are retained on all loaded maps and
+return when a map is reopened.
+
+`camera hotspot clear` clears all flames. **Clear Hotspots** in a camera's menu
+clears that camera's flames; the command equivalent is
+`camera for SYSID:COMPID hotspot clear`. Clearing leaves thresholds enabled,
+so new hot frames can add markers again. Unloading the camera module removes
+its hotspot markers. Enabling detection requests thermal-range telemetry,
+including a probe for cameras that do not advertise the capability; the camera
+firmware must implement the message.
+
 ## Custom camera settings
 
 Choose **Camera → Custom Settings** in the console or map menu, or run

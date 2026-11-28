@@ -14,6 +14,7 @@ from MAVProxy.modules.lib import mp_util
 from MAVProxy.modules.lib import camera_projection
 from MAVProxy.modules.mavproxy_camera.parameters import CameraParameters
 from MAVProxy.modules.mavproxy_camera.graphs import CameraGraphs, PRESETS
+from MAVProxy.modules.mavproxy_camera.hotspots import CameraHotspots
 from MAVProxy.modules.mavproxy_camera.survey import SurveyCoverage
 from MAVProxy.modules.mavproxy_camera.roi import CameraROI, gimbal_capabilities
 from MAVProxy.modules.mavproxy_camera.thermal_stream import is_raw_thermal
@@ -100,6 +101,7 @@ class CameraDevice:
         self.thermal_interval = None
         self.last_thermal_request = 0.0
         self.last_thermal_update = 0.0
+        self.hotspot_threshold = 0.0
         self.definition = None
         self.parameters = None
         self.control_overrides = {}
@@ -164,7 +166,7 @@ class CameraModule(mp_module.MPModule):
         ])
         camera_commands = (
             "<status|discover|info|custom|definition|params|param|streams|view|"
-            "projection|graph|roi|coverage|photo|stopphotos|record|zoom|focus|"
+            "projection|graph|hotspot|roi|coverage|photo|stopphotos|record|zoom|focus|"
             "mode|source|stream|mount|set>")
         self.add_command(
             "camera", self.cmd_camera, "MAVLink camera control",
@@ -172,6 +174,7 @@ class CameraModule(mp_module.MPModule):
              "all " + camera_commands,
              "roi <all|clear>",
              "projection <toggle>",
+             "hotspot <clear>",
              "for (CAMERAADDRESS)",
              "graph <%s|close>" % "|".join(p[0] for p in PRESETS),
              "set (CAMERASETTING)"])
@@ -190,6 +193,7 @@ class CameraModule(mp_module.MPModule):
         self.graphs = CameraGraphs(self, _quaternion_to_euler)
         self.roi = CameraROI(self)
         self.coverage = SurveyCoverage(self)
+        self.hotspots = CameraHotspots(self)
         self.last_status_request = 0.0
         self.last_discovery_request = 0.0
         self.vehicle_messages = {}
@@ -213,6 +217,7 @@ class CameraModule(mp_module.MPModule):
             MPMenuItem("Discover", returnkey=prefix + "discover"),
             MPMenuItem("Custom Settings", returnkey=prefix + "custom"),
             MPMenuItem("Toggle Projection", returnkey=prefix + "projection toggle"),
+            MPMenuItem("Clear Hotspots", returnkey=prefix + "hotspot clear"),
             MPMenuSubMenu("Graphs", items=[
                 MPMenuItem(title, returnkey=prefix + "graph " + graph_name)
                 for graph_name, title, _message_type, _fields in PRESETS
@@ -313,6 +318,7 @@ class CameraModule(mp_module.MPModule):
 
     def unload(self):
         self.roi.close()
+        self.hotspots.clear()
         self.remove_command("camera")
         self._clear_fov()
         for view in self.views.values():
@@ -343,6 +349,7 @@ class CameraModule(mp_module.MPModule):
   camera view <ID|rgb|thermal|rawthermal|all>     open video/raw thermal viewer(s)
   camera projection [toggle]           show/refresh or toggle this camera's projection
   camera graph [NAME|close]            list/open graphs or close camera graphs
+  camera hotspot [CELSIUS|clear]       mark hotter points; 0 disables (default); clear flames
   camera roi [all|clear]               point camera(s) at map click or stop tracking
   camera photo [INTERVAL [COUNT]]      capture one or a sequence of photos
   camera stopphotos                    stop an indefinite/interval capture
@@ -636,6 +643,8 @@ class CameraModule(mp_module.MPModule):
                 self.cmd_projection(args[1:])
             elif command == "graph":
                 self.graphs.open(args[1:])
+            elif command == "hotspot":
+                self.hotspots.command(args[1:])
             elif command == "roi":
                 self.roi.command(args[1:])
             elif command == "photo":
@@ -1066,6 +1075,8 @@ class CameraModule(mp_module.MPModule):
                 "ATTITUDE", system_id, self.camera_settings.manager_component)
             if vehicle_attitude is None:
                 return None
+            if time.time() - getattr(vehicle_attitude, "_timestamp", time.time()) > 5.0:
+                return None
             vehicle_dt = max(0.0, min(
                 0.5, time.time() -
                 getattr(vehicle_attitude, "_timestamp", time.time())))
@@ -1139,6 +1150,8 @@ class CameraModule(mp_module.MPModule):
             position = self._vehicle_message(
                 "GLOBAL_POSITION_INT", camera.system_id,
                 self.camera_settings.manager_component)
+            if time.time() - getattr(position, "_timestamp", time.time()) > 5.0:
+                return None
             located = self._camera_position(position)
             attitude = self._fov_attitude()
             if located is None or attitude is None:
@@ -1540,6 +1553,7 @@ class CameraModule(mp_module.MPModule):
         elif message_type == "CAMERA_THERMAL_RANGE":
             camera = self._ensure_camera(system_id, component_id)
             camera.last_thermal_update = time.time()
+            self.hotspots.packet(camera, message)
         elif message_type == "CAMERA_CAPTURE_STATUS":
             camera = self._ensure_camera(system_id, component_id)
             camera.capture_status = message
@@ -1577,6 +1591,9 @@ class CameraModule(mp_module.MPModule):
                 if view is not None:
                     view.close()
             camera.streams[message.stream_id] = message
+            view = self.views.get((system_id, component_id, message.stream_id))
+            if view is not None:
+                view.stream = message
             for stream_id in range(1, message.count + 1):
                 if stream_id not in camera.streams:
                     self._request_message(
@@ -1586,8 +1603,14 @@ class CameraModule(mp_module.MPModule):
         elif message_type == "VIDEO_STREAM_STATUS":
             camera = self._ensure_camera(system_id, component_id)
             stream = camera.streams.get(message.stream_id)
-            if stream is not None:
+            if stream is not None and (getattr(message, "camera_device_id", 0) ==
+                                       getattr(stream, "camera_device_id", 0)):
                 stream.flags = message.flags
+                # zoom changes the FOV without a new VIDEO_STREAM_INFORMATION
+                for field in ("hfov", "resolution_h", "resolution_v"):
+                    value = getattr(message, field, 0)
+                    if value:
+                        setattr(stream, field, value)
         elif message_type == "GIMBAL_DEVICE_INFORMATION":
             if self._is_gimbal_device_component(component_id):
                 gimbal = self._ensure_gimbal(system_id, component_id)
@@ -1633,6 +1656,7 @@ class CameraModule(mp_module.MPModule):
     def idle_task(self):
         now = time.time()
         self.coverage.idle()
+        self.hotspots.idle()
         self.graphs.idle()
         self.roi.idle()
         self._sync_menus()

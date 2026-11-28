@@ -16,6 +16,7 @@ os.environ.setdefault("MAVLINK20", "1")
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from MAVProxy.modules.lib import mp_util  # noqa: E402
 from MAVProxy.modules.mavproxy_camera import CameraModule  # noqa: E402
 from MAVProxy.modules.mavproxy_camera.graphs import PRESETS  # noqa: E402
 from MAVProxy.modules.mavproxy_link import LinkModule  # noqa: E402
@@ -151,6 +152,13 @@ def stream_information(stream_id, thermal=False, uri=None):
         name="Thermal" if thermal else "Visible",
         uri=uri or "rtsp://192.168.144.25:8554/video%u" % stream_id,
         encoding=mavutil.mavlink.VIDEO_STREAM_ENCODING_H264)
+
+
+def thermal_range(**overrides):
+    fields = dict(stream_id=2, camera_device_id=0, time_boot_ms=1000,
+                  max=80.0, max_point_x=.5, max_point_y=.5)
+    fields.update(overrides)
+    return Message("CAMERA_THERMAL_RANGE", **fields)
 
 
 class CameraModuleTest(unittest.TestCase):
@@ -814,6 +822,302 @@ class CameraModuleTest(unittest.TestCase):
         self.module.mavlink_packet(Message("CAMERA_THERMAL_RANGE", component_id=100,
                                           stream_id=2, camera_device_id=0, max=42.5))
         first.add_values.assert_called_once_with([42.5])
+
+    def hotspot_icons(self, display=None):
+        display = self.state.map if display is None else display
+        return {key: obj for key, obj in display.objects.items()
+                if key.startswith("CameraHotspot_")}
+
+    @mock.patch("MAVProxy.modules.lib.mp_util.has_wxpython", True)
+    def test_hotspot_default_threshold_validation_and_disable(self):
+        self.module.mavlink_packet(camera_information())
+        self.module.mavlink_packet(stream_information(2, thermal=True))
+        camera = self.module.cameras[(1, 100)]
+        self.assertEqual(camera.hotspot_threshold, 0)
+        with mock.patch.object(self.module, "project_pixel", return_value=(-35., 149., 500.)) as project:
+            self.module.mavlink_packet(thermal_range())
+            project.assert_not_called()
+            self.module.cmd_camera(["hotspot", "60"])
+            self.assertEqual(camera.hotspot_threshold, 60)
+            requests = self.commands(mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL)
+            self.assertEqual(requests[-1][:2], (1, 100))
+            self.assertEqual(requests[-1][4], mavutil.mavlink.MAVLINK_MSG_ID_CAMERA_THERMAL_RANGE)
+            for args in (["nan"], ["inf"], ["-inf"], ["bad"], ["60", "extra"]):
+                with self.subTest(args=args), contextlib.redirect_stdout(io.StringIO()) as output:
+                    self.module.cmd_camera(["hotspot"] + args)
+                    self.assertIn("Camera command error", output.getvalue())
+                    self.assertEqual(camera.hotspot_threshold, 60)
+            self.module.mavlink_packet(thermal_range(max=60))
+            project.assert_not_called()
+            self.module.mavlink_packet(thermal_range(max=61))
+            project.assert_called_once()
+            self.assertEqual(len(self.module.hotspots.markers), 1)
+            self.module.cmd_camera(["hotspot", "0"])
+            self.module.mavlink_packet(thermal_range(time_boot_ms=2000))
+            project.assert_called_once()
+            self.assertEqual(len(self.module.hotspots.markers), 1)
+            with contextlib.redirect_stdout(io.StringIO()) as output:
+                self.module.cmd_camera(["hotspot"])
+            self.assertIn("disabled", output.getvalue())
+
+    @mock.patch("MAVProxy.modules.lib.mp_util.has_wxpython", True)
+    def test_hotspot_projects_thermal_frame_without_open_viewer(self):
+        self.module.hotspots.radius = -1  # no grouping
+        self.setup_nadir_view()
+        self.module.mavlink_packet(stream_information(2, thermal=True))
+        self.assertFalse(self.module.views)
+        self.module.cmd_camera(["hotspot", "60"])
+        with mock.patch.object(self.state.map, "icon", wraps=self.state.map.icon) as icon:
+            self.module.mavlink_packet(thermal_range())
+            icon.assert_called_once_with("flame.png")
+        center = next(iter(self.hotspot_icons().values()))
+        self.assertAlmostEqual(center.latlon[0], -35.363262, places=5)
+        self.assertAlmostEqual(center.latlon[1], 149.165237, places=5)
+        self.assertEqual(center.label, "80 C")
+        self.assertEqual(center.layer, "Thermal hotspots")
+        self.assertGreater(center.layer, "Survey coverage")  # layers draw in name order
+        self.module.mavlink_packet(thermal_range())  # same frame, another link
+        self.assertEqual(len(self.hotspot_icons()), 1)
+        self.module.mavlink_packet(thermal_range(time_boot_ms=2000, max_point_x=.75))
+        icons = list(self.hotspot_icons().values())
+        self.assertEqual(len(icons), 2)
+        self.assertGreater(icons[1].latlon[1], center.latlon[1])
+        self.assertNotIn("CameraClick", self.state.map.objects)
+        self.assertFalse(hasattr(self.state, "click_location"))
+
+    @mock.patch("MAVProxy.modules.lib.mp_util.has_wxpython", True)
+    def test_hotspot_repeats_stale_position_and_stream_status(self):
+        self.module.hotspots.radius = -1  # no grouping
+        self.setup_nadir_view()
+        self.module.mavlink_packet(stream_information(2, thermal=True))
+        self.module.cmd_camera(["hotspot", "60"])
+        first = thermal_range(max_point_x=.75)
+        self.module.mavlink_packet(first)
+        self.module.mavlink_packet(thermal_range(time_boot_ms=2000, max_point_x=.75))
+        self.module.mavlink_packet(first)  # delayed copy from another link
+        self.module.mavlink_packet(thermal_range(time_boot_ms=1500))  # late frame
+        self.module.mavlink_packet(thermal_range(time_boot_ms=2500, max=20))
+        self.module.mavlink_packet(thermal_range(time_boot_ms=2400))  # late after a cool frame
+        self.module.mavlink_packet(thermal_range(time_boot_ms=2600, max_point_x=float("nan")))
+        self.module.mavlink_packet(thermal_range(time_boot_ms=20000, max=20))
+        self.module.mavlink_packet(thermal_range(time_boot_ms=2600, max_point_x=float("nan")))
+        self.assertEqual(self.module.hotspots.newest[(1, 100, 2)], 20000)
+        self.module.mavlink_packet(thermal_range(time_boot_ms=10000))  # exactly 10 s late
+        self.assertEqual(self.module.hotspots.newest[(1, 100, 2)], 20000)
+        self.module.mavlink_packet(first)  # an old repeat is not a camera restart
+        self.module.mavlink_packet(thermal_range(time_boot_ms=15000))
+        cool = thermal_range(time_boot_ms=5000, max=20)
+        self.module.mavlink_packet(cool)  # taken as a camera restart
+        self.module.mavlink_packet(thermal_range(time_boot_ms=40000, max=20))
+        self.module.mavlink_packet(cool)  # an old cool repeat
+        self.module.mavlink_packet(thermal_range(time_boot_ms=35000))
+        self.module.mavlink_packet(thermal_range(time_boot_ms=2**32 - 19000, max=20))
+        late_hot = thermal_range(time_boot_ms=2**32 - 20000)
+        self.module.mavlink_packet(late_hot)
+        self.module.mavlink_packet(thermal_range(time_boot_ms=2**32 - 1000, max=20))
+        self.module.mavlink_packet(thermal_range(time_boot_ms=2000, max=20))
+        self.module.mavlink_packet(late_hot)  # repeat 22 s after the original stamp
+        self.module.mavlink_packet(thermal_range(time_boot_ms=2**32 - 500))  # late across wrap
+        self.assertEqual(self.module.hotspots.newest[(1, 100, 2)], 2000)
+        icons = list(self.hotspot_icons().values())
+        self.assertEqual(len(icons), 2)
+        status = Message("VIDEO_STREAM_STATUS", stream_id=2, hfov=12, resolution_h=0,
+                         resolution_v=0, flags=self.module.cameras[(1, 100)].streams[2].flags)
+        self.module.mavlink_packet(status)
+        stream = self.module.cameras[(1, 100)].streams[2]
+        self.assertEqual((stream.hfov, stream.resolution_h, stream.resolution_v), (12, 1280, 720))
+        self.module.mavlink_packet(thermal_range(time_boot_ms=3000, max_point_x=.75))
+        icons = list(self.hotspot_icons().values())
+        self.assertEqual(len(icons), 3)
+        self.assertLess(icons[2].latlon[1], icons[0].latlon[1])
+        status.camera_device_id, status.hfov = 2, 40  # another camera's stream
+        self.module.mavlink_packet(status)
+        self.assertEqual(stream.hfov, 12)
+        self.state._master.messages["ATTITUDE"]._timestamp = time.time() - 10
+        self.module.mavlink_packet(thermal_range(time_boot_ms=3500))
+        self.assertEqual(len(self.hotspot_icons()), 3)
+        self.state._master.messages["ATTITUDE"]._timestamp = time.time()
+        position = self.projection_position()
+        position._timestamp = time.time() - 10
+        self.module.mavlink_packet(position)
+        self.module.mavlink_packet(thermal_range(time_boot_ms=4000))
+        self.assertEqual(len(self.hotspot_icons()), 3)
+
+    @mock.patch("MAVProxy.modules.lib.mp_util.has_wxpython", True)
+    def test_hotspot_uses_report_stream_and_rejects_invalid_data(self):
+        self.module.hotspots.radius = -1  # no grouping
+        self.state.map = FakeMap()
+        self.module.mavlink_packet(camera_information())
+        self.module.mavlink_packet(stream_information(1))
+        self.module.mavlink_packet(stream_information(2, thermal=True))
+        self.module.cmd_camera(["hotspot", "60"])
+        camera = self.module.cameras[(1, 100)]
+        with mock.patch.object(self.module, "project_pixel", return_value=(-35., 149., 500.)) as project:
+            for fields in (dict(max=math.nan), dict(max=math.inf), dict(max=59),
+                           dict(max_point_x=math.nan), dict(max_point_y=math.inf),
+                           dict(max_point_x=-.01), dict(max_point_x=1.01),
+                           dict(max_point_y=-.01), dict(max_point_y=1.01),
+                           dict(stream_id=99), dict(camera_device_id=1),
+                           dict(system_id=42), dict(component_id=101)):
+                with self.subTest(fields=fields):
+                    self.module.mavlink_packet(thermal_range(**fields))
+            project.assert_not_called()
+            self.module.mavlink_packet(thermal_range(max_point_x=.25, max_point_y=.75))
+            project.assert_called_once_with(camera, camera.streams[2], 320., 540., 1280, 720)
+            self.assertEqual(len(self.hotspot_icons()), 1)
+            # A valid edge location is retained; an unknown image size is not.
+            self.module.mavlink_packet(thermal_range(time_boot_ms=2000, max_point_x=0, max_point_y=1))
+            self.assertEqual(len(self.hotspot_icons()), 2)
+            camera.streams[2].resolution_h = 0
+            self.module.mavlink_packet(thermal_range(time_boot_ms=3000))
+            self.assertEqual(project.call_count, 2)
+
+    @mock.patch("MAVProxy.modules.lib.mp_util.has_wxpython", True)
+    def test_hotspots_without_timestamps_and_changed_reports_are_retained(self):
+        self.module.hotspots.radius = -1  # no grouping
+        self.state.map = FakeMap()
+        self.module.mavlink_packet(camera_information())
+        self.module.mavlink_packet(stream_information(2, thermal=True))
+        self.module.cmd_camera(["hotspot", "60"])
+        with mock.patch.object(self.module, "project_pixel", return_value=(-35., 149., 500.)):
+            self.module.mavlink_packet(thermal_range(time_boot_ms=0))
+            self.module.mavlink_packet(thermal_range(time_boot_ms=0))
+            self.assertEqual(len(self.hotspot_icons()), 2)
+            self.module.mavlink_packet(thermal_range(time_boot_ms=1000, max=80))
+            self.module.mavlink_packet(thermal_range(time_boot_ms=1000, max=81))
+            self.module.mavlink_packet(thermal_range(time_boot_ms=1000, max=81))
+        self.assertEqual(len(self.hotspot_icons()), 4)
+
+    @mock.patch("MAVProxy.modules.lib.mp_util.has_wxpython", True)
+    def test_hotspots_evict_oldest_marker_from_each_map(self):
+        self.module.hotspots.radius = -1  # no grouping
+        self.state.map = FakeMap()
+        second = FakeMap()
+        self.state.public_modules['map2'] = SimpleNamespace(map=second)
+        self.state.map.objects['unrelated'] = object()
+        self.module.hotspots.limit = 2
+        self.module.mavlink_packet(camera_information())
+        self.module.mavlink_packet(stream_information(2, thermal=True))
+        self.module.cmd_camera(["hotspot", "60"])
+        with mock.patch.object(self.module, "project_pixel", return_value=(-35., 149., 500.)):
+            for stamp in (1000, 2000, 3000):
+                self.module.mavlink_packet(thermal_range(time_boot_ms=stamp))
+        self.assertEqual(len(self.module.hotspots.markers), 2)
+        for display in (self.state.map, second):
+            self.assertEqual(set(self.hotspot_icons(display)),
+                             {'CameraHotspot_1_100_2', 'CameraHotspot_1_100_3'})
+            self.assertIn('CameraHotspot_1_100_1', display.removed)
+        self.assertIn('unrelated', self.state.map.objects)
+        self.state.map = FakeMap()
+        self.module.hotspots.idle()
+        self.assertEqual(set(self.hotspot_icons()),
+                         {'CameraHotspot_1_100_2', 'CameraHotspot_1_100_3'})
+
+    @mock.patch("MAVProxy.modules.lib.mp_util.has_wxpython", True)
+    def test_hotspots_within_radius_are_grouped(self):
+        self.state.map = FakeMap()
+        self.module.mavlink_packet(camera_information())
+        self.module.mavlink_packet(stream_information(2, thermal=True))
+        self.module.cmd_camera(["hotspot", "60"])
+        hotspots = self.module.hotspots
+        east = mp_util.gps_newpos(-35., 149., 90, 30)
+        far = mp_util.gps_newpos(-35., 149., 90, 200)
+        with mock.patch.object(self.module, "project_pixel") as project:
+            for stamp, (lat, lon), temperature in ((1000, (-35., 149.), 70), (2000, east, 79),
+                                                   (3000, far, 65), (4000, (-35., 149.), 72)):
+                project.return_value = (lat, lon, 500.)
+                self.module.mavlink_packet(thermal_range(time_boot_ms=stamp, max=temperature))
+        self.assertEqual([(len(g.points), g.count) for g in hotspots.markers.values()], [(1, 1), (3, 3)])
+        # redraws are limited to once a second per group
+        self.assertEqual(self.hotspot_icons()['CameraHotspot_1_100_1'].label, "70 C")
+        for group in hotspots.markers.values():
+            group.drawn = 0
+        hotspots.idle()
+        icons = self.hotspot_icons()
+        self.assertEqual(set(icons), {'CameraHotspot_1_100_1', 'CameraHotspot_1_100_2'})
+        group = icons['CameraHotspot_1_100_1']
+        self.assertEqual(group.label, "79 C (3)")
+        self.assertAlmostEqual(group.latlon[1], 149. + (east[1] - 149.) / 3, places=7)
+        self.assertEqual(icons['CameraHotspot_1_100_2'].label, "65 C")
+        circle = self.state.map.objects['CameraHotspotArea_1_100_1']
+        self.assertEqual((circle.color, circle.layer), ((255, 255, 0), group.layer))
+        self.assertAlmostEqual(circle.radius, 20, delta=0.5)
+        self.assertLess(circle.key, group.key)  # the flame is drawn over its circle
+        self.assertNotIn('CameraHotspotArea_1_100_2', self.state.map.objects)
+        self.module.cmd_camera(["hotspot", "clear"])
+        self.assertFalse([k for k in self.state.map.objects if k.startswith('CameraHotspot')])
+
+    @mock.patch("MAVProxy.modules.lib.mp_util.has_wxpython", True)
+    def test_hotspot_requires_ground_intersection(self):
+        view = self.setup_nadir_view()
+        self.module.mavlink_packet(stream_information(2, thermal=True))
+        self.module.cmd_camera(["hotspot", "60"])
+        self.module.vehicle_messages.clear()
+        self.state._master.messages.pop("GLOBAL_POSITION_INT", None)
+        self.module.mavlink_packet(thermal_range())
+        self.assertFalse(self.hotspot_icons())
+        # A report without geometry must not consume the frame permanently.
+        self.module.mavlink_packet(self.projection_position())
+        self.module.mavlink_packet(thermal_range())
+        self.assertEqual(len(self.hotspot_icons()), 1)
+        self.assertEqual(view.camera.hotspot_threshold, 60)
+
+    @mock.patch("MAVProxy.modules.lib.mp_util.has_wxpython", True)
+    def test_hotspot_thresholds_menu_clear_and_unload_are_camera_scoped(self):
+        self.state.map = FakeMap()
+        for system, component in ((1, 100), (1, 101), (42, 100)):
+            self.module.mavlink_packet(camera_information(system_id=system, component_id=component))
+            stream = stream_information(2, thermal=True)
+            stream._system_id, stream._component_id = system, component
+            self.module.mavlink_packet(stream)
+        self.module.cmd_camera(["for", "1:101", "hotspot", "60"])
+        self.assertEqual(self.module.cameras[(1, 100)].hotspot_threshold, 0)
+        self.assertEqual(self.module.cameras[(1, 101)].hotspot_threshold, 60)
+        self.module.cmd_camera(["all", "hotspot", "70"])
+        with mock.patch.object(self.module, "project_pixel", return_value=(-35., 149., 500.)):
+            for system, component in ((1, 100), (1, 101), (42, 100)):
+                self.module.mavlink_packet(thermal_range(system_id=system, component_id=component))
+            self.assertEqual(len(self.hotspot_icons()), 3)
+            self.module._sync_menus()
+            menu = next(m for m in self.module.menus if m.name == "Camera2")
+            clear = next(item for item in menu.items if item.name == "Clear Hotspots")
+            self.assertEqual(clear.returnkey, "# camera for 1:101 hotspot clear")
+            self.module.cmd_camera(clear.returnkey.split()[2:])
+            self.assertEqual(len(self.hotspot_icons()), 2)
+            self.assertEqual(self.module.cameras[(1, 101)].hotspot_threshold, 70)
+            self.module.mavlink_packet(thermal_range(component_id=101, time_boot_ms=2000))
+            self.assertEqual(len(self.hotspot_icons()), 3)
+            self.state.map.objects['unrelated'] = object()
+            self.module.cmd_camera(["hotspot", "clear"])
+            self.assertFalse(self.hotspot_icons())
+            self.assertIn('unrelated', self.state.map.objects)
+            self.module.mavlink_packet(thermal_range(time_boot_ms=3000))
+            self.assertEqual(len(self.hotspot_icons()), 1)
+        self.module.unload()
+        self.assertFalse(self.hotspot_icons())
+        self.assertIn('unrelated', self.state.map.objects)
+
+    @mock.patch("MAVProxy.modules.lib.mp_util.has_wxpython", True)
+    def test_hotspots_appear_on_new_and_replaced_maps(self):
+        self.module.mavlink_packet(camera_information())
+        self.module.mavlink_packet(stream_information(2, thermal=True))
+        self.module.cmd_camera(["hotspot", "60"])
+        with mock.patch.object(self.module, "project_pixel", return_value=(-35., 149., 500.)):
+            self.module.mavlink_packet(thermal_range())
+        self.state.map = FakeMap()
+        second = FakeMap()
+        self.state.public_modules['map2'] = SimpleNamespace(map=second)
+        self.module.hotspots.idle()
+        self.assertEqual(len(self.hotspot_icons()), 1)
+        self.assertEqual(len(self.hotspot_icons(second)), 1)
+        self.state.map = FakeMap()
+        self.module.hotspots.idle()
+        self.assertEqual(len(self.hotspot_icons()), 1)
+        self.module.cmd_camera(["hotspot", "clear"])
+        self.assertFalse(self.hotspot_icons())
+        self.assertFalse(self.hotspot_icons(second))
+        self.module.hotspots.idle()
+        self.assertFalse(self.hotspot_icons())
 
     def test_thermal_telemetry_requested_without_open_graph(self):
         self.module.mavlink_packet(camera_information(
