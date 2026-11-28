@@ -287,8 +287,12 @@ on'''
                     time.asctime(time.localtime(m._timestamp)),
                     time.asctime()))
                 self.wploader.expected_count = m.count
-                self.send_wp_requests()
                 self.opaque.set_expected(getattr(m, 'opaque_id', 0))
+                if m.count == 0:
+                    # nothing to request, so no item will complete the download
+                    self.download_complete(m.get_srcSystem())
+                    return
+                self.send_wp_requests()
 
         elif mtype in ['MISSION_CURRENT']:
             self.opaque.set_autopilot_id(getattr(m, self.MISSION_CURRENT_opaque_id_attribute(), 0))
@@ -325,18 +329,22 @@ on'''
                 # print("m.seq=%u expected_count=%u" % (m.seq, self.wploader.expected_count))
                 self.send_wp_requests()
                 return
-            if self.wp_op == 'list':
-                self.show_and_save(m.get_srcSystem())
-                self.loading_waypoints = False
-            elif self.wp_op == "save":
-                self.save_waypoints(self.wp_save_filename)
-            self.wp_op = None
-            self.wp_requested = {}
-            self.wp_received = {}
-            self.opaque.transfer_complete()
+            self.download_complete(m.get_srcSystem())
 
         elif mtype in frozenset(["MISSION_REQUEST", "MISSION_REQUEST_INT"]):
             self.process_waypoint_request(m, self.master)
+
+    def download_complete(self, source_system):
+        '''we hold every item the vehicle told us it has'''
+        if self.wp_op == 'list':
+            self.show_and_save(source_system)
+            self.loading_waypoints = False
+        elif self.wp_op == "save":
+            self.save_waypoints(self.wp_save_filename)
+        self.wp_op = None
+        self.wp_requested = {}
+        self.wp_received = {}
+        self.opaque.transfer_complete()
 
     def idle_task(self):
         '''handle missing waypoints'''
