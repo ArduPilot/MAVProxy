@@ -130,6 +130,12 @@ class MiscModule(mp_module.MPModule):
         # the (sysid, compid) of a "gethome" request awaiting its
         # MAV_CMD_REQUEST_MESSAGE ACK
         self.gethome_pending = None
+        # the (sysid, compid) of a "dfu_boot" request awaiting its
+        # MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN ACK, and when it was sent
+        self.dfu_boot_pending = None
+        self.dfu_boot_sent = 0
+        # the param6 of a "dfu_boot" request waiting for a vehicle
+        self.dfu_boot_waiting = None
 
     def altitude_difference(self, pressure1, pressure2, ground_temp):
         '''calculate barometric altitude'''
@@ -283,8 +289,44 @@ class MiscModule(mp_module.MPModule):
         self.cmd_dosomethingreallynastyto_autopilot(args, 'internal-error', 98)
 
     def cmd_dfu_boot(self, args):
-        '''boot into DFU bootloader without hold'''
-        self.cmd_dosomethingreallynastyto_autopilot(args, 'DFU-boot-without-hold', 99)
+        '''boot into the MCU's ROM (DFU) bootloader'''
+        if len(args) == 0 or args[0] != 'IREALLYMEANIT':
+            print("Usage: dfu_boot IREALLYMEANIT [force]")
+            print("  force: allow it while armed")
+            return
+        param6 = 20190226 if "force" in args[1:] else 0
+        if self.settings.target_system == 0:
+            # until a vehicle is seen its ACK doesn't reach this
+            # module, so there would be no fallback
+            print("Waiting for a vehicle to send the DFU-boot command to")
+            self.dfu_boot_waiting = param6
+            return
+        self.dfu_boot_send(param6)
+
+    def dfu_boot_send(self, param6):
+        '''ask the autopilot to reboot into its ROM bootloader'''
+        print("Sending DFU-boot command")
+        autopilot = (self.settings.target_system, mavutil.mavlink.MAV_COMP_ID_AUTOPILOT1)
+        self.dfu_boot_pending = autopilot
+        self.dfu_boot_sent = time.time()
+        self.master.mav.command_long_send(
+            autopilot[0],
+            autopilot[1],
+            mavutil.mavlink.MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN,
+            0,
+            getattr(mavutil.mavlink, 'REBOOT_SHUTDOWN_ACTION_REBOOT_TO_ROM_BOOTLOADER', 6),
+            0, 0, 0, 0, param6, 0)
+
+    def dfu_boot_fallback(self, autopilot):
+        '''boot into DFU with the param sequence ArduPilot used before
+        REBOOT_SHUTDOWN_ACTION_REBOOT_TO_ROM_BOOTLOADER'''
+        print("Sending DFU-boot-without-hold command")
+        self.master.mav.command_long_send(
+            autopilot[0],
+            autopilot[1],
+            mavutil.mavlink.MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN,
+            0,
+            42, 24, 71, 99, 0, 0, 0)
 
     def cmd_config_error_autopilot(self, args):
         '''Ask the autopilot to jump into its config error loop'''
@@ -777,12 +819,24 @@ Alt: gear <extend|retract> [ID]'''
                 if m.result == mavutil.mavlink.MAV_RESULT_UNSUPPORTED:
                     # the vehicle doesn't know MAV_CMD_REQUEST_MESSAGE
                     self.gethome_fallback()
+            elif (m.command == mavutil.mavlink.MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN and
+                  self.dfu_boot_pending == (m.get_srcSystem(), m.get_srcComponent())):
+                self.dfu_boot_pending = None
+                # a late ACK may answer some other reboot command:
+                recent = time.time() - self.dfu_boot_sent < 5
+                if recent and m.result == mavutil.mavlink.MAV_RESULT_UNSUPPORTED:
+                    # the vehicle doesn't know REBOOT_TO_ROM_BOOTLOADER
+                    self.dfu_boot_fallback((m.get_srcSystem(), m.get_srcComponent()))
 
     def idle_task(self):
         '''called on idle'''
         for r in self.repeats:
             if r.enabled and r.event.trigger():
                 self.mpstate.functions.process_stdin(r.cmd, immediate=True)
+        if self.dfu_boot_waiting is not None and self.settings.target_system != 0:
+            param6 = self.dfu_boot_waiting
+            self.dfu_boot_waiting = None
+            self.dfu_boot_send(param6)
 
 
 def init(mpstate):
