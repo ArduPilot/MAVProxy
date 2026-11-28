@@ -292,6 +292,17 @@ on'''
 
         elif mtype in ['MISSION_CURRENT']:
             self.opaque.set_autopilot_id(getattr(m, self.MISSION_CURRENT_opaque_id_attribute(), 0))
+        elif mtype in ['MISSION_ACK']:
+            # the vehicle accepted our upload (or clear) and returns the
+            # opaque ID of the items it now has, which are ours.  This
+            # arrives before MISSION_CURRENT reports the new ID.
+            if (getattr(m, 'mission_type', 0) == self.mav_mission_type() and
+                    m.type == mavutil.mavlink.MAV_MISSION_ACCEPTED and
+                    m.target_system == self.settings.source_system and
+                    m.target_component == self.settings.source_component):
+                opaque_id = getattr(m, 'opaque_id', 0)
+                self.opaque.set_have_id(opaque_id)
+                self.opaque.set_autopilot_id(opaque_id)
         elif mtype in ['MISSION_ITEM', 'MISSION_ITEM_INT'] and self.wp_op is not None:
             if m.get_type() == 'MISSION_ITEM_INT':
                 if getattr(m, 'mission_type', 0) != self.mav_mission_type():
